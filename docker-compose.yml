@@ -1,0 +1,53 @@
+version: '3'
+
+# Base Docker Compose configuration for ISMD Validator
+#
+# This file uses production images and configuration for local testing.
+# Note: Actual production deployment is handled by Terraform, not Docker Compose.
+#
+# For other environments, use the override files:
+#   - docker-compose.dev.yml - Development environment settings
+#   - docker-compose.test.yml - Test environment settings
+#   - docker-compose.local.yml - Local development with locally built images
+#
+# Usage:
+#   - Local testing with production images: docker compose up
+#   - Development: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   - Local development with local images: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+
+services:
+  ismd-validator-backend:
+    image: ghcr.io/datagov-cz/ismd-validator-backend:latest
+    container_name: ismd-validator-backend
+    environment:
+      - PORT=8080
+      - SPRING_PROFILES_ACTIVE=production
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ismd-network
+
+  ismd-validator-frontend:
+    image: ghcr.io/datagov-cz/ismd-validator-frontend:latest
+    container_name: ismd-validator-frontend
+    environment:
+      - NEXT_PUBLIC_BE_URL=http://ismd-validator-backend:8080
+      - NODE_ENV=production
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - ismd-validator-backend
+    networks:
+      - ismd-network
+
+networks:
+  ismd-network:
+    driver: bridge

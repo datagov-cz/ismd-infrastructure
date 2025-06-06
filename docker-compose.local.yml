@@ -1,0 +1,24 @@
+version: '3'
+
+# Local images override for ISMD Validator
+#
+# This file overrides image names to use locally built images.
+# Use it with the dev environment configuration.
+#
+# Usage:
+#   # First build your local images:
+#   cd /path/to/frontend && docker build -t ismd-validator-frontend-local .
+#   cd /path/to/backend && docker build -t ismd-validator-backend-local .
+#
+#   # Then run with local images in dev environment:
+#   cd /path/to/docker-compose-location
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+#
+# This approach doesn't require setting environment variables.
+
+services:
+  ismd-validator-backend:
+    image: ismd-validator-backend-local
+    
+  ismd-validator-frontend:
+    image: ismd-validator-frontend-local
