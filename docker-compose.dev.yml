@@ -1,0 +1,50 @@
+version: '3'
+
+# Development environment override for ISMD Validator
+#
+# This file contains development-specific settings that override the production configuration.
+#
+# Usage:
+#   # Standard development environment:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#   # With locally built images:(see docker-compose.local.yml for instructions)
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+#
+#   # With custom images via environment variables:
+#   # For Windows PowerShell:
+#   $env:FRONTEND_IMAGE="ghcr.io/your-org/custom-frontend:tag"
+#   $env:BACKEND_IMAGE="ghcr.io/your-org/custom-backend:tag"
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#   # For Windows Command Prompt:
+#   set FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag
+#   set BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#   # For Linux/macOS (using export to make variables available to child processes):
+#   export FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag
+#   export BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#   # For Linux/macOS (alternative inline method):
+#   FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  ismd-validator-backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-backend-dev:latest}
+    environment:
+      - SPRING_PROFILES_ACTIVE=localhost
+    restart: "no"
+    ports:
+      - "8080:8080"
+    logging: {}
+
+  ismd-validator-frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest}
+    environment:
+      - NODE_ENV=development
+    restart: "no"
+    ports:
+      - "3000:3000"
+    logging: {}

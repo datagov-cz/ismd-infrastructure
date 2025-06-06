@@ -1,0 +1,14 @@
+
+# IntelliJ IDEA
+/.idea/
+/*.iml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Local environment files
+.env
+.env.local

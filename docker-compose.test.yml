@@ -1,0 +1,25 @@
+version: '3'
+
+# Test environment override for ISMD Validator
+#
+# This file contains test-specific settings that override the production configuration.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up
+
+services:
+  ismd-validator-backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-backend-test:latest}
+    environment:
+      - SPRING_PROFILES_ACTIVE=stage
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+  ismd-validator-frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-test:latest}
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
