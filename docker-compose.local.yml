@@ -1,20 +1,37 @@
-version: '3'
-
-# Local images override for ISMD Validator
+# ==============================================
+# ISMD Validator - Local Development Override
+# ==============================================
+# This file configures Docker Compose to use locally built images instead of
+# pulling from the container registry. Use this for active development when
+# you need to test local changes.
 #
-# This file overrides image names to use locally built images.
-# Use it with the dev environment configuration.
+# Prerequisites:
+# - Node.js and npm installed for frontend development
+# - Java and Maven for backend development
+# - Docker and docker-compose installed
 #
-# Usage:
-#   # First build your local images:
-#   cd /path/to/frontend && docker build -t ismd-validator-frontend-local .
-#   cd /path/to/backend && docker build -t ismd-validator-backend-local .
+# Quick Start:
+# 1. Build the frontend and backend Docker images:
+#    # From the root of the frontend directory:
+#    docker build -t ismd-validator-frontend-local .
 #
-#   # Then run with local images in dev environment:
-#   cd /path/to/docker-compose-location
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+#    # From the root of the backend directory:
+#    docker build -t ismd-validator-backend-local .
 #
-# This approach doesn't require setting environment variables.
+# 2. Start the application stack with local images:
+#    docker compose -f docker-compose.yml \
+#                  -f docker-compose.dev.yml \
+#                  -f docker-compose.local.yml up
+#
+# Development Workflow:
+# - The frontend runs in development mode with hot-reload enabled
+# - The backend runs with the 'localhost' Spring profile
+# - Frontend is accessible at http://localhost:3000
+# - Backend API is available at http://localhost:8080
+#
+# Note: This configuration is for local development only.
+#       For production, use the Terraform deployment.
+# ==============================================
 
 services:
   ismd-validator-backend:
@@ -22,3 +39,8 @@ services:
     
   ismd-validator-frontend:
     image: ismd-validator-frontend-local
+    environment:
+      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+      - NODE_ENV=development
+    depends_on:
+      - ismd-validator-backend

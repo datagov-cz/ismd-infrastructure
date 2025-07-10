@@ -1,19 +1,54 @@
 version: '3'
 
-# Base Docker Compose configuration for ISMD Validator
+# ==============================================
+# ISMD Validator - Docker Compose Configuration
+# ==============================================
+# This file defines the base configuration for running the ISMD Validator locally.
+# Production deployments use Azure Container Apps managed by Terraform.
 #
-# This file uses production images and configuration for local testing.
-# Note: Actual production deployment is handled by Terraform, not Docker Compose.
+# Environment Files:
+# -----------------
+# - docker-compose.dev.yml    : Development environment overrides
+# - docker-compose.local.yml  : Local development with custom images
 #
-# For other environments, use the override files:
-#   - docker-compose.dev.yml - Development environment settings
-#   - docker-compose.test.yml - Test environment settings
-#   - docker-compose.local.yml - Local development with locally built images
+# Quick Start:
+# -----------
+# 1. Install Prerequisites:
+#    - Docker Desktop (Windows/Mac) or Docker Engine (Linux)
+#    - docker-compose (v2.0.0+)
 #
-# Usage:
-#   - Local testing with production images: docker compose up
-#   - Development: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-#   - Local development with local images: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+# 2. Basic Usage:
+#    # Start with production images (not for development):
+#    docker compose up
+#
+#    # Development environment (recommended for local work):
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#    # Local development with custom built images:
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+#
+# 3. Access Applications:
+#    - Frontend: http://localhost:3000
+#    - Backend API: http://localhost:8080
+#
+# 4. Useful Commands:
+#    # View logs (follow mode):
+#    docker compose logs -f
+#
+#    # Rebuild and restart services:
+#    docker compose up -d --build
+#
+#    # Stop all services:
+#    docker compose down
+#
+# Environment Variables:
+# ---------------------
+# NEXT_PUBLIC_BE_URL: Backend API URL (default: http://localhost:8080)
+# NODE_ENV: Node.js environment (development/production)
+# SPRING_PROFILES_ACTIVE: Spring profile (localhost/development/production)
+#
+# Note: For production deployment, use Terraform configuration instead.
+# ==============================================
 
 services:
   ismd-validator-backend:
@@ -28,14 +63,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    networks:
-      - ismd-network
 
   ismd-validator-frontend:
     image: ghcr.io/datagov-cz/ismd-validator-frontend:latest
     container_name: ismd-validator-frontend
     environment:
-      - NEXT_PUBLIC_BE_URL=http://ismd-validator-backend:8080
+      - NEXT_PUBLIC_BE_URL=http://localhost:8080
       - NODE_ENV=production
     restart: always
     logging:
@@ -45,9 +78,3 @@ services:
         max-file: "3"
     depends_on:
       - ismd-validator-backend
-    networks:
-      - ismd-network
-
-networks:
-  ismd-network:
-    driver: bridge
