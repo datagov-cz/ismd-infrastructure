@@ -1,34 +1,43 @@
 version: '3'
 
-# Development environment override for ISMD Validator
+# ==============================================
+# ISMD Validator - Development Environment
+# ==============================================
+# This file configures the development environment for the ISMD Validator.
+# It overrides the base configuration with development-specific settings.
 #
-# This file contains development-specific settings that override the production configuration.
+# Key Features:
+# - Frontend runs on port 3000 (hot-reload NOT enabled by default)
+# - Backend runs on port 8080 with development profile
+# - Automatic restart on failure is disabled for better debugging
+# - Development logging is enabled
+#
+# Note: For hot-reloading during development, you have two options:
+# 1. Run the frontend directly on your host machine with 'npm run dev'
+# 2. Or modify this configuration to mount your source code as a volume
 #
 # Usage:
-#   # Standard development environment:
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# 1. Start with development configuration:
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
-#   # With locally built images:(see docker-compose.local.yml for instructions)
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up
+# 2. For local development with custom images:
+#    docker compose -f docker-compose.yml \
+#                  -f docker-compose.dev.yml \
+#                  -f docker-compose.local.yml up
 #
-#   # With custom images via environment variables:
-#   # For Windows PowerShell:
-#   $env:FRONTEND_IMAGE="ghcr.io/your-org/custom-frontend:tag"
-#   $env:BACKEND_IMAGE="ghcr.io/your-org/custom-backend:tag"
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Environment Variables (can be set in .env or command line):
+# - FRONTEND_IMAGE: Custom frontend image (default: ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest)
+# - BACKEND_IMAGE: Custom backend image (default: ghcr.io/datagov-cz/ismd-validator-backend-dev:latest)
 #
-#   # For Windows Command Prompt:
-#   set FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag
-#   set BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Access:
+# - Frontend: http://localhost:3000
+# - Backend API: http://localhost:8080
 #
-#   # For Linux/macOS (using export to make variables available to child processes):
-#   export FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag
-#   export BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-#
-#   # For Linux/macOS (alternative inline method):
-#   FRONTEND_IMAGE=ghcr.io/your-org/custom-frontend:tag BACKEND_IMAGE=ghcr.io/your-org/custom-backend:tag docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Development Tips:
+# - Use docker-compose.local.yml for local image development
+# - Check logs with: docker compose logs -f
+# - Rebuild images with: docker compose build
+# ==============================================
 
 services:
   ismd-validator-backend:
@@ -44,7 +53,10 @@ services:
     image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest}
     environment:
       - NODE_ENV=development
+      - NEXT_PUBLIC_BE_URL=http://localhost:8080
     restart: "no"
     ports:
       - "3000:3000"
+    depends_on:
+      - ismd-validator-backend
     logging: {}

@@ -1,23 +1,28 @@
-variable "environment" {
-  description = "Environment name (dev, test, prod)"
-  type        = string
-}
+# Note: All variables are now defined in variables.tf
+# This includes:
+# - environment
+# - resource_group_name
+# - location
+# - backend_address_pools
+# - backend_http_settings
+# - probes
+# - http_listeners
+# - request_routing_rules
+# - url_path_maps
 
-variable "resource_group_name" {
-  description = "Name of the shared resource group"
-  type        = string
-}
-
-variable "location" {
-  description = "Azure region for resources"
-  type        = string
-  default     = "germanywestcentral"
-}
 
 # Create or reference the shared resource group
 resource "azurerm_resource_group" "shared" {
   name     = var.resource_group_name
   location = var.location
+  
+  lifecycle {
+    # Protect from accidental deletion - destroying the shared resource group would:
+    # - Delete shared networking resources (VNet, subnets)
+    # - Break connectivity for ALL environments
+    # - Require complete network infrastructure rebuild
+    prevent_destroy = true
+  }
   
   tags = {
     Environment = var.environment
@@ -25,10 +30,12 @@ resource "azurerm_resource_group" "shared" {
   }
 }
 
+# Application Gateway resources are defined in application_gateway.tf
+
 # Create a virtual network for the environment
 resource "azurerm_virtual_network" "main" {
   name                = "ismd-vnet-${var.environment}"
-  address_space       = ["10.0.0.0/16"]
+  address_space       = ["10.0.0.0/16", "fd00:db8:deca::/48"]
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
   
@@ -39,11 +46,12 @@ resource "azurerm_virtual_network" "main" {
 }
 
 # Create validator subnet with delegation for Container Apps
+# Note: Container Apps require at least /23 subnet size (512 IPs)
 resource "azurerm_subnet" "validator" {
   name                 = "ismd-validator-subnet-${var.environment}"
   resource_group_name  = azurerm_resource_group.shared.name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = ["10.0.0.0/26"]
+  address_prefixes     = ["10.0.2.0/23"]
   
   delegation {
     name = "Microsoft.App.environments"
@@ -54,30 +62,6 @@ resource "azurerm_subnet" "validator" {
   }
 }
 
-# Outputs to be used by other modules
-output "resource_group_id" {
-  value = azurerm_resource_group.shared.id
-}
+# Application Gateway configuration is in application_gateway.tf
 
-output "resource_group_name" {
-  value = azurerm_resource_group.shared.name
-}
-
-output "virtual_network_id" {
-  value = azurerm_virtual_network.main.id
-}
-
-output "virtual_network_name" {
-  value = azurerm_virtual_network.main.name
-}
-
-output "validator_subnet_id" {
-  value = azurerm_subnet.validator.id
-}
-
-output "validator_subnet_name" {
-  value = azurerm_subnet.validator.name
-}
-
-# Outputs for Terraform state storage are removed as these resources
-# will be created manually by an admin
+# Outputs are defined in outputs.tf
