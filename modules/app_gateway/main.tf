@@ -33,11 +33,6 @@ variable "backend_app_name" {
   default     = "ismd-validator-backend"
 }
 
-variable "region" {
-  description = "Azure region code for container app FQDN construction"
-  type        = string
-  default     = "germanywestcentral"
-}
 
 variable "container_app_environment_default_domain" {
   description = "Default domain of the container app environment"
@@ -233,7 +228,7 @@ resource "azurerm_application_gateway" "main" {
     
     path_rule {
       name                       = "validator-rule"
-      paths                      = ["/validator/*"]
+      paths                      = ["/validator/*", "/validator", "/"]
       backend_address_pool_name  = "frontend-pool"
       backend_http_settings_name = "frontend-http-settings"
     }

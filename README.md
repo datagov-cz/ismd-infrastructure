@@ -10,24 +10,21 @@ This repository contains Terraform configurations for managing Azure Container A
 - **Networking**: VNet with properly sized subnets for Container Apps and App Gateway
 - **State Management**: Azure Storage backend for team collaboration
 
-## State Management
+## State Management & Workspaces
 
-This project uses Azure Storage for Terraform state management. The state configuration is defined in `backend.tf` but requires explicit key specification during initialization.
+This project uses a single remote state file (`ismd.tfstate`) stored in Azure Storage to manage the infrastructure for all environments. Environment separation is handled using **Terraform Workspaces**.
 
-### State Files
+### Workspace Configuration
 
-Each environment has its own dedicated state file:
-- Development: `workspace.dev.tfstate`
-- Test: `workspace.test.tfstate`
-- Production: `workspace.prod.tfstate`
+- **Single State File**: All environment states (dev, test, prod) are stored within the `ismd.tfstate` blob in the `tfstate` container.
+- **Backend Configuration**: The `backend.tf` file is configured with a fixed key. There is no need to pass any `-backend-config` during initialization.
+- **Switching Environments**: To work on a specific environment, you must switch to the corresponding workspace.
 
 ### State Storage
 
 - **Resource Group**: `ismd-shared-tfstate`
 - **Storage Account**: `ismdtfstate`
 - **Container**: `tfstate`
-
-> **IMPORTANT**: The state file key is intentionally omitted from `backend.tf` and must be specified during initialization to prevent accidental state conflicts.
 
 ## Directory Structure
 
@@ -126,24 +123,54 @@ The infrastructure supports three environments with different configurations:
 3. **Login to Azure**:
    ```bash
    az login
-   az account set --subscription "your-subscription-id"
    ```
+
+4. **Run Terraform commands using the helper script**:
+   - PowerShell (Windows):
+     ```powershell
+     # Run plan
+     .\tf.ps1 plan
+     
+     # Run apply
+     .\tf.ps1 apply
+     
+     # Specify environment (dev/test/prod)
+     .\tf.ps1 -Environment test plan
+     
+     # Pass additional arguments to terraform
+     .\tf.ps1 apply -auto-approve
+     ```
+   
+   - Bash (Linux/macOS/WSL):
+     ```bash
+     # Make the script executable
+     chmod +x tf.sh
+     
+     # Run plan
+     ./tf.sh plan
+     
+     # Run apply
+     ./tf.sh apply
+     
+     # Specify environment (dev/test/prod)
+     ./tf.sh plan test
+     
+     # Pass additional arguments to terraform
+     ./tf.sh apply -auto-approve
+     ```
+
+   The helper scripts will automatically:
+   - Get your Azure subscription ID
+   - Set up the required environment variables
+   - Initialize Terraform if needed
+   - Run the specified command with the correct context
 
 ### Deployment
 
 1. **Initialize Terraform**:
    ```bash
-   # IMPORTANT: You must specify the state file key for your environment
-   # This ensures the correct state file is used and prevents accidental state conflicts
-   
-   # For development
-   terraform init -backend-config="key=workspace.dev.tfstate"
-   
-   # For test
-   terraform init -backend-config="key=workspace.test.tfstate"
-   
-   # For production
-   terraform init -backend-config="key=workspace.prod.tfstate"
+   # This only needs to be done once.
+   terraform init
    ```
 
 2. **Select workspace** (environment):
@@ -192,36 +219,23 @@ The repository includes automated workflows:
 
 ## Remote State Configuration
 
-Terraform state is stored in Azure Storage for team collaboration. The backend configuration in `backend.tf` intentionally omits the key to prevent accidental state conflicts:
+Terraform state is stored in Azure Storage for team collaboration:
 
 ```hcl
 terraform {
   backend "azurerm" {
-    # IMPORTANT: The state file key is intentionally omitted here
     resource_group_name  = "ismd-shared-tfstate"
     storage_account_name = "ismdtfstate"
     container_name       = "tfstate"
-    # key must be specified via -backend-config during terraform init
+    key                  = "workspace.dev.tfstate"
   }
 }
 ```
 
-**Environment-specific state management**:
-- Each environment requires explicit key specification during initialization
-- Keys follow the pattern `workspace.[environment].tfstate`
-- This approach prevents accidental state conflicts between environments
-
-**Example initialization commands**:
-```bash
-# For development
-terraform init -backend-config="key=workspace.dev.tfstate"
-
-# For test
-terraform init -backend-config="key=workspace.test.tfstate"
-
-# For production
-terraform init -backend-config="key=workspace.prod.tfstate"
-```
+**Workspace-based state management**:
+- Each environment uses the same backend configuration
+- Terraform workspaces isolate state between environments
+- State files are automatically managed per workspace
 
 ## Docker Compose Configuration
 
@@ -277,11 +291,36 @@ Key configuration managed through Terraform:
    - Verify `pick_host_name_from_backend_address = true` in App Gateway
    - Check backend CORS_ALLOWED_ORIGINS includes App Gateway IP
 
+### Useful Commands
+
+```bash
+# Check current workspace
+terraform workspace show
+
+# List all workspaces
+terraform workspace list
+
+# View planned changes without applying
+terraform plan -out=plan.tfplan
+
+# Apply specific plan file
+terraform apply plan.tfplan
+```
+
 ## Additional Resources
 
 - [Azure Container Apps Documentation](https://docs.microsoft.com/en-us/azure/container-apps/)
 - [Azure Application Gateway Documentation](https://docs.microsoft.com/en-us/azure/application-gateway/)
 - [Terraform Azure Provider Documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
+
+## Support
+
+For issues with this infrastructure:
+
+1. Check the troubleshooting section above
+2. Review Azure resource logs in the Log Analytics workspace
+3. Verify Terraform state consistency
+4. Contact the infrastructure team
 
 ## Notes
 
