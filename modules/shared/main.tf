@@ -3,13 +3,6 @@
 # - environment
 # - resource_group_name
 # - location
-# - backend_address_pools
-# - backend_http_settings
-# - probes
-# - http_listeners
-# - request_routing_rules
-# - url_path_maps
-
 
 # Create or reference the shared resource group
 resource "azurerm_resource_group" "shared" {
@@ -29,8 +22,6 @@ resource "azurerm_resource_group" "shared" {
     ManagedBy   = "Terraform"
   }
 }
-
-# Application Gateway resources are defined in application_gateway.tf
 
 # Create a virtual network for the environment
 resource "azurerm_virtual_network" "main" {
@@ -61,7 +52,5 @@ resource "azurerm_subnet" "validator" {
     }
   }
 }
-
-# Application Gateway configuration is in application_gateway.tf
 
 # Outputs are defined in outputs.tf

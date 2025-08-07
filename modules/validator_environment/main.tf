@@ -68,34 +68,28 @@ resource "azurerm_container_app_environment" "validator" {
   location                           = var.location
   resource_group_name                = azurerm_resource_group.validator.name
   log_analytics_workspace_id         = azurerm_log_analytics_workspace.validator.id
-  # infrastructure_subnet_id only needed for dedicated workload profiles (non-dev)
-  # Dev uses Consumption profile which doesn't need infrastructure subnet
-  infrastructure_subnet_id           = var.environment == "dev" ? null : var.subnet_id
-  # infrastructure_resource_group_name only valid with dedicated workload profiles
-  # Dev uses Consumption profile, so this parameter is not needed
-  infrastructure_resource_group_name = var.environment == "dev" ? null : "ME_ismd-validator-environment-${var.environment}_${azurerm_resource_group.validator.name}_${var.location}"
-  # zone_redundancy_enabled only valid when infrastructure_subnet_id is set (dedicated profiles)
-  # Dev uses Consumption profile, so this parameter is not needed
-  zone_redundancy_enabled            = var.environment == "dev" ? null : false
+  # Enable VNet integration for all environments
+  infrastructure_subnet_id           = var.subnet_id
+  infrastructure_resource_group_name = "ME_ismd-validator-environment-${var.environment}_${azurerm_resource_group.validator.name}_${var.location}"
+  internal_load_balancer_enabled     = false  # Disabled since we're using Application Gateway
+  
+  # Enable zone redundancy in production only
+  zone_redundancy_enabled = var.environment == "prod"
   
   lifecycle {
     # Protect from accidental deletion - destroying the environment would:
     # - Stop ALL container apps running in this environment
     # - Lose workload profile configurations
     # - Require complex recreation with networking setup
-    prevent_destroy = true
+    # prevent_destroy = true
   }
   
-  # Container App Environment workload profile configuration
-  # Dev uses Consumption profile for maximum cost savings (scale to zero)
-  # Production uses dedicated D4 profile for consistent performance
-  dynamic "workload_profile" {
-    for_each = var.environment == "dev" ? [] : [1]
-    content {
-      name                  = "ismd-wl-${var.environment}"
-      workload_profile_type = "D4"
-      maximum_count         = 3
-    }
+  # Standard workload profile for all environments
+  workload_profile {
+    name                  = "default"
+    workload_profile_type = "D4"
+    minimum_count         = 1
+    maximum_count         = 3
   }
   
   tags = {

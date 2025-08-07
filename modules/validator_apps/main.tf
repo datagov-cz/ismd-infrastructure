@@ -58,13 +58,15 @@ variable "container_app_environment_default_domain" {
 
 # Backend container app
 resource "azurerm_container_app" "backend" {
-  name                         = "ismd-validator-backend-${var.environment}"
+  name                         = "${var.backend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
-  # Dev uses Consumption profile (no workload_profile_name needed)
-  # Production uses dedicated D4 workload profile
-  workload_profile_name        = var.environment == "dev" ? null : "ismd-wl-${var.environment}"
+  
+  # Set workload profile name based on environment
+  # For Consumption profile, set to null
+  # For Dedicated profile, use the provided workload profile name
+  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
   
   identity {
     type = "SystemAssigned"
@@ -141,13 +143,15 @@ resource "azurerm_container_app" "backend" {
 
 # Frontend container app
 resource "azurerm_container_app" "frontend" {
-  name                         = "ismd-validator-frontend-${var.environment}"
+  name                         = "${var.frontend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
-  # Dev uses Consumption profile (no workload_profile_name needed)
-  # Production uses dedicated D4 workload profile
-  workload_profile_name        = var.environment == "dev" ? null : "ismd-wl-${var.environment}"
+  
+  # Set workload profile name based on environment
+  # For Consumption profile, set to null
+  # For Dedicated profile, use the provided workload profile name
+  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
 
   template {
     min_replicas = 1
@@ -190,19 +194,29 @@ resource "azurerm_container_app" "frontend" {
 }
 
 # Outputs
+output "frontend_name" {
+  description = "The name of the frontend container app"
+  value       = azurerm_container_app.frontend.name
+}
+
+output "backend_name" {
+  description = "The name of the backend container app"
+  value       = azurerm_container_app.backend.name
+}
+
 output "frontend_fqdn" {
   description = "The FQDN of the frontend container app"
-  value       = "ismd-validator-frontend-${var.environment}.${var.container_app_environment_default_domain}"
+  value       = azurerm_container_app.frontend.latest_revision_fqdn
 }
 
 output "backend_fqdn" {
   description = "The FQDN of the backend container app"
-  value       = "ismd-validator-backend-${var.environment}.${var.container_app_environment_default_domain}"
+  value       = azurerm_container_app.backend.latest_revision_fqdn
 }
 
 output "frontend_url" {
   description = "The URL of the frontend container app"
-  value       = "https://ismd-validator-frontend-${var.environment}.${var.container_app_environment_default_domain}"
+  value       = "https://${azurerm_container_app.frontend.latest_revision_fqdn}"
 }
 
 output "backend_url" {
