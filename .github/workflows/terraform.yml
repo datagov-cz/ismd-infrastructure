@@ -4,9 +4,9 @@ on:
   # Triggered from other repositories
   repository_dispatch:
     types:
-      - deploy-dev
-      - deploy-test
-      - deploy-prod
+      - new-image-dev
+      - new-image-test
+      - new-image-prod
 
 jobs:
   terraform:
