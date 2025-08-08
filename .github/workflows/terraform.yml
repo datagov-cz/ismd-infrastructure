@@ -1,0 +1,91 @@
+name: 'Terraform Deployment'
+
+on:
+  # Triggered from other repositories
+  repository_dispatch:
+    types:
+      - new-image-DEV
+      - new-image-TEST
+      - new-image-PROD
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    environment: |
+      ${{ 
+        github.event.action == 'new-image-PROD' && 'PROD' 
+        || github.event.action == 'new-image-TEST' && 'TEST' 
+        || 'DEV' 
+      }}
+    
+    defaults:
+      run:
+        working-directory: .
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: '~1.0'
+    
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: Select Environment
+      id: select-env
+      run: |
+        # Extract environment from the event type (new-image-DEV, new-image-TEST, new-image-PROD)
+        EVENT_TYPE="${{ github.event.action }}"
+        ENV="${EVENT_TYPE#new-image-}" 
+        ENV="$(echo $ENV | tr '[:upper:]' '[:lower:]')"
+        echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
+        echo "STATE_KEY=$ENV/terraform.tfstate" >> $GITHUB_ENV
+        
+        # Extract image versions from payload if provided
+        if [ ! -z "${{ github.event.client_payload.frontend_image }}" ]; then
+          echo "FRONTEND_IMAGE=${{ github.event.client_payload.frontend_image }}" >> $GITHUB_ENV
+        fi
+        
+        if [ ! -z "${{ github.event.client_payload.backend_image }}" ]; then
+          echo "BACKEND_IMAGE=${{ github.event.client_payload.backend_image }}" >> $GITHUB_ENV
+        fi
+    
+    - name: Terraform Init
+      run: |
+        terraform init \
+          -backend-config="key=${{ env.STATE_KEY }}"
+    
+    - name: Terraform Format
+      run: terraform fmt -check
+      continue-on-error: true
+    
+    - name: Terraform Plan
+      run: |
+        # Base command with environment-specific var file
+        PLAN_CMD="terraform plan -var-file=\"environments/${{ env.ENVIRONMENT }}/terraform.tfvars\""
+        
+        # Add image version variables if provided
+        if [ ! -z "${{ env.FRONTEND_IMAGE }}" ]; then
+          PLAN_CMD="$PLAN_CMD -var=\"frontend_image=${{ env.FRONTEND_IMAGE }}\""
+        fi
+        
+        if [ ! -z "${{ env.BACKEND_IMAGE }}" ]; then
+          PLAN_CMD="$PLAN_CMD -var=\"backend_image=${{ env.BACKEND_IMAGE }}\""
+        fi
+        
+        # Add output file and execute
+        PLAN_CMD="$PLAN_CMD -out=tfplan"
+        eval $PLAN_CMD
+      continue-on-error: true
+    
+    - name: Terraform Apply
+      run: |
+        terraform apply -auto-approve tfplan
