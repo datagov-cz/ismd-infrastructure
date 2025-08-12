@@ -1,0 +1,13 @@
+# Example configuration for dev environment
+# Copy this file to terraform.tfvars and update with your values
+
+environment = "dev"
+location = "germanywestcentral"
+shared_resource_group_name = "ismd-shared-dev"
+validator_resource_group_name = "ismd-validator-dev"
+
+# Container images
+frontend_image = "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
+frontend_image_tag = "0.1.0-c255c74"
+backend_image = "ghcr.io/datagov-cz/ismd-validator-backend-dev"
+backend_image_tag = "0.0.1-snapshot-deff379"

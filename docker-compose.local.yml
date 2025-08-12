@@ -1,0 +1,46 @@
+# ==============================================
+# ISMD Validator - Local Development Override
+# ==============================================
+# This file configures Docker Compose to use locally built images instead of
+# pulling from the container registry. Use this for active development when
+# you need to test local changes.
+#
+# Prerequisites:
+# - Node.js and npm installed for frontend development
+# - Java and Maven for backend development
+# - Docker and docker-compose installed
+#
+# Quick Start:
+# 1. Build the frontend and backend Docker images:
+#    # From the root of the frontend directory:
+#    docker build -t ismd-validator-frontend-local .
+#
+#    # From the root of the backend directory:
+#    docker build -t ismd-validator-backend-local .
+#
+# 2. Start the application stack with local images:
+#    docker compose -f docker-compose.yml \
+#                  -f docker-compose.dev.yml \
+#                  -f docker-compose.local.yml up
+#
+# Development Workflow:
+# - The frontend runs in development mode with hot-reload enabled
+# - The backend runs with the 'localhost' Spring profile
+# - Frontend is accessible at http://localhost:3000
+# - Backend API is available at http://localhost:8080
+#
+# Note: This configuration is for local development only.
+#       For production, use the Terraform deployment.
+# ==============================================
+
+services:
+  ismd-validator-backend:
+    image: ismd-validator-backend-local
+    
+  ismd-validator-frontend:
+    image: ismd-validator-frontend-local
+    environment:
+      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+      - NODE_ENV=development
+    depends_on:
+      - ismd-validator-backend

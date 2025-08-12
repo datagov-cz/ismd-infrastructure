@@ -1,0 +1,62 @@
+version: '3'
+
+# ==============================================
+# ISMD Validator - Development Environment
+# ==============================================
+# This file configures the development environment for the ISMD Validator.
+# It overrides the base configuration with development-specific settings.
+#
+# Key Features:
+# - Frontend runs on port 3000 (hot-reload NOT enabled by default)
+# - Backend runs on port 8080 with development profile
+# - Automatic restart on failure is disabled for better debugging
+# - Development logging is enabled
+#
+# Note: For hot-reloading during development, you have two options:
+# 1. Run the frontend directly on your host machine with 'npm run dev'
+# 2. Or modify this configuration to mount your source code as a volume
+#
+# Usage:
+# 1. Start with development configuration:
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# 2. For local development with custom images:
+#    docker compose -f docker-compose.yml \
+#                  -f docker-compose.dev.yml \
+#                  -f docker-compose.local.yml up
+#
+# Environment Variables (can be set in .env or command line):
+# - FRONTEND_IMAGE: Custom frontend image (default: ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest)
+# - BACKEND_IMAGE: Custom backend image (default: ghcr.io/datagov-cz/ismd-validator-backend-dev:latest)
+#
+# Access:
+# - Frontend: http://localhost:3000
+# - Backend API: http://localhost:8080
+#
+# Development Tips:
+# - Use docker-compose.local.yml for local image development
+# - Check logs with: docker compose logs -f
+# - Rebuild images with: docker compose build
+# ==============================================
+
+services:
+  ismd-validator-backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-backend-dev:latest}
+    environment:
+      - SPRING_PROFILES_ACTIVE=localhost
+    restart: "no"
+    ports:
+      - "8080:8080"
+    logging: {}
+
+  ismd-validator-frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest}
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+    restart: "no"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - ismd-validator-backend
+    logging: {}
