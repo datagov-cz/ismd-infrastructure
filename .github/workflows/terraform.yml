@@ -63,27 +63,55 @@ jobs:
           -backend-config="key=${{ env.STATE_KEY }}"
     
     - name: Terraform Format
-      run: terraform fmt -check
+      run: terraform fmt -recursive
       continue-on-error: true
+    
+    - name: Create Variable File
+      run: |
+        # Create directory if it doesn't exist
+        mkdir -p environments/${{ env.ENVIRONMENT }}
+        
+        # Set default location
+        LOCATION="germanywestcentral"
+        
+        # Set resource group names based on environment
+        SHARED_RG="ismd-shared-${{ env.ENVIRONMENT }}"
+        VALIDATOR_RG="ismd-validator-${{ env.ENVIRONMENT }}"
+        
+        # Set image repositories based on environment
+        FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-${{ env.ENVIRONMENT }}"
+        BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-${{ env.ENVIRONMENT }}"
+        
+        # Get image tags from environment or use defaults
+        FE_TAG="${{ env.FRONTEND_IMAGE || 'latest' }}"
+        BE_TAG="${{ env.BACKEND_IMAGE || 'latest' }}"
+        
+        # Create dynamic tfvars file
+        cat > environments/${{ env.ENVIRONMENT }}/terraform.tfvars << EOF
+        environment = "${{ env.ENVIRONMENT }}"
+        location = "$LOCATION"
+        shared_resource_group_name = "$SHARED_RG"
+        validator_resource_group_name = "$VALIDATOR_RG"
+        
+        # Container images
+        frontend_image = "$FE_REPO"
+        frontend_image_tag = "$FE_TAG"
+        backend_image = "$BE_REPO"
+        backend_image_tag = "$BE_TAG"
+        EOF
+        
+        # Show created file for debugging
+        echo "Created variable file:"
+        cat environments/${{ env.ENVIRONMENT }}/terraform.tfvars
     
     - name: Terraform Plan
       run: |
-        # Base command with environment-specific var file
-        PLAN_CMD="terraform plan -var-file=\"environments/${{ env.ENVIRONMENT }}/terraform.tfvars\""
+        # Run plan with the dynamically created variable file
+        terraform plan -var-file="environments/${{ env.ENVIRONMENT }}/terraform.tfvars" -out=tfplan
         
-        # Add image version variables if provided
-        if [ ! -z "${{ env.FRONTEND_IMAGE }}" ]; then
-          PLAN_CMD="$PLAN_CMD -var=\"frontend_image=${{ env.FRONTEND_IMAGE }}\""
-        fi
-        
-        if [ ! -z "${{ env.BACKEND_IMAGE }}" ]; then
-          PLAN_CMD="$PLAN_CMD -var=\"backend_image=${{ env.BACKEND_IMAGE }}\""
-        fi
-        
-        # Add output file and execute
-        PLAN_CMD="$PLAN_CMD -out=tfplan"
-        eval $PLAN_CMD
-      continue-on-error: true
+        # Display the plan for review
+        echo "\n\nTerraform Plan Output:\n"
+        terraform show -no-color tfplan || echo "Plan creation failed"
     
     - name: Terraform Apply
       run: |
