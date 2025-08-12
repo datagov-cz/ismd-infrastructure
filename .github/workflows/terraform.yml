@@ -4,9 +4,9 @@ on:
   # Triggered from other repositories
   repository_dispatch:
     types:
-      - new-image-DEV
-      - new-image-TEST
-      - new-image-PROD
+      - new-image-dev
+      - new-image-test
+      - new-image-prod
 
 jobs:
   terraform:
@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: |
       ${{ 
-        github.event.action == 'new-image-PROD' && 'PROD' 
-        || github.event.action == 'new-image-TEST' && 'TEST' 
-        || 'DEV' 
+        github.event.action == 'new-image-prod' && 'prod' 
+        || github.event.action == 'new-image-test' && 'test' 
+        || 'dev' 
       }}
     
     defaults:
@@ -25,7 +25,7 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -42,20 +42,21 @@ jobs:
     - name: Select Environment
       id: select-env
       run: |
-        # Extract environment from the event type (new-image-DEV, new-image-TEST, new-image-PROD)
+        # Extract environment from the event type (new-image-dev, new-image-test, new-image-prod)
         EVENT_TYPE="${{ github.event.action }}"
-        ENV="${EVENT_TYPE#new-image-}" 
-        ENV="$(echo $ENV | tr '[:upper:]' '[:lower:]')"
+        ENV="${EVENT_TYPE#new-image-}"
         echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
         echo "STATE_KEY=$ENV/terraform.tfstate" >> $GITHUB_ENV
         
         # Extract image versions from payload if provided
-        if [ ! -z "${{ github.event.client_payload.frontend_image }}" ]; then
-          echo "FRONTEND_IMAGE=${{ github.event.client_payload.frontend_image }}" >> $GITHUB_ENV
+        if [ "${{ github.event.client_payload.component }}" == "frontend" ] && [ ! -z "${{ github.event.client_payload.image_tag }}" ]; then
+          echo "FRONTEND_IMAGE=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
+          echo "Processing frontend image: ${{ github.event.client_payload.image_tag }}"
         fi
         
-        if [ ! -z "${{ github.event.client_payload.backend_image }}" ]; then
-          echo "BACKEND_IMAGE=${{ github.event.client_payload.backend_image }}" >> $GITHUB_ENV
+        if [ "${{ github.event.client_payload.component }}" == "backend" ] && [ ! -z "${{ github.event.client_payload.image_tag }}" ]; then
+          echo "BACKEND_IMAGE=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
+          echo "Processing backend image: ${{ github.event.client_payload.image_tag }}"
         fi
     
     - name: Terraform Init
