@@ -12,12 +12,7 @@ jobs:
   terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
-    environment: |
-      ${{ 
-        github.event.action == 'new-image-prod' && 'prod' 
-        || github.event.action == 'new-image-test' && 'test' 
-        || 'dev' 
-      }}
+    environment: ${{ github.event.action == 'new-image-prod' && 'PROD' || github.event.action == 'new-image-test' && 'TEST' || 'DEV' }}
     
     defaults:
       run:
@@ -36,6 +31,18 @@ jobs:
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Export ARM credentials for Terraform
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      run: |
+        echo "ARM_CLIENT_ID=$ARM_CLIENT_ID" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$ARM_CLIENT_SECRET" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$ARM_TENANT_ID" >> $GITHUB_ENV
     
     - name: Select Environment
       id: select-env
@@ -59,12 +66,16 @@ jobs:
     
     - name: Terraform Init
       run: |
-        terraform init \
-          -backend-config="key=${{ env.STATE_KEY }}"
+        # Use backend config from backend.tf; do not override key
+        terraform init
     
     - name: Terraform Format
       run: terraform fmt -recursive
       continue-on-error: true
+    
+    - name: Terraform Workspace
+      run: |
+        terraform workspace select ${{ env.ENVIRONMENT }} || terraform workspace new ${{ env.ENVIRONMENT }}
     
     - name: Create Variable File
       run: |
@@ -82,9 +93,11 @@ jobs:
         FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-${{ env.ENVIRONMENT }}"
         BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-${{ env.ENVIRONMENT }}"
         
-        # Get image tags from environment or use defaults
-        FE_TAG="${{ env.FRONTEND_IMAGE || 'latest' }}"
-        BE_TAG="${{ env.BACKEND_IMAGE || 'latest' }}"
+        # Get image tags from environment or use defaults (GitHub expressions don't support JS '||')
+        FE_TAG="${{ env.FRONTEND_IMAGE }}"
+        if [ -z "$FE_TAG" ]; then FE_TAG="latest"; fi
+        BE_TAG="${{ env.BACKEND_IMAGE }}"
+        if [ -z "$BE_TAG" ]; then BE_TAG="latest"; fi
         
         # Create dynamic tfvars file
         cat > environments/${{ env.ENVIRONMENT }}/terraform.tfvars << EOF
