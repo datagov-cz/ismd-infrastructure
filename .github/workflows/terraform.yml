@@ -7,17 +7,35 @@ on:
       - new-image-dev
       - new-image-test
       - new-image-prod
+  # Manual trigger for testing without PRs
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+        default: dev
+      component:
+        description: "Component to deploy"
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+      image_tag:
+        description: "Image version tag in the format MAJOR.MINOR.PATCH with optional suffix. Examples: 0.1.0-c255c74, 0.0.1-snapshot-deff379 (prefix 'v' also allowed)."
+        required: true
+        type: string
 
 jobs:
   terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
-    environment: |
-      ${{ 
-        github.event.action == 'new-image-prod' && 'prod' 
-        || github.event.action == 'new-image-test' && 'test' 
-        || 'dev' 
-      }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event.action == 'new-image-prod' && 'PROD' || github.event.action == 'new-image-test' && 'TEST' || 'DEV') }}
     
     defaults:
       run:
@@ -36,35 +54,52 @@ jobs:
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Export ARM credentials for Terraform
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      run: |
+        echo "ARM_CLIENT_ID=$ARM_CLIENT_ID" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$ARM_CLIENT_SECRET" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$ARM_TENANT_ID" >> $GITHUB_ENV
     
     - name: Select Environment
       id: select-env
       run: |
-        # Extract environment from the event type (new-image-dev, new-image-test, new-image-prod)
-        EVENT_TYPE="${{ github.event.action }}"
-        ENV="${EVENT_TYPE#new-image-}"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # Manual dispatch path
+          ENV="${{ github.event.inputs.environment }}"
+        else
+          # repository_dispatch: extract env from action (new-image-<env>)
+          EVENT_TYPE="${{ github.event.action }}"
+          ENV="${EVENT_TYPE#new-image-}"
+        fi
         echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
         echo "STATE_KEY=$ENV/terraform.tfstate" >> $GITHUB_ENV
-        
-        # Extract image versions from payload if provided
-        if [ "${{ github.event.client_payload.component }}" == "frontend" ] && [ ! -z "${{ github.event.client_payload.image_tag }}" ]; then
-          echo "FRONTEND_IMAGE=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
-          echo "Processing frontend image: ${{ github.event.client_payload.image_tag }}"
-        fi
-        
-        if [ "${{ github.event.client_payload.component }}" == "backend" ] && [ ! -z "${{ github.event.client_payload.image_tag }}" ]; then
-          echo "BACKEND_IMAGE=${{ github.event.client_payload.image_tag }}" >> $GITHUB_ENV
-          echo "Processing backend image: ${{ github.event.client_payload.image_tag }}"
-        fi
     
     - name: Terraform Init
-      run: |
-        terraform init \
-          -backend-config="key=${{ env.STATE_KEY }}"
+      run: terraform init
     
     - name: Terraform Format
       run: terraform fmt -recursive
       continue-on-error: true
+    
+    - name: Terraform Workspace
+      run: terraform workspace select ${{ env.ENVIRONMENT }} || terraform workspace new ${{ env.ENVIRONMENT }}
+    
+    - name: Resolve Container Apps Environment Domain
+      run: |
+        ENV="${{ env.ENVIRONMENT }}"
+        CAE_NAME="ismd-validator-environment-$ENV"
+        CAE_RG="ismd-validator-$ENV"
+        DOMAIN=$(az containerapp env show -g "$CAE_RG" -n "$CAE_NAME" --query properties.defaultDomain -o tsv 2>/dev/null || true)
+        if [ -n "$DOMAIN" ]; then
+          echo "CONTAINER_ENV_DOMAIN=$DOMAIN" >> $GITHUB_ENV
+        fi
     
     - name: Create Variable File
       run: |
@@ -82,9 +117,56 @@ jobs:
         FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-${{ env.ENVIRONMENT }}"
         BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-${{ env.ENVIRONMENT }}"
         
-        # Get image tags from environment or use defaults
-        FE_TAG="${{ env.FRONTEND_IMAGE || 'latest' }}"
-        BE_TAG="${{ env.BACKEND_IMAGE || 'latest' }}"
+        # Determine which component changed and enforce required version format for it.
+        COMPONENT="${{ github.event.client_payload.component }}"
+        if [ -z "$COMPONENT" ]; then COMPONENT="${{ github.event.inputs.component }}"; fi
+        NEW_TAG="${{ github.event.client_payload.image_tag }}"
+        if [ -z "$NEW_TAG" ]; then NEW_TAG="${{ github.event.inputs.image_tag }}"; fi
+        ENVIRONMENT="${{ env.ENVIRONMENT }}"
+        VALIDATOR_RG="ismd-validator-${{ env.ENVIRONMENT }}"
+        
+        SEMVER_RE='^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9-]+)?$'
+        
+        if [ -z "$COMPONENT" ] || [ -z "$NEW_TAG" ]; then
+          echo "Error: repository_dispatch must include component and image_tag." >&2
+          exit 1
+        fi
+        if ! echo "$NEW_TAG" | grep -Eq "$SEMVER_RE"; then
+          echo "Error: image_tag '$NEW_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.1.0-c255c74 or 0.0.1-snapshot-deff379)." >&2
+          exit 1
+        fi
+        
+        # Fetch current tags from Azure for the component that did NOT change to preserve it
+        if [ "$COMPONENT" = "frontend" ]; then
+          FE_TAG="$NEW_TAG"
+          BE_IMAGE=$(az containerapp show -g "$VALIDATOR_RG" -n "ismd-validator-backend-$ENVIRONMENT" --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          BE_TAG=$(echo "$BE_IMAGE" | awk -F: '{print $2}')
+          if [ -z "$BE_TAG" ]; then
+            echo "Error: Could not determine existing backend image tag. Ensure backend app exists or provide a backend tag in a separate event first." >&2
+            exit 1
+          fi
+        elif [ "$COMPONENT" = "backend" ]; then
+          BE_TAG="$NEW_TAG"
+          FE_IMAGE=$(az containerapp show -g "$VALIDATOR_RG" -n "ismd-validator-frontend-$ENVIRONMENT" --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
+          FE_TAG=$(echo "$FE_IMAGE" | awk -F: '{print $2}')
+          if [ -z "$FE_TAG" ]; then
+            echo "Error: Could not determine existing frontend image tag. Ensure frontend app exists or provide a frontend tag in a separate event first." >&2
+            exit 1
+          fi
+        else
+          echo "Error: Unsupported component '$COMPONENT' (expected 'frontend' or 'backend')." >&2
+          exit 1
+        fi
+        
+        # Final validation of both tags
+        if ! echo "$FE_TAG" | grep -Eq "$SEMVER_RE"; then
+          echo "Error: resolved frontend tag '$FE_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.1.0-c255c74)." >&2
+          exit 1
+        fi
+        if ! echo "$BE_TAG" | grep -Eq "$SEMVER_RE"; then
+          echo "Error: resolved backend tag '$BE_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.0.1-snapshot-deff379)." >&2
+          exit 1
+        fi
         
         # Create dynamic tfvars file
         cat > environments/${{ env.ENVIRONMENT }}/terraform.tfvars << EOF
@@ -99,6 +181,11 @@ jobs:
         backend_image = "$BE_REPO"
         backend_image_tag = "$BE_TAG"
         EOF
+        
+        # Append container app environment domain if we resolved it
+        if [ -n "${CONTAINER_ENV_DOMAIN:-}" ]; then
+          echo "container_app_environment_domain = \"${CONTAINER_ENV_DOMAIN}\"" >> environments/${{ env.ENVIRONMENT }}/terraform.tfvars
+        fi
         
         # Show created file for debugging
         echo "Created variable file:"
