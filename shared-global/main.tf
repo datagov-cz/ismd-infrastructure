@@ -19,8 +19,8 @@ module "shared_global" {
 
   # Construct FQDNs from provided domain to avoid circular dep
   # Treat these as DEV defaults when environment == dev
-  frontend_fqdn = var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain}" : ""
-  backend_fqdn  = var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.backend_app_name}-dev.${var.container_app_environment_domain}" : ""
+  frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain}" : "")
+  backend_fqdn  = var.backend_fqdn  != "" ? var.backend_fqdn  : (var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.backend_app_name}-dev.${var.container_app_environment_domain}"  : "")
 
   # For TEST/PROD, prefer explicit overrides; else construct when this workflow is called with that environment and domain is provided
   frontend_fqdn_test = var.frontend_fqdn_test != "" ? var.frontend_fqdn_test : (var.environment == "test" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-test.${var.container_app_environment_domain}" : "")
