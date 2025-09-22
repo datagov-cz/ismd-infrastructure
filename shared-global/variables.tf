@@ -26,6 +26,19 @@ variable "container_app_environment_domain" {
   type        = string
 }
 
+# Optional explicit DEV FQDNs (used to preserve DEV pools when applying other environments)
+variable "frontend_fqdn" {
+  description = "Frontend FQDN for DEV"
+  type        = string
+  default     = ""
+}
+
+variable "backend_fqdn" {
+  description = "Backend FQDN for DEV"
+  type        = string
+  default     = ""
+}
+
 variable "dev_hostname" {
   description = "Hostname for DEV (ASCII/punycode)"
   type        = string

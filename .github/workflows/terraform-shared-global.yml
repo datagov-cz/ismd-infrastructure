@@ -163,6 +163,22 @@ jobs:
           echo "FE_FQDN_PROD=$FE_FQDN_PROD" >> $GITHUB_ENV
           echo "BE_FQDN_PROD=$BE_FQDN_PROD" >> $GITHUB_ENV
 
+      - name: Resolve existing Container App FQDNs (all envs)
+        run: |
+          for ENV in dev test prod; do
+            RG="ismd-validator-$ENV"
+            FE="ismd-validator-frontend-$ENV"
+            BE="ismd-validator-backend-$ENV"
+            FE_FQDN=$(az containerapp show -g "$RG" -n "$FE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
+            BE_FQDN=$(az containerapp show -g "$RG" -n "$BE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
+            if [ -n "$FE_FQDN" ]; then
+              echo "FE_FQDN_${ENV^^}=$FE_FQDN" >> $GITHUB_ENV
+            fi
+            if [ -n "$BE_FQDN" ]; then
+              echo "BE_FQDN_${ENV^^}=$BE_FQDN" >> $GITHUB_ENV
+            fi
+          done
+
       - name: Terraform Init
         run: terraform init
 
@@ -181,6 +197,13 @@ jobs:
           frontend_app_name = "${FE_APP}"
           backend_app_name  = "${BE_APP}"
           EOF
+          # Preserve existing DEV FQDNs when available (prevents clearing DEV pools)
+          if [ -n "${FE_FQDN_DEV:-}" ]; then
+            echo "frontend_fqdn = \"${FE_FQDN_DEV}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${BE_FQDN_DEV:-}" ]; then
+            echo "backend_fqdn  = \"${BE_FQDN_DEV}\"" >> .tfvars/terraform.tfvars
+          fi
           if [ -n "${DOMAIN_INPUT}" ]; then
             echo "container_app_environment_domain = \"${DOMAIN_INPUT}\"" >> .tfvars/terraform.tfvars
           fi
