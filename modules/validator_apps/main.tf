@@ -83,11 +83,14 @@ resource "azurerm_container_app" "backend" {
     }
     allow_insecure_connections = true
     
-    # Restrict ingress to Application Gateway public IP
-    ip_security_restriction {
-      name             = "AllowAppGateway"
-      ip_address_range = "${var.app_gateway_public_ip}/32"
-      action           = "Allow"
+    # Restrict ingress to Application Gateway public IP (only when known)
+    dynamic "ip_security_restriction" {
+      for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
+      content {
+        name             = "AllowAppGateway"
+        ip_address_range = "${ip_security_restriction.value}/32"
+        action           = "Allow"
+      }
     }
   }
   
@@ -101,7 +104,7 @@ resource "azurerm_container_app" "backend" {
       
       env {
         name  = "CORS_ALLOWED_ORIGINS"
-        value = "http://${var.app_gateway_public_ip}"
+        value = var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip}" : ""
       }
       env {
         name  = "PORT"
@@ -138,6 +141,8 @@ resource "azurerm_container_app" "backend" {
     Environment = var.environment
     Application = "Validator"
     ManagedBy   = "Terraform"
+    Location    = var.location
+    SharedRG    = var.shared_resource_group_name
   }
 }
 
@@ -162,7 +167,7 @@ resource "azurerm_container_app" "frontend" {
       memory = "1Gi"
       env {
         name  = "NEXT_PUBLIC_BE_URL"
-        value = "http://${var.app_gateway_public_ip}/validator"
+        value = var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip}/validator" : ""
       }
     }
   }
@@ -178,11 +183,14 @@ resource "azurerm_container_app" "frontend" {
     
     allow_insecure_connections = true
     
-    # Restrict ingress to Application Gateway public IP
-    ip_security_restriction {
-      name             = "AllowAppGateway"
-      ip_address_range = "${var.app_gateway_public_ip}/32"
-      action           = "Allow"
+    # Restrict ingress to Application Gateway public IP (only when known)
+    dynamic "ip_security_restriction" {
+      for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
+      content {
+        name             = "AllowAppGateway"
+        ip_address_range = "${ip_security_restriction.value}/32"
+        action           = "Allow"
+      }
     }
   }
   
@@ -190,6 +198,8 @@ resource "azurerm_container_app" "frontend" {
     Environment = var.environment
     Application = "Validator"
     ManagedBy   = "Terraform"
+    Location    = var.location
+    SharedRG    = var.shared_resource_group_name
   }
 }
 

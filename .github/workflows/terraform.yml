@@ -32,10 +32,25 @@ on:
         type: string
 
 jobs:
+  shared_global_pre:
+    name: 'Shared-Global Pre'
+    uses: datagov-cz/ismd-infrastructure/.github/workflows/terraform-shared-global.yml@dev
+    secrets: inherit
+    with:
+      environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'prod' || github.event.inputs.environment == 'test' && 'test' || 'dev') || (github.event.action == 'new-image-prod' && 'prod' || github.event.action == 'new-image-test' && 'test' || 'dev') }}
+      dev_hostname: ${{ vars.DEV_HOSTNAME }}
+      test_hostname: ${{ vars.TEST_HOSTNAME }}
+      prod_hostname: ${{ vars.PROD_HOSTNAME }}
+      # Pass 1: omit domain so pools can be empty if env not created yet
+      apply: true
+
   terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
+    needs: [shared_global_pre]
     environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event.action == 'new-image-prod' && 'PROD' || github.event.action == 'new-image-test' && 'TEST' || 'DEV') }}
+    outputs:
+      job_status: ${{ job.status }}
     
     defaults:
       run:
@@ -80,6 +95,26 @@ jobs:
         fi
         echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
         echo "STATE_KEY=$ENV/terraform.tfstate" >> $GITHUB_ENV
+    
+    - name: Check shared-global state exists
+      run: |
+        # Verify the shared-global remote state blob exists; if not, fail early with guidance
+        RG="ismd-shared-tfstate"
+        SA="ismdtfstate"
+        CN="tfstate"
+        BLOB="ismd-shared-global.tfstate"
+        echo "Checking for shared-global state: $RG/$SA/$CN/$BLOB"
+        EXISTS=$(az storage blob exists \
+          --auth-mode login \
+          --account-name "$SA" \
+          --container-name "$CN" \
+          --name "$BLOB" \
+          --query exists -o tsv 2>/dev/null || echo false)
+        if [ "$EXISTS" != "true" ]; then
+          echo "Shared-global state not found. Please run the 'Shared Global (App Gateway)' workflow first to provision the Application Gateway and global networking." >&2
+          echo "Expected blob: https://$SA.blob.core.windows.net/$CN/$BLOB" >&2
+          exit 1
+        fi
     
     - name: Terraform Init
       run: terraform init
@@ -203,3 +238,94 @@ jobs:
     - name: Terraform Apply
       run: |
         terraform apply -auto-approve tfplan
+
+  get_domain:
+    name: 'Resolve Container App Environment Domain'
+    runs-on: ubuntu-latest
+    needs: [terraform]
+    outputs:
+      domain: ${{ steps.out.outputs.domain }}
+      env_lower: ${{ steps.out.outputs.env_lower }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Resolve domain
+        id: out
+        run: |
+          # Determine environment (lowercase) from event
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV_LOWER="${{ github.event.inputs.environment }}"
+          else
+            case "${{ github.event.action }}" in
+              new-image-prod) ENV_LOWER="prod" ;;
+              new-image-test) ENV_LOWER="test" ;;
+              *) ENV_LOWER="dev" ;;
+            esac
+          fi
+          CAE_NAME="ismd-validator-environment-$ENV_LOWER"
+          CAE_RG="ismd-validator-$ENV_LOWER"
+          DOMAIN=$(az containerapp env show -g "$CAE_RG" -n "$CAE_NAME" --query properties.defaultDomain -o tsv 2>/dev/null || true)
+          echo "env_lower=$ENV_LOWER" >> $GITHUB_OUTPUT
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+
+  shared_global_post:
+    name: 'Shared-Global Post'
+    if: needs.get_domain.outputs.domain != ''
+    uses: datagov-cz/ismd-infrastructure/.github/workflows/terraform-shared-global.yml@dev
+    secrets: inherit
+    needs: [get_domain]
+    with:
+      environment: ${{ needs.get_domain.outputs.env_lower }}
+      dev_hostname: ${{ vars.DEV_HOSTNAME }}
+      test_hostname: ${{ vars.TEST_HOSTNAME }}
+      prod_hostname: ${{ vars.PROD_HOSTNAME }}
+      container_app_environment_domain: ${{ needs.get_domain.outputs.domain }}
+      apply: true
+
+  report-status:
+    name: Report Deployment Status
+    runs-on: ubuntu-latest
+    needs: [terraform]
+    if: always()
+    steps:
+      - name: Set deployment state (success)
+        if: ${{ needs.terraform.outputs.job_status == 'success' }}
+        run: echo "STATE=success" >> $GITHUB_ENV
+
+      - name: Set deployment state (failure)
+        if: ${{ needs.terraform.outputs.job_status != 'success' }}
+        run: echo "STATE=failure" >> $GITHUB_ENV
+
+      - name: Compose status and context
+        id: ctx
+        run: |
+          echo "state=${STATE}" >> $GITHUB_OUTPUT
+          echo "run_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+          # Extract environment from event (repository_dispatch or workflow_dispatch)
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            EVENT_TYPE="${{ github.event.action }}" # e.g., new-image-dev
+            ENV="${EVENT_TYPE#new-image-}"
+          else
+            ENV="${{ github.event.inputs.environment }}"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+      
+      - name: Notify source repository
+        uses: peter-evans/repository-dispatch@v3
+        continue-on-error: true
+        with:
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          repository: ${{ github.event.client_payload.source_repo }}
+          event-type: infra-deploy-complete
+          client-payload: |
+            {
+              "deployment_id": "${{ github.event.client_payload.source_deployment_id }}",
+              "state": "${{ steps.ctx.outputs.state }}",
+              "environment": "${{ steps.ctx.outputs.environment }}",
+              "infra_run_url": "${{ steps.ctx.outputs.run_url }}",
+              "component": "${{ github.event.client_payload.component }}",
+              "image_tag": "${{ github.event.client_payload.image_tag }}",
+              "infra_repo": "${{ github.repository }}"
+            }
