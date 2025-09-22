@@ -16,3 +16,4 @@
 # Local environment files
 .env*
 .env.local
+/load_env_vars.ps1

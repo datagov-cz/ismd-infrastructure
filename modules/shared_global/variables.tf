@@ -14,30 +14,6 @@ variable "domain_name_label" {
   default     = "ismd-appgw-ipv6"
 }
 
-variable "container_app_environment_name" {
-  description = "The name of the Container Apps Environment"
-  type        = string
-  default     = ""
-}
-
-variable "container_app_environment_id" {
-  description = "The ID of the Container Apps Environment to depend on (optional)"
-  type        = string
-  default     = ""
-}
-
-variable "frontend_app_name" {
-  description = "Base name of the frontend container app (without environment suffix)"
-  type        = string
-  default     = "ismd-validator-frontend"
-}
-
-variable "backend_app_name" {
-  description = "Base name of the backend container app (without environment suffix)"
-  type        = string
-  default     = "ismd-validator-backend"
-}
-
 variable "frontend_fqdn" {
   description = "FQDN of the frontend container app (if already known)"
   type        = string
@@ -46,6 +22,50 @@ variable "frontend_fqdn" {
 
 variable "backend_fqdn" {
   description = "FQDN of the backend container app (if already known)"
+  type        = string
+  default     = ""
+}
+
+# Optional hostnames for host-based routing (use punycode for IDNs)
+variable "dev_hostname" {
+  description = "Hostname for DEV (e.g., ismd.oha03.dia.gov.cz)"
+  type        = string
+  default     = ""
+}
+
+variable "test_hostname" {
+  description = "Hostname for TEST (e.g., ismd.slovník-test.dia.gov.cz) — use punycode"
+  type        = string
+  default     = ""
+}
+
+variable "prod_hostname" {
+  description = "Hostname for PROD (e.g., ismd.slovník.gov.cz) — use punycode"
+  type        = string
+  default     = ""
+}
+
+# Optional FQDNs for other environments (if known)
+variable "frontend_fqdn_test" {
+  description = "FQDN of the frontend container app in TEST"
+  type        = string
+  default     = ""
+}
+
+variable "backend_fqdn_test" {
+  description = "FQDN of the backend container app in TEST"
+  type        = string
+  default     = ""
+}
+
+variable "frontend_fqdn_prod" {
+  description = "FQDN of the frontend container app in PROD"
+  type        = string
+  default     = ""
+}
+
+variable "backend_fqdn_prod" {
+  description = "FQDN of the backend container app in PROD"
   type        = string
   default     = ""
 }

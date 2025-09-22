@@ -1,0 +1,239 @@
+name: 'Shared Global (App Gateway)'
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Environment (dev/test/prod)
+        required: true
+        type: string
+      container_app_environment_domain:
+        description: Optional CA Environment default domain
+        required: false
+        type: string
+      dev_hostname:
+        required: false
+        type: string
+      test_hostname:
+        required: false
+        type: string
+      prod_hostname:
+        required: false
+        type: string
+      frontend_fqdn_test:
+        required: false
+        type: string
+      backend_fqdn_test:
+        required: false
+        type: string
+      frontend_fqdn_prod:
+        required: false
+        type: string
+      backend_fqdn_prod:
+        required: false
+        type: string
+      apply:
+        description: Whether to apply changes
+        required: false
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to configure in the gateway (dev/test/prod)"
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+        default: dev
+      container_app_environment_domain:
+        description: "Optional Container Apps environment default domain (e.g. xyz.region.azurecontainerapps.io). If omitted, backend pools will be created empty."
+        required: false
+        type: string
+      dev_hostname:
+        description: "DEV hostname (ASCII/punycode). Example: ismd.oha03.dia.gov.cz"
+        required: false
+        type: string
+      test_hostname:
+        description: "TEST hostname (ASCII/punycode). Example: ismd.xn--slovnk-7va-test.dia.gov.cz"
+        required: false
+        type: string
+      prod_hostname:
+        description: "PROD hostname (ASCII/punycode). Example: ismd.xn--slovnk-7va.gov.cz"
+        required: false
+        type: string
+      frontend_fqdn_test:
+        description: "Optional explicit TEST frontend FQDN (container app)."
+        required: false
+        type: string
+      backend_fqdn_test:
+        description: "Optional explicit TEST backend FQDN (container app)."
+        required: false
+        type: string
+      frontend_fqdn_prod:
+        description: "Optional explicit PROD frontend FQDN (container app)."
+        required: false
+        type: string
+      backend_fqdn_prod:
+        description: "Optional explicit PROD backend FQDN (container app)."
+        required: false
+        type: string
+  repository_dispatch:
+    types:
+      - update-shared-global
+
+jobs:
+  terraform:
+    name: 'Terraform (Shared Global)'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event_name == 'repository_dispatch' && (github.event.client_payload.environment == 'prod' && 'PROD' || github.event.client_payload.environment == 'test' && 'TEST' || 'DEV')) }}
+    defaults:
+      run:
+        working-directory: shared-global
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.11.3'
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Export ARM credentials for Terraform
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        run: |
+          echo "ARM_CLIENT_ID=$ARM_CLIENT_ID" >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$ARM_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=$ARM_TENANT_ID" >> $GITHUB_ENV
+
+      - name: Resolve inputs
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+            DOMAIN_INPUT="${{ github.event.inputs.container_app_environment_domain }}"
+            DEV_HOST="${{ github.event.inputs.dev_hostname }}"
+            TEST_HOST="${{ github.event.inputs.test_hostname }}"
+            PROD_HOST="${{ github.event.inputs.prod_hostname }}"
+            FE_FQDN_TEST="${{ github.event.inputs.frontend_fqdn_test }}"
+            BE_FQDN_TEST="${{ github.event.inputs.backend_fqdn_test }}"
+            FE_FQDN_PROD="${{ github.event.inputs.frontend_fqdn_prod }}"
+            BE_FQDN_PROD="${{ github.event.inputs.backend_fqdn_prod }}"
+          elif [ "${{ github.event_name }}" = "workflow_call" ]; then
+            ENV="${{ inputs.environment }}"
+            DOMAIN_INPUT="${{ inputs.container_app_environment_domain }}"
+            DEV_HOST="${{ inputs.dev_hostname }}"
+            TEST_HOST="${{ inputs.test_hostname }}"
+            PROD_HOST="${{ inputs.prod_hostname }}"
+            FE_FQDN_TEST="${{ inputs.frontend_fqdn_test }}"
+            BE_FQDN_TEST="${{ inputs.backend_fqdn_test }}"
+            FE_FQDN_PROD="${{ inputs.frontend_fqdn_prod }}"
+            BE_FQDN_PROD="${{ inputs.backend_fqdn_prod }}"
+          else
+            ENV="${{ github.event.client_payload.environment }}"
+            DOMAIN_INPUT="${{ github.event.client_payload.container_app_environment_domain }}"
+            DEV_HOST="${{ github.event.client_payload.dev_hostname }}"
+            TEST_HOST="${{ github.event.client_payload.test_hostname }}"
+            PROD_HOST="${{ github.event.client_payload.prod_hostname }}"
+            FE_FQDN_TEST="${{ github.event.client_payload.frontend_fqdn_test }}"
+            BE_FQDN_TEST="${{ github.event.client_payload.backend_fqdn_test }}"
+            FE_FQDN_PROD="${{ github.event.client_payload.frontend_fqdn_prod }}"
+            BE_FQDN_PROD="${{ github.event.client_payload.backend_fqdn_prod }}"
+          fi
+          echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
+          echo "DOMAIN_INPUT=$DOMAIN_INPUT" >> $GITHUB_ENV
+          echo "DEV_HOST=$DEV_HOST" >> $GITHUB_ENV
+          echo "TEST_HOST=$TEST_HOST" >> $GITHUB_ENV
+          echo "PROD_HOST=$PROD_HOST" >> $GITHUB_ENV
+          echo "FE_FQDN_TEST=$FE_FQDN_TEST" >> $GITHUB_ENV
+          echo "BE_FQDN_TEST=$BE_FQDN_TEST" >> $GITHUB_ENV
+          echo "FE_FQDN_PROD=$FE_FQDN_PROD" >> $GITHUB_ENV
+          echo "BE_FQDN_PROD=$BE_FQDN_PROD" >> $GITHUB_ENV
+
+      - name: Resolve existing Container App FQDNs (all envs)
+        run: |
+          for ENV in dev test prod; do
+            RG="ismd-validator-$ENV"
+            FE="ismd-validator-frontend-$ENV"
+            BE="ismd-validator-backend-$ENV"
+            FE_FQDN=$(az containerapp show -g "$RG" -n "$FE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
+            BE_FQDN=$(az containerapp show -g "$RG" -n "$BE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
+            if [ -n "$FE_FQDN" ]; then
+              echo "FE_FQDN_${ENV^^}=$FE_FQDN" >> $GITHUB_ENV
+            fi
+            if [ -n "$BE_FQDN" ]; then
+              echo "BE_FQDN_${ENV^^}=$BE_FQDN" >> $GITHUB_ENV
+            fi
+          done
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Create Variable File
+        run: |
+          ENV="${{ env.ENVIRONMENT }}"
+          LOCATION="germanywestcentral"
+          FE_APP="ismd-validator-frontend"
+          BE_APP="ismd-validator-backend"
+          DOMAIN_INPUT="${{ env.DOMAIN_INPUT }}"
+
+          mkdir -p .tfvars
+          cat > .tfvars/terraform.tfvars << EOF
+          environment = "${ENV}"
+          location    = "${LOCATION}"
+          frontend_app_name = "${FE_APP}"
+          backend_app_name  = "${BE_APP}"
+          EOF
+          # Preserve existing DEV FQDNs when available (prevents clearing DEV pools)
+          if [ -n "${FE_FQDN_DEV:-}" ]; then
+            echo "frontend_fqdn = \"${FE_FQDN_DEV}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${BE_FQDN_DEV:-}" ]; then
+            echo "backend_fqdn  = \"${BE_FQDN_DEV}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${DOMAIN_INPUT}" ]; then
+            echo "container_app_environment_domain = \"${DOMAIN_INPUT}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${DEV_HOST}" ]; then
+            echo "dev_hostname = \"${DEV_HOST}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${TEST_HOST}" ]; then
+            echo "test_hostname = \"${TEST_HOST}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${PROD_HOST}" ]; then
+            echo "prod_hostname = \"${PROD_HOST}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${FE_FQDN_TEST}" ]; then
+            echo "frontend_fqdn_test = \"${FE_FQDN_TEST}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${BE_FQDN_TEST}" ]; then
+            echo "backend_fqdn_test = \"${BE_FQDN_TEST}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${FE_FQDN_PROD}" ]; then
+            echo "frontend_fqdn_prod = \"${FE_FQDN_PROD}\"" >> .tfvars/terraform.tfvars
+          fi
+          if [ -n "${BE_FQDN_PROD}" ]; then
+            echo "backend_fqdn_prod = \"${BE_FQDN_PROD}\"" >> .tfvars/terraform.tfvars
+          fi
+          echo "--- tfvars ---"
+          cat .tfvars/terraform.tfvars
+
+      - name: Terraform Plan
+        run: terraform plan -var-file=".tfvars/terraform.tfvars" -out=tfplan
+
+      - name: Terraform Apply
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_call' && inputs.apply == true) }}
+        run: terraform apply -auto-approve tfplan
