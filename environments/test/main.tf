@@ -108,11 +108,6 @@ variable "container_app_environment_id" {
   default     = ""
 }
 
-variable "container_app_environment_name" {
-  description = "Name of the container app environment"
-  type        = string
-  default     = ""
-}
 
 variable "container_app_environment_default_domain" {
   description = "Default domain of the container app environment"
@@ -210,6 +205,7 @@ output "container_app_environment_name" {
 
 # VNet Peering from this environment's VNet to the shared global VNet
 resource "azurerm_virtual_network_peering" "env_to_shared" {
+  count                       = var.shared_global_vnet_id != "" ? 1 : 0
   name                         = "peer-${var.environment}-to-global"
   resource_group_name          = var.shared_resource_group_name
   virtual_network_name         = module.shared.virtual_network_name
@@ -222,6 +218,7 @@ resource "azurerm_virtual_network_peering" "env_to_shared" {
 
 # VNet Peering from the shared global VNet back to this environment's VNet
 resource "azurerm_virtual_network_peering" "shared_to_env" {
+  count                       = var.shared_global_vnet_name != "" ? 1 : 0
   name                         = "peer-global-to-${var.environment}"
   resource_group_name          = var.shared_global_resource_group_name
   virtual_network_name         = var.shared_global_vnet_name
