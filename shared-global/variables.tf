@@ -24,6 +24,7 @@ variable "backend_app_name" {
 variable "container_app_environment_domain" {
   description = "Default domain of the Container Apps environment for constructing FQDNs"
   type        = string
+  default     = ""
 }
 
 # Optional explicit DEV FQDNs (used to preserve DEV pools when applying other environments)
