@@ -89,6 +89,9 @@ jobs:
     name: 'Terraform (Shared Global)'
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event_name == 'repository_dispatch' && (github.event.client_payload.environment == 'prod' && 'PROD' || github.event.client_payload.environment == 'test' && 'TEST' || 'DEV')) }}
+    concurrency:
+      group: shared-global-${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || (github.event_name == 'repository_dispatch' && github.event.client_payload.environment) || inputs.environment || 'dev' }}
+      cancel-in-progress: false
     defaults:
       run:
         working-directory: shared-global
@@ -243,8 +246,8 @@ jobs:
           cat .tfvars/terraform.tfvars
 
       - name: Terraform Plan
-        run: terraform plan -var-file=".tfvars/terraform.tfvars" -out=tfplan
+        run: terraform plan -lock-timeout=10m -var-file=".tfvars/terraform.tfvars" -out=tfplan
 
       - name: Terraform Apply
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_call' && inputs.apply == true) }}
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -lock-timeout=10m -auto-approve tfplan

@@ -104,12 +104,23 @@ jobs:
         CN="tfstate"
         BLOB="ismd-shared-global.tfstate"
         echo "Checking for shared-global state: $RG/$SA/$CN/$BLOB"
+        # First try data-plane with login; if RBAC is missing, fall back to account key
         EXISTS=$(az storage blob exists \
           --auth-mode login \
           --account-name "$SA" \
           --container-name "$CN" \
           --name "$BLOB" \
-          --query exists -o tsv 2>/dev/null || echo false)
+          --query exists -o tsv 2>/dev/null || echo __ERROR__)
+        if [ "$EXISTS" = "__ERROR__" ]; then
+          echo "Data-plane check failed (likely missing Storage Blob Data Reader). Falling back to account key..."
+          KEY=$(az storage account keys list -g "$RG" -n "$SA" --query "[0].value" -o tsv)
+          EXISTS=$(az storage blob exists \
+            --account-name "$SA" \
+            --account-key "$KEY" \
+            --container-name "$CN" \
+            --name "$BLOB" \
+            --query exists -o tsv 2>/dev/null || echo false)
+        fi
         if [ "$EXISTS" != "true" ]; then
           echo "Shared-global state not found. Please run the 'Shared Global (App Gateway)' workflow first to provision the Application Gateway and global networking." >&2
           echo "Expected blob: https://$SA.blob.core.windows.net/$CN/$BLOB" >&2
@@ -313,7 +324,7 @@ jobs:
           echo "environment=$ENV" >> $GITHUB_OUTPUT
       
       - name: Notify source repository
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         continue-on-error: true
         with:
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
