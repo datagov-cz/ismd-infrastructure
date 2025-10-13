@@ -44,6 +44,7 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-backend-dev:latest}
     environment:
       - SPRING_PROFILES_ACTIVE=localhost
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
     restart: "no"
     ports:
       - "8080:8080"

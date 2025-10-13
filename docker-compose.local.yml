@@ -12,11 +12,13 @@
 #
 # Quick Start:
 # 1. Build the frontend and backend Docker images:
-#    # From the root of the frontend directory:
-#    docker build -t ismd-validator-frontend-local .
+#    # Backend (run from backend parent directory):
+#    cd c:\Work\DIA\backend
+#    docker build -f ismd-backend-validator/Dockerfile -t ismd-validator-backend-local --target validator-runtime .
 #
-#    # From the root of the backend directory:
-#    docker build -t ismd-validator-backend-local .
+#    # Frontend (run from frontend directory):
+#    cd c:\Work\DIA\frontend
+#    docker build -t ismd-validator-frontend-local .
 #
 # 2. Start the application stack with local images:
 #    docker compose -f docker-compose.yml \
@@ -36,6 +38,8 @@
 services:
   ismd-validator-backend:
     image: ismd-validator-backend-local
+    environment:
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
     
   ismd-validator-frontend:
     image: ismd-validator-frontend-local
