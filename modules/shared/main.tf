@@ -15,8 +15,7 @@ resource "azurerm_resource_group" "shared" {
     # - Delete shared networking resources (VNet, subnets)
     # - Break connectivity for ALL environments
     # - Require complete network infrastructure rebuild
-    # Temporarily disabled for test environment rebuild
-    # prevent_destroy = true
+    prevent_destroy = true
   }
   
   tags = {

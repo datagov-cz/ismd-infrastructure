@@ -32,8 +32,7 @@ resource "azurerm_resource_group" "validator" {
     # - Delete ALL resources inside it (container apps, environment, logs)
     # - Cause complete service outage
     # - Require full infrastructure rebuild
-    # Temporarily disabled for test environment rebuild
-    # prevent_destroy = true
+    prevent_destroy = true
   }
   
   tags = {
@@ -55,8 +54,7 @@ resource "azurerm_log_analytics_workspace" "validator" {
     # - Lose ALL historical logs and metrics
     # - Break monitoring and alerting
     # - Lose audit trail and troubleshooting data
-    # Temporarily disabled for test environment rebuild
-    # prevent_destroy = true
+    prevent_destroy = true
   }
   
   tags = {
@@ -85,7 +83,7 @@ resource "azurerm_container_app_environment" "validator" {
     # - Stop ALL container apps running in this environment
     # - Lose workload profile configurations
     # - Require complex recreation with networking setup
-    # prevent_destroy = true
+    prevent_destroy = true
   }
   
   # Standard workload profile for all environments

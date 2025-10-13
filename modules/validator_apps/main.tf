@@ -173,8 +173,8 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name  = "NEXT_PUBLIC_BE_HOSTNAME"
-        # Use hostname if provided (test/prod), fallback to IP (dev), fallback to empty
+        name  = "NEXT_PUBLIC_BE_URL"
+        # Just the hostname (no protocol) - frontend will add protocol dynamically
         value = var.app_gateway_hostname != "" ? var.app_gateway_hostname : var.app_gateway_public_ip
       }
     }
