@@ -27,11 +27,13 @@ resource "azurerm_resource_group" "validator" {
   location = var.location
   
   lifecycle {
-    # Protect from accidental deletion - destroying the resource group would:
+    # Prevent accidental deletion of the entire resource group
+    # Deleting this would:
     # - Delete ALL resources inside it (container apps, environment, logs)
     # - Cause complete service outage
     # - Require full infrastructure rebuild
-    prevent_destroy = true
+    # Temporarily disabled for test environment rebuild
+    # prevent_destroy = true
   }
   
   tags = {
@@ -48,11 +50,13 @@ resource "azurerm_log_analytics_workspace" "validator" {
   resource_group_name = azurerm_resource_group.validator.name
   
   lifecycle {
-    # Protect from accidental deletion - destroying the workspace would:
+    # Prevent accidental deletion of logs
+    # Deleting this would:
     # - Lose ALL historical logs and metrics
     # - Break monitoring and alerting
     # - Lose audit trail and troubleshooting data
-    prevent_destroy = true
+    # Temporarily disabled for test environment rebuild
+    # prevent_destroy = true
   }
   
   tags = {

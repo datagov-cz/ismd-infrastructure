@@ -31,6 +31,12 @@ variable "app_gateway_public_ip" {
   type        = string
 }
 
+variable "app_gateway_hostname" {
+  description = "Hostname for the environment (e.g., ismd.oha03.dia.gov.cz for dev)"
+  type        = string
+  default     = ""
+}
+
 variable "frontend_image" {
   description = "Base container image URL for the frontend (without tag)"
   type        = string
@@ -104,7 +110,8 @@ resource "azurerm_container_app" "backend" {
       
       env {
         name  = "CORS_ALLOWED_ORIGINS"
-        value = var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip}" : ""
+        # Support both HTTP and HTTPS for dual-protocol access (comma-separated)
+        value = var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname}" : (var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : "")
       }
       env {
         name  = "PORT"
@@ -166,8 +173,9 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name  = "NEXT_PUBLIC_BE_URL"
-        value = var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip}/validator" : ""
+        name  = "NEXT_PUBLIC_BE_HOSTNAME"
+        # Use hostname if provided (test/prod), fallback to IP (dev), fallback to empty
+        value = var.app_gateway_hostname != "" ? var.app_gateway_hostname : var.app_gateway_public_ip
       }
     }
   }
@@ -216,20 +224,31 @@ output "backend_name" {
 
 output "frontend_fqdn" {
   description = "The FQDN of the frontend container app"
-  value       = azurerm_container_app.frontend.latest_revision_fqdn
+  value       = azurerm_container_app.frontend.ingress[0].fqdn
 }
 
 output "backend_fqdn" {
   description = "The FQDN of the backend container app"
-  value       = azurerm_container_app.backend.latest_revision_fqdn
+  value       = azurerm_container_app.backend.ingress[0].fqdn
 }
 
 output "frontend_url" {
   description = "The URL of the frontend container app"
-  value       = "https://${azurerm_container_app.frontend.latest_revision_fqdn}"
+  value       = "https://${azurerm_container_app.frontend.ingress[0].fqdn}"
 }
 
 output "backend_url" {
   description = "The URL of the backend container app"
-  value       = "https://ismd-validator-backend-${var.environment}.${var.container_app_environment_default_domain}"
+  value       = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
+}
+
+# Optional: expose revision-specific FQDNs for troubleshooting
+output "frontend_revision_fqdn" {
+  description = "The FQDN of the latest frontend revision"
+  value       = azurerm_container_app.frontend.latest_revision_fqdn
+}
+
+output "backend_revision_fqdn" {
+  description = "The FQDN of the latest backend revision"
+  value       = azurerm_container_app.backend.latest_revision_fqdn
 }
