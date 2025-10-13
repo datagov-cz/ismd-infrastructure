@@ -44,7 +44,7 @@ services:
   ismd-validator-frontend:
     image: ismd-validator-frontend-local
     environment:
-      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+      - NEXT_PUBLIC_BE_URL=localhost:8080
       - NODE_ENV=development
     depends_on:
       - ismd-validator-backend

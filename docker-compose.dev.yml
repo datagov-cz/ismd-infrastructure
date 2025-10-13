@@ -54,7 +54,7 @@ services:
     image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest}
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+      - NEXT_PUBLIC_BE_URL=localhost:8080
     restart: "no"
     ports:
       - "3000:3000"

@@ -43,7 +43,7 @@ version: '3'
 #
 # Environment Variables:
 # ---------------------
-# NEXT_PUBLIC_BE_URL: Backend API URL (use Docker service name for container-to-container)
+# NEXT_PUBLIC_BE_URL: Backend hostname with port (protocol added dynamically by frontend)
 # NODE_ENV: Node.js environment (development/production)
 # SPRING_PROFILES_ACTIVE: Spring profile (localhost/development/production)
 #
@@ -71,7 +71,7 @@ services:
     image: ghcr.io/datagov-cz/ismd-validator-frontend:latest
     container_name: ismd-validator-frontend
     environment:
-      - NEXT_PUBLIC_BE_URL=http://localhost:8080
+      - NEXT_PUBLIC_BE_URL=localhost:8080
       - NODE_ENV=production
     ports:
       - "3000:3000"

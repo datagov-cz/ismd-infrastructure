@@ -110,8 +110,15 @@ resource "azurerm_container_app" "backend" {
       
       env {
         name  = "CORS_ALLOWED_ORIGINS"
-        # Support both HTTP and HTTPS for dual-protocol access (comma-separated)
-        value = var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname}" : (var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : "")
+        # Support both HTTP and HTTPS for dual-protocol access
+        # Include both domain and IP for environments where both are used (e.g., DEV)
+        value = var.app_gateway_hostname != "" && var.app_gateway_public_ip != "" ? 
+                "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname},http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" :
+                var.app_gateway_hostname != "" ? 
+                "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname}" :
+                var.app_gateway_public_ip != "" ?
+                "http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" :
+                ""
       }
       env {
         name  = "PORT"
@@ -174,7 +181,8 @@ resource "azurerm_container_app" "frontend" {
       memory = "1Gi"
       env {
         name  = "NEXT_PUBLIC_BE_URL"
-        # Just the hostname (no protocol) - frontend will add protocol dynamically
+        # Hostname only (no protocol) - frontend axios interceptor adds protocol dynamically
+        # based on whether user accesses site via HTTP or HTTPS
         value = var.app_gateway_hostname != "" ? var.app_gateway_hostname : var.app_gateway_public_ip
       }
     }

@@ -95,7 +95,7 @@ variable "app_gateway_public_ip_address" {
 variable "app_gateway_hostname" {
   description = "Hostname for the dev environment (e.g., ismd.oha03.dia.gov.cz)"
   type        = string
-  default     = ""
+  default     = "ismd.oha03.dia.gov.cz"
 }
 
 variable "frontend_app_name" {
