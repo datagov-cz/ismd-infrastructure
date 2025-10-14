@@ -22,25 +22,7 @@ variable "backend_app_name" {
 }
 
 variable "container_app_environment_domain" {
-  description = "DEPRECATED: Use container_app_environment_domain_dev/test/prod instead"
-  type        = string
-  default     = ""
-}
-
-variable "container_app_environment_domain_dev" {
-  description = "Default domain of the DEV Container Apps environment (e.g., yellowforest-xyz.germanywestcentral.azurecontainerapps.io)"
-  type        = string
-  default     = ""
-}
-
-variable "container_app_environment_domain_test" {
-  description = "Default domain of the TEST Container Apps environment (e.g., greenocean-xyz.germanywestcentral.azurecontainerapps.io)"
-  type        = string
-  default     = ""
-}
-
-variable "container_app_environment_domain_prod" {
-  description = "Default domain of the PROD Container Apps environment (e.g., bluemountain-xyz.germanywestcentral.azurecontainerapps.io)"
+  description = "Default domain of the Container Apps environment for constructing FQDNs"
   type        = string
   default     = ""
 }
