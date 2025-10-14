@@ -11,22 +11,37 @@ provider "azurerm" {
   features {}
 }
 
-# Shared Global (App Gateway + Global VNet), parameterized by environment
+# Shared Global (App Gateway + Global VNet) - Manages all environments in one deployment
 module "shared_global" {
   source      = "../modules/shared_global"
   location    = var.location
-  environment = var.environment
+  environment = var.environment  # Used for tagging only
 
-  # Construct FQDNs from provided domain to avoid circular dep
-  # Treat these as DEV defaults when environment == dev
-  frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain}" : "")
-  backend_fqdn  = var.backend_fqdn  != "" ? var.backend_fqdn  : (var.environment == "dev" && var.container_app_environment_domain != "" ? "${var.backend_app_name}-dev.${var.container_app_environment_domain}"  : "")
+  # Construct FQDNs from environment-specific domains (backward compatible with old variable)
+  frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (
+    var.container_app_environment_domain_dev != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}" :
+    (var.container_app_environment_domain != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain}" : "")
+  )
+  backend_fqdn = var.backend_fqdn != "" ? var.backend_fqdn : (
+    var.container_app_environment_domain_dev != "" ? "${var.backend_app_name}-dev.${var.container_app_environment_domain_dev}" :
+    (var.container_app_environment_domain != "" ? "${var.backend_app_name}-dev.${var.container_app_environment_domain}" : "")
+  )
 
-  # For TEST/PROD, prefer explicit overrides; else construct when this workflow is called with that environment and domain is provided
-  frontend_fqdn_test = var.frontend_fqdn_test != "" ? var.frontend_fqdn_test : (var.environment == "test" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-test.${var.container_app_environment_domain}" : "")
-  backend_fqdn_test  = var.backend_fqdn_test  != "" ? var.backend_fqdn_test  : (var.environment == "test" && var.container_app_environment_domain != "" ? "${var.backend_app_name}-test.${var.container_app_environment_domain}"  : "")
-  frontend_fqdn_prod = var.frontend_fqdn_prod != "" ? var.frontend_fqdn_prod : (var.environment == "prod" && var.container_app_environment_domain != "" ? "${var.frontend_app_name}-prod.${var.container_app_environment_domain}" : "")
-  backend_fqdn_prod  = var.backend_fqdn_prod  != "" ? var.backend_fqdn_prod  : (var.environment == "prod" && var.container_app_environment_domain != "" ? "${var.backend_app_name}-prod.${var.container_app_environment_domain}"  : "")
+  # TEST FQDNs
+  frontend_fqdn_test = var.frontend_fqdn_test != "" ? var.frontend_fqdn_test : (
+    var.container_app_environment_domain_test != "" ? "${var.frontend_app_name}-test.${var.container_app_environment_domain_test}" : ""
+  )
+  backend_fqdn_test = var.backend_fqdn_test != "" ? var.backend_fqdn_test : (
+    var.container_app_environment_domain_test != "" ? "${var.backend_app_name}-test.${var.container_app_environment_domain_test}" : ""
+  )
+
+  # PROD FQDNs
+  frontend_fqdn_prod = var.frontend_fqdn_prod != "" ? var.frontend_fqdn_prod : (
+    var.container_app_environment_domain_prod != "" ? "${var.frontend_app_name}-prod.${var.container_app_environment_domain_prod}" : ""
+  )
+  backend_fqdn_prod = var.backend_fqdn_prod != "" ? var.backend_fqdn_prod : (
+    var.container_app_environment_domain_prod != "" ? "${var.backend_app_name}-prod.${var.container_app_environment_domain_prod}" : ""
+  )
 
   # Hostname-based routing inputs (must be ASCII/punycode)
   dev_hostname  = var.dev_hostname
