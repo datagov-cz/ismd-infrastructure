@@ -90,12 +90,6 @@ variable "app_gateway_public_ip_address" {
   type        = string
 }
 
-variable "app_gateway_hostname" {
-  description = "Hostname for the production environment (e.g., ismd.xn--slovnk-7va.gov.cz)"
-  type        = string
-  default     = "ismd.xn--slovnk-7va.gov.cz"
-}
-
 variable "frontend_app_name" {
   description = "Name of the frontend application"
   type        = string
@@ -127,12 +121,9 @@ module "shared" {
   # count  = var.create_environment ? 1 : 0
   source = "../../modules/shared"
   
-  environment                      = var.environment
-  location                         = var.location
-  resource_group_name              = var.shared_resource_group_name
-  vnet_address_space               = "10.3.0.0/16"        # PROD: 10.3.x.x
-  vnet_address_space_ipv6          = "fd00:db8:decd::/48" # PROD: unique IPv6
-  validator_subnet_address_prefix  = "10.3.2.0/23"        # PROD: within 10.3.0.0/16
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = var.shared_resource_group_name
 }
 
 # Create the container app environment if requested
@@ -170,7 +161,6 @@ module "validator_apps" {
   
   # IP Restrictions
   app_gateway_public_ip = var.app_gateway_public_ip_address
-  app_gateway_hostname  = var.app_gateway_hostname
   
   # App names
   frontend_app_name = var.frontend_app_name
