@@ -38,11 +38,13 @@
 services:
   ismd-validator-backend:
     image: ismd-validator-backend-local
+    pull_policy: never
     environment:
       - CORS_ALLOWED_ORIGINS=http://localhost:3000
     
   ismd-validator-frontend:
     image: ismd-validator-frontend-local
+    pull_policy: never
     environment:
       - NEXT_PUBLIC_BE_URL=localhost:8080
       - NODE_ENV=development
