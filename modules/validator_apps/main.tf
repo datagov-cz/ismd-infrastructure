@@ -175,10 +175,10 @@ resource "azurerm_container_app" "frontend" {
       memory = "1Gi"
       env {
         name  = "NEXT_PUBLIC_BE_URL"
-        # Hostname with path (no protocol) - frontend axios interceptor adds protocol dynamically
-        # based on whether user accesses site via HTTP or HTTPS
+        # Include protocol for compatibility with current frontend (without interceptor)
+        # Use HTTPS for TEST/PROD (accessed via HTTPS), HTTP for DEV (no cert yet)
         # Path /validator is required for App Gateway routing
-        value = var.app_gateway_hostname != "" ? "${var.app_gateway_hostname}/validator" : "${var.app_gateway_public_ip}/validator"
+        value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/validator" : "http://${var.app_gateway_public_ip}/validator") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/validator" : "https://${var.app_gateway_public_ip}/validator")
       }
     }
   }

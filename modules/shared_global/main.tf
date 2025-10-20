@@ -81,6 +81,13 @@ resource "azurerm_application_gateway" "appgw" {
   location            = azurerm_resource_group.shared_global.location
   enable_http2       = true
 
+  identity {
+    type = "UserAssigned"
+    identity_ids = [
+      "/subscriptions/7d72da57-155c-4d56-883e-0e68a747e9e1/resourceGroups/ismd-asistent-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ismd-identity"
+    ]
+  }
+
   sku {
     name     = "Standard_v2"
     tier     = "Standard_v2"
