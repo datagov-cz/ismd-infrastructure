@@ -69,3 +69,9 @@ variable "backend_fqdn_prod" {
   type        = string
   default     = ""
 }
+
+variable "ssl_certificate_keyvault_secret_id" {
+  description = "Key Vault secret ID for SSL certificate (supports versioned or versionless URLs)"
+  type        = string
+  default     = "https://ismd-keyvault.vault.azure.net/secrets/datagov-cz"
+}

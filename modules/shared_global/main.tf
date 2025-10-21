@@ -81,6 +81,13 @@ resource "azurerm_application_gateway" "appgw" {
   location            = azurerm_resource_group.shared_global.location
   enable_http2       = true
 
+  identity {
+    type = "UserAssigned"
+    identity_ids = [
+      "/subscriptions/7d72da57-155c-4d56-883e-0e68a747e9e1/resourceGroups/ismd-asistent-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/ismd-identity"
+    ]
+  }
+
   sku {
     name     = "Standard_v2"
     tier     = "Standard_v2"
@@ -103,6 +110,11 @@ resource "azurerm_application_gateway" "appgw" {
     port = 80
   }
 
+  frontend_port {
+    name = "port_443"
+    port = 443
+  }
+
   frontend_ip_configuration {
     name                 = "appGwPublicFrontendIpIPv4"
     public_ip_address_id = azurerm_public_ip.appgw.id
@@ -111,6 +123,12 @@ resource "azurerm_application_gateway" "appgw" {
   frontend_ip_configuration {
     name                 = "appGwPublicFrontendIpIPv6"
     public_ip_address_id = azurerm_public_ip.appgw_ipv6.id
+  }
+
+  # SSL Certificate from Key Vault
+  ssl_certificate {
+    name                = "datagov-cz"
+    key_vault_secret_id = var.ssl_certificate_keyvault_secret_id
   }
   
   # Backend Pools (DEV default) - Use provided FQDNs if available, otherwise use empty pool
@@ -448,6 +466,114 @@ resource "azurerm_application_gateway" "appgw" {
       host_name                      = http_listener.value
     }
   }
+
+  # HTTPS Hostname-based listeners (IPv4) - only created when hostname provided
+  dynamic "http_listener" {
+    for_each = var.dev_hostname != "" ? [var.dev_hostname] : []
+    content {
+      name                           = "https-host-dev-listener"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv4"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.test_hostname != "" ? [var.test_hostname] : []
+    content {
+      name                           = "https-host-test-listener"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv4"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.prod_hostname != "" ? [var.prod_hostname] : []
+    content {
+      name                           = "https-host-prod-listener"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv4"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
+
+  # HTTP Hostname-based listeners (IPv6) - only created when hostname provided
+  dynamic "http_listener" {
+    for_each = var.dev_hostname != "" ? [var.dev_hostname] : []
+    content {
+      name                           = "http-host-dev-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_80"
+      protocol                       = "Http"
+      host_name                      = http_listener.value
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.test_hostname != "" ? [var.test_hostname] : []
+    content {
+      name                           = "http-host-test-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_80"
+      protocol                       = "Http"
+      host_name                      = http_listener.value
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.prod_hostname != "" ? [var.prod_hostname] : []
+    content {
+      name                           = "http-host-prod-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_80"
+      protocol                       = "Http"
+      host_name                      = http_listener.value
+    }
+  }
+
+  # HTTPS Hostname-based listeners (IPv6) - only created when hostname provided
+  dynamic "http_listener" {
+    for_each = var.dev_hostname != "" ? [var.dev_hostname] : []
+    content {
+      name                           = "https-host-dev-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.test_hostname != "" ? [var.test_hostname] : []
+    content {
+      name                           = "https-host-test-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
+
+  dynamic "http_listener" {
+    for_each = var.prod_hostname != "" ? [var.prod_hostname] : []
+    content {
+      name                           = "https-host-prod-listener-ipv6"
+      frontend_ip_configuration_name = "appGwPublicFrontendIpIPv6"
+      frontend_port_name             = "port_443"
+      protocol                       = "Https"
+      host_name                      = http_listener.value
+      ssl_certificate_name           = "datagov-cz"
+    }
+  }
   
   # URL Path Maps
   url_path_map {
@@ -660,6 +786,108 @@ resource "azurerm_application_gateway" "appgw" {
       http_listener_name = "http-host-prod-listener"
       url_path_map_name  = "path-map-prod"
       priority           = 250
+    }
+  }
+
+  # HTTPS host-based rules (only active when listeners exist)
+  dynamic "request_routing_rule" {
+    for_each = var.dev_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-dev-rule"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-dev-listener"
+      url_path_map_name  = "path-map-dev"
+      priority           = 151
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.test_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-test-rule"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-test-listener"
+      url_path_map_name  = "path-map-test"
+      priority           = 201
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.prod_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-prod-rule"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-prod-listener"
+      url_path_map_name  = "path-map-prod"
+      priority           = 251
+    }
+  }
+
+  # IPv6 HTTP host-based rules (only active when listeners exist)
+  dynamic "request_routing_rule" {
+    for_each = var.dev_hostname != "" ? [1] : []
+    content {
+      name               = "http-host-dev-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "http-host-dev-listener-ipv6"
+      url_path_map_name  = "path-map-dev"
+      priority           = 152
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.test_hostname != "" ? [1] : []
+    content {
+      name               = "http-host-test-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "http-host-test-listener-ipv6"
+      url_path_map_name  = "path-map-test"
+      priority           = 202
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.prod_hostname != "" ? [1] : []
+    content {
+      name               = "http-host-prod-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "http-host-prod-listener-ipv6"
+      url_path_map_name  = "path-map-prod"
+      priority           = 252
+    }
+  }
+
+  # IPv6 HTTPS host-based rules (only active when listeners exist)
+  dynamic "request_routing_rule" {
+    for_each = var.dev_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-dev-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-dev-listener-ipv6"
+      url_path_map_name  = "path-map-dev"
+      priority           = 153
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.test_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-test-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-test-listener-ipv6"
+      url_path_map_name  = "path-map-test"
+      priority           = 203
+    }
+  }
+
+  dynamic "request_routing_rule" {
+    for_each = var.prod_hostname != "" ? [1] : []
+    content {
+      name               = "https-host-prod-rule-ipv6"
+      rule_type          = "PathBasedRouting"
+      http_listener_name = "https-host-prod-listener-ipv6"
+      url_path_map_name  = "path-map-prod"
+      priority           = 253
     }
   }
   
