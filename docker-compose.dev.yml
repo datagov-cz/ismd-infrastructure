@@ -1,5 +1,3 @@
-version: '3'
-
 # ==============================================
 # ISMD Validator - Development Environment
 # ==============================================
@@ -42,8 +40,10 @@ version: '3'
 services:
   ismd-validator-backend:
     image: ${BACKEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-backend-dev:latest}
+    pull_policy: always
     environment:
       - SPRING_PROFILES_ACTIVE=localhost
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
     restart: "no"
     ports:
       - "8080:8080"
@@ -51,6 +51,7 @@ services:
 
   ismd-validator-frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/datagov-cz/ismd-validator-frontend-dev:latest}
+    pull_policy: always
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_BE_URL=http://localhost:8080

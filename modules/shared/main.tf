@@ -10,7 +10,8 @@ resource "azurerm_resource_group" "shared" {
   location = var.location
   
   lifecycle {
-    # Protect from accidental deletion - destroying the shared resource group would:
+    # Prevent accidental deletion of the shared resource group
+    # Deleting this would:
     # - Delete shared networking resources (VNet, subnets)
     # - Break connectivity for ALL environments
     # - Require complete network infrastructure rebuild
@@ -26,7 +27,7 @@ resource "azurerm_resource_group" "shared" {
 # Create a virtual network for the environment
 resource "azurerm_virtual_network" "main" {
   name                = "ismd-vnet-${var.environment}"
-  address_space       = ["10.0.0.0/16", "fd00:db8:deca::/48"]
+  address_space       = [var.vnet_address_space, var.vnet_address_space_ipv6]
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
   
@@ -42,7 +43,7 @@ resource "azurerm_subnet" "validator" {
   name                 = "ismd-validator-subnet-${var.environment}"
   resource_group_name  = azurerm_resource_group.shared.name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = ["10.0.2.0/23"]
+  address_prefixes     = [var.validator_subnet_address_prefix]
   
   delegation {
     name = "Microsoft.App.environments"
