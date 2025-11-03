@@ -160,8 +160,14 @@ jobs:
         VALIDATOR_RG="ismd-validator-${{ env.ENVIRONMENT }}"
         
         # Set image repositories based on environment
-        FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-${{ env.ENVIRONMENT }}"
-        BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-${{ env.ENVIRONMENT }}"
+        # Only dev images have environment suffix, test/prod use base image name
+        if [ "${{ env.ENVIRONMENT }}" = "dev" ]; then
+          FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-dev"
+          BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-dev"
+        else
+          FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend"
+          BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend"
+        fi
         
         # Determine which component changed and enforce required version format for it.
         COMPONENT="${{ github.event.client_payload.component }}"
