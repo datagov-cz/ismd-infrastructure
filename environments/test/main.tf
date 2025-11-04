@@ -40,7 +40,7 @@ variable "validator_resource_group_name" {
 variable "frontend_image" {
   description = "Base container image URL for the frontend (without tag)"
   type        = string
-  default     = "ghcr.io/datagov-cz/ismd-validator-frontend-test"
+  default     = "ghcr.io/datagov-cz/ismd-validator-frontend"
 }
 
 variable "frontend_image_tag" {
@@ -56,7 +56,7 @@ variable "frontend_image_tag" {
 variable "backend_image" {
   description = "Base container image URL for the backend (without tag)"
   type        = string
-  default     = "ghcr.io/datagov-cz/ismd-validator-backend-test"
+  default     = "ghcr.io/datagov-cz/ismd-validator-backend"
 }
 
 variable "backend_image_tag" {
