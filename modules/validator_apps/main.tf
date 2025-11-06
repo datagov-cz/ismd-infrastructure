@@ -68,27 +68,27 @@ resource "azurerm_container_app" "backend" {
   container_app_environment_id = var.container_app_environment_id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
-  
+
   # Set workload profile name based on environment
   # For Consumption profile, set to null
   # For Dedicated profile, use the provided workload profile name
   workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
-  
+
   identity {
     type = "SystemAssigned"
   }
-  
+
   ingress {
     external_enabled = true
     target_port      = 8080
     transport        = "auto"
-    
+
     traffic_weight {
       latest_revision = true
       percentage      = 100
     }
     allow_insecure_connections = true
-    
+
     # Restrict ingress to Application Gateway public IP (only when known)
     dynamic "ip_security_restriction" {
       for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
@@ -99,7 +99,7 @@ resource "azurerm_container_app" "backend" {
       }
     }
   }
-  
+
   template {
     min_replicas = 1
     container {
@@ -107,9 +107,9 @@ resource "azurerm_container_app" "backend" {
       image  = "${var.backend_image}:${var.backend_image_tag}"
       cpu    = 0.5
       memory = "1Gi"
-      
+
       env {
-        name  = "CORS_ALLOWED_ORIGINS"
+        name = "CORS_ALLOWED_ORIGINS"
         # Support both HTTP and HTTPS for dual-protocol access
         # Include both domain and IP for environments where both are used (e.g., DEV)
         value = var.app_gateway_hostname != "" && var.app_gateway_public_ip != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname},http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname}" : var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : ""
@@ -131,20 +131,20 @@ resource "azurerm_container_app" "backend" {
         interval_seconds = var.environment == "dev" ? 30 : 10
       }
       readiness_probe {
-        transport = "HTTP"
-        port      = 8080
-        path      = "/actuator/health"
+        transport        = "HTTP"
+        port             = 8080
+        path             = "/actuator/health"
         interval_seconds = 10
       }
       startup_probe {
-        transport = "HTTP"
-        port      = 8080
-        path      = "/actuator/health"
+        transport        = "HTTP"
+        port             = 8080
+        path             = "/actuator/health"
         interval_seconds = 10
       }
     }
   }
-  
+
   tags = {
     Environment = var.environment
     Application = "Validator"
@@ -160,7 +160,7 @@ resource "azurerm_container_app" "frontend" {
   container_app_environment_id = var.container_app_environment_id
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
-  
+
   # Set workload profile name based on environment
   # For Consumption profile, set to null
   # For Dedicated profile, use the provided workload profile name
@@ -174,7 +174,7 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name  = "NEXT_PUBLIC_BE_URL"
+        name = "NEXT_PUBLIC_BE_URL"
         # Include protocol for compatibility with current frontend (without interceptor)
         # Use HTTPS for TEST/PROD (accessed via HTTPS), HTTP for DEV (no cert yet)
         # Path /validator is required for App Gateway routing
@@ -182,18 +182,18 @@ resource "azurerm_container_app" "frontend" {
       }
     }
   }
-  
+
   ingress {
     external_enabled = true
     target_port      = 3000
-    
+
     traffic_weight {
       latest_revision = true
       percentage      = 100
     }
-    
+
     allow_insecure_connections = true
-    
+
     # Restrict ingress to Application Gateway public IP (only when known)
     dynamic "ip_security_restriction" {
       for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
@@ -204,7 +204,7 @@ resource "azurerm_container_app" "frontend" {
       }
     }
   }
-  
+
   tags = {
     Environment = var.environment
     Application = "Validator"

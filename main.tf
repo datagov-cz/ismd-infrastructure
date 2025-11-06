@@ -8,6 +8,8 @@ terraform {
 }
 
 provider "azurerm" {
+  subscription_id = "7d72da57-155c-4d56-883e-0e68a747e9e1" # InformacniSystemModelovaniDat
+  
   features {
     # Allow the provider to delete resources that exist in the state but not in the configuration
     # This is useful for cleaning up resources that are no longer needed
@@ -18,16 +20,16 @@ provider "azurerm" {
   }
 }
 
- # Read outputs from the shared-global Terraform state (App Gateway, global VNet, etc.)
- data "terraform_remote_state" "shared_global" {
-   backend = "azurerm"
-   config = {
-     resource_group_name  = "ismd-shared-tfstate"
-     storage_account_name = "ismdtfstate"
-     container_name       = "tfstate"
-     key                  = "ismd-shared-global.tfstate"
-   }
- }
+# Read outputs from the shared-global Terraform state (App Gateway, global VNet, etc.)
+data "terraform_remote_state" "shared_global" {
+  backend = "azurerm"
+  config = {
+    resource_group_name  = "ismd-shared-tfstate"
+    storage_account_name = "ismdtfstate"
+    container_name       = "tfstate"
+    key                  = "ismd-shared-global.tfstate"
+  }
+}
 
 # We'll use the environment module from the dev environment instead
 # This avoids circular dependencies between modules

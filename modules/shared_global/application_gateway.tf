@@ -1,85 +1,16 @@
-# Shared Global Resource Group
-resource "azurerm_resource_group" "shared_global" {
-  name     = "ismd-shared-global"
-  location = var.location
-
-  tags = {
-    ManagedBy = "Terraform"
-    Purpose   = "Shared Global Resources"
-  }
-}
-
-# Shared Global Virtual Network
-resource "azurerm_virtual_network" "shared_global" {
-  name                = "ismd-vnet-shared-global"
-  resource_group_name = azurerm_resource_group.shared_global.name
-  location            = azurerm_resource_group.shared_global.location
-  address_space       = ["10.1.0.0/16", "fd00:db8:decb::/48"]
-  dns_servers         = ["168.63.129.16"]  # Azure's internal DNS server
-
-  tags = {
-    ManagedBy = "Terraform"
-    Purpose   = "Shared Global Resources"
-  }
-}
-
-
-# Subnet for the Application Gateway within the Shared Global VNet
-resource "azurerm_subnet" "appgw" {
-  name                 = "ismd-appgw-subnet"
-  resource_group_name  = azurerm_resource_group.shared_global.name
-  virtual_network_name = azurerm_virtual_network.shared_global.name
-  address_prefixes     = ["10.1.0.0/24", "fd00:db8:decb::/64"]
-  delegation {
-    name = "appgw-delegation"
-    service_delegation {
-      name    = "Microsoft.Network/applicationGateways"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
-    }
-  }
-}
-
-# IPv4 Public IP for Application Gateway
-resource "azurerm_public_ip" "appgw" {
-  name                = "ismd-appgw-pipv4"
-  resource_group_name = azurerm_resource_group.shared_global.name
-  location            = azurerm_resource_group.shared_global.location
-  allocation_method   = "Static"
-  sku                 = "Standard"
-  ip_version          = "IPv4"
-  zones               = ["1", "2", "3"]
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-# IPv6 Public IP for Application Gateway
-resource "azurerm_public_ip" "appgw_ipv6" {
-  name                = "ismd-appgw-pipv6"
-  resource_group_name = azurerm_resource_group.shared_global.name
-  location            = azurerm_resource_group.shared_global.location
-  allocation_method   = "Static"
-  sku                 = "Standard"
-  ip_version          = "IPv6"
-  domain_name_label   = var.domain_name_label
-  zones               = ["1", "2", "3"]
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
 # Shared Application Gateway
+# Note: Resource group and networking resources are now in separate files:
+# - resource_group.tf: Resource group
+# - networking.tf: VNet, subnet, public IPs
 resource "azurerm_application_gateway" "appgw" {
   name                = "ismd-app-gateway"
   resource_group_name = azurerm_resource_group.shared_global.name
-  
+
   lifecycle {
     prevent_destroy = true
   }
-  location            = azurerm_resource_group.shared_global.location
-  enable_http2       = true
+  location     = azurerm_resource_group.shared_global.location
+  enable_http2 = true
 
   identity {
     type = "UserAssigned"
@@ -89,11 +20,11 @@ resource "azurerm_application_gateway" "appgw" {
   }
 
   sku {
-    name     = "Standard_v2"
-    tier     = "Standard_v2"
+    name = "Standard_v2"
+    tier = "Standard_v2"
   }
 
-  zones = ["1", "2", "3"]  # Deploy across all availability zones in the region
+  zones = ["1", "2", "3"] # Deploy across all availability zones in the region
 
   autoscale_configuration {
     min_capacity = 0
@@ -130,7 +61,7 @@ resource "azurerm_application_gateway" "appgw" {
     name                = "datagov-cz"
     key_vault_secret_id = var.ssl_certificate_keyvault_secret_id
   }
-  
+
   # Backend Pools (DEV default) - Use provided FQDNs if available, otherwise use empty pool
   backend_address_pool {
     name  = "validator-dev-fe-pool"
@@ -163,60 +94,60 @@ resource "azurerm_application_gateway" "appgw" {
     name  = "validator-prod-be-pool"
     fqdns = var.backend_fqdn_prod != "" ? [var.backend_fqdn_prod] : []
   }
-  
+
   # Health Probes - DEV default
   probe {
-    name   = "validator-dev-fe-probe"
-    protocol = "Http"
-    path   = "/"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-dev-fe-probe"
+    protocol                                  = "Http"
+    path                                      = "/"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
   }
 
   probe {
-    name   = "validator-dev-be-probe"
-    protocol = "Http"
-    path   = "/actuator/health"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-dev-be-probe"
+    protocol                                  = "Http"
+    path                                      = "/actuator/health"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
   }
-  
+
   # Health Probes - TEST
   probe {
-    name   = "validator-test-fe-probe"
-    protocol = "Http"
-    path   = "/"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-test-fe-probe"
+    protocol                                  = "Http"
+    path                                      = "/"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
   }
 
   probe {
-    name   = "validator-test-be-probe"
-    protocol = "Http"
-    path   = "/actuator/health"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-test-be-probe"
+    protocol                                  = "Http"
+    path                                      = "/actuator/health"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
@@ -224,200 +155,200 @@ resource "azurerm_application_gateway" "appgw" {
 
   # Health Probes - PROD
   probe {
-    name   = "validator-prod-fe-probe"
-    protocol = "Http"
-    path   = "/"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-prod-fe-probe"
+    protocol                                  = "Http"
+    path                                      = "/"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
   }
 
   probe {
-    name   = "validator-prod-be-probe"
-    protocol = "Http"
-    path   = "/actuator/health"
-    interval = 30
-    timeout  = 30
-    unhealthy_threshold = 3
+    name                                      = "validator-prod-be-probe"
+    protocol                                  = "Http"
+    path                                      = "/actuator/health"
+    interval                                  = 30
+    timeout                                   = 30
+    unhealthy_threshold                       = 3
     pick_host_name_from_backend_http_settings = true
-    
+
     match {
       status_code = ["200-399"]
     }
   }
-  
+
   # Backend HTTP Settings
   backend_http_settings {
-    name                  = "validator-dev-fe-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-dev-fe-probe"
+    name                                = "validator-dev-fe-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-dev-fe-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-dev-be-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-dev-be-probe"
+    name                                = "validator-dev-be-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-dev-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/api/"
+    path                                = "/api/"
   }
-    
+
   # Additional BE settings for Swagger and root-level paths
   backend_http_settings {
-    name                  = "validator-dev-be-root-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-dev-be-probe"
+    name                                = "validator-dev-be-root-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-dev-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-dev-be-swagger-ui-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-dev-be-probe"
+    name                                = "validator-dev-be-swagger-ui-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-dev-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/swagger-ui/index.html"
+    path                                = "/swagger-ui/index.html"
   }
-  
+
   # Pass-through BE settings: preserve original request path (no path override)
   backend_http_settings {
-    name                  = "validator-dev-be-pass-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-dev-be-probe"
+    name                                = "validator-dev-be-pass-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-dev-be-probe"
     pick_host_name_from_backend_address = true
   }
 
   # TEST backend HTTP settings
   backend_http_settings {
-    name                  = "validator-test-fe-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-test-fe-probe"
+    name                                = "validator-test-fe-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-test-fe-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-test-be-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-test-be-probe"
+    name                                = "validator-test-be-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-test-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/api/"
+    path                                = "/api/"
   }
 
   backend_http_settings {
-    name                  = "validator-test-be-root-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-test-be-probe"
+    name                                = "validator-test-be-root-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-test-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-test-be-swagger-ui-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-test-be-probe"
+    name                                = "validator-test-be-swagger-ui-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-test-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/swagger-ui/index.html"
+    path                                = "/swagger-ui/index.html"
   }
 
   backend_http_settings {
-    name                  = "validator-test-be-pass-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-test-be-probe"
+    name                                = "validator-test-be-pass-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-test-be-probe"
     pick_host_name_from_backend_address = true
   }
 
   # PROD backend HTTP settings
   backend_http_settings {
-    name                  = "validator-prod-fe-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-prod-fe-probe"
+    name                                = "validator-prod-fe-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-prod-fe-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-prod-be-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-prod-be-probe"
+    name                                = "validator-prod-be-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-prod-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/api/"
+    path                                = "/api/"
   }
 
   backend_http_settings {
-    name                  = "validator-prod-be-root-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-prod-be-probe"
+    name                                = "validator-prod-be-root-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-prod-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/"
+    path                                = "/"
   }
 
   backend_http_settings {
-    name                  = "validator-prod-be-swagger-ui-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-prod-be-probe"
+    name                                = "validator-prod-be-swagger-ui-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-prod-be-probe"
     pick_host_name_from_backend_address = true
-    path                  = "/swagger-ui/index.html"
+    path                                = "/swagger-ui/index.html"
   }
 
   backend_http_settings {
-    name                  = "validator-prod-be-pass-http-settings"
-    cookie_based_affinity = "Disabled"
-    port                  = 80
-    protocol              = "Http"
-    request_timeout       = 60
-    probe_name            = "validator-prod-be-probe"
+    name                                = "validator-prod-be-pass-http-settings"
+    cookie_based_affinity               = "Disabled"
+    port                                = 80
+    protocol                            = "Http"
+    request_timeout                     = 60
+    probe_name                          = "validator-prod-be-probe"
     pick_host_name_from_backend_address = true
   }
-  
+
   # HTTP Listeners  
   http_listener {
     name                           = "http-ipv4-listener"
@@ -574,7 +505,7 @@ resource "azurerm_application_gateway" "appgw" {
       ssl_certificate_name           = "datagov-cz"
     }
   }
-  
+
   # URL Path Maps
   url_path_map {
     name                               = "path-map-dev"
@@ -587,7 +518,7 @@ resource "azurerm_application_gateway" "appgw" {
       backend_address_pool_name  = "validator-dev-be-pool"
       backend_http_settings_name = "validator-dev-be-http-settings"
     }
-    
+
     # (removed) swagger-docs-rule for now per request
 
     # Swagger UI static resources and OpenAPI endpoints
@@ -641,7 +572,7 @@ resource "azurerm_application_gateway" "appgw" {
       backend_address_pool_name  = "validator-test-be-pool"
       backend_http_settings_name = "validator-test-be-http-settings"
     }
-    
+
     # (removed) swagger-docs-rule for now per request
 
     # Swagger UI static resources and OpenAPI endpoints
@@ -695,7 +626,7 @@ resource "azurerm_application_gateway" "appgw" {
       backend_address_pool_name  = "validator-prod-be-pool"
       backend_http_settings_name = "validator-prod-be-http-settings"
     }
-    
+
     # (removed) swagger-docs-rule for now per request
 
     # Swagger UI static resources and OpenAPI endpoints
@@ -737,22 +668,22 @@ resource "azurerm_application_gateway" "appgw" {
       backend_http_settings_name = "validator-prod-fe-http-settings"
     }
   }
-  
+
   # Request Routing Rules  
   request_routing_rule {
-    name                       = "http-ipv4-rule"
-    rule_type                  = "PathBasedRouting"
-    http_listener_name         = "http-ipv4-listener"
-    url_path_map_name          = "path-map-dev"
-    priority                   = 100
+    name               = "http-ipv4-rule"
+    rule_type          = "PathBasedRouting"
+    http_listener_name = "http-ipv4-listener"
+    url_path_map_name  = "path-map-dev"
+    priority           = 100
   }
 
   request_routing_rule {
-    name                       = "http-ipv6-rule"
-    rule_type                  = "PathBasedRouting"
-    http_listener_name         = "http-ipv6-listener"
-    url_path_map_name          = "path-map-dev"
-    priority                   = 101
+    name               = "http-ipv6-rule"
+    rule_type          = "PathBasedRouting"
+    http_listener_name = "http-ipv6-listener"
+    url_path_map_name  = "path-map-dev"
+    priority           = 101
   }
 
   # Host-based rules (only active when listeners exist)
@@ -890,7 +821,7 @@ resource "azurerm_application_gateway" "appgw" {
       priority           = 253
     }
   }
-  
+
   tags = {
     environment = "shared"
   }
