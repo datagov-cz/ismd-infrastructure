@@ -81,7 +81,7 @@ locals {
         pick_host_name_from_backend_address = true
         path                                = "/"
       },
-      # Backend swagger UI settings
+      # Backend swagger UI settings (for /swagger-ui paths)
       {
         name                                = "validator-${env}-be-swagger-ui-http-settings"
         cookie_based_affinity               = "Disabled"
@@ -181,6 +181,18 @@ locals {
           paths                      = ["/validator/swagger-ui", "/validator/swagger-ui/", "/validator/swagger-ui/index.html"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-swagger-ui-http-settings"
+        },
+        {
+          name                       = "validator-api-docs-rule-${env}"
+          paths                      = ["/validator/api-docs", "/validator/api-docs/*"]
+          backend_address_pool_name  = "validator-${env}-be-pool"
+          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
+        },
+        {
+          name                       = "validator-v3-api-docs-rule-${env}"
+          paths                      = ["/validator/v3/*"]
+          backend_address_pool_name  = "validator-${env}-be-pool"
+          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },
         {
           name                       = "swagger-ui-rule-${env}"
