@@ -8,7 +8,7 @@
 resource "azurerm_resource_group" "shared" {
   name     = var.resource_group_name
   location = var.location
-  
+
   lifecycle {
     # Prevent accidental deletion of the shared resource group
     # Deleting this would:
@@ -17,7 +17,7 @@ resource "azurerm_resource_group" "shared" {
     # - Require complete network infrastructure rebuild
     prevent_destroy = true
   }
-  
+
   tags = {
     Environment = var.environment
     ManagedBy   = "Terraform"
@@ -30,7 +30,7 @@ resource "azurerm_virtual_network" "main" {
   address_space       = [var.vnet_address_space, var.vnet_address_space_ipv6]
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
-  
+
   tags = {
     Environment = var.environment
     ManagedBy   = "Terraform"
@@ -44,7 +44,7 @@ resource "azurerm_subnet" "validator" {
   resource_group_name  = azurerm_resource_group.shared.name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.validator_subnet_address_prefix]
-  
+
   delegation {
     name = "Microsoft.App.environments"
     service_delegation {

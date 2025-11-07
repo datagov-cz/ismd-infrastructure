@@ -46,7 +46,7 @@ variable "frontend_image" {
 variable "frontend_image_tag" {
   description = "Tag for the frontend container image (e.g., '1.0.0' or '1.0.0-abc1234' for development)"
   type        = string
-  
+
   validation {
     condition     = can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.frontend_image_tag))
     error_message = "The frontend_image_tag must be a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
@@ -62,7 +62,7 @@ variable "backend_image" {
 variable "backend_image_tag" {
   description = "Tag for the backend container image (e.g., '1.0.0' or '1.0.0-abc1234' for development)"
   type        = string
-  
+
   validation {
     condition     = can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.backend_image_tag))
     error_message = "The backend_image_tag must be a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
@@ -126,13 +126,13 @@ module "shared" {
   # Remove count to ensure stable resource addressing
   # count  = var.create_environment ? 1 : 0
   source = "../../modules/shared"
-  
-  environment                      = var.environment
-  location                         = var.location
-  resource_group_name              = var.shared_resource_group_name
-  vnet_address_space               = "10.2.0.0/16"        # TEST: 10.2.x.x (avoids conflict with shared-global 10.1.x.x)
-  vnet_address_space_ipv6          = "fd00:db8:decc::/48" # TEST: unique IPv6
-  validator_subnet_address_prefix  = "10.2.2.0/23"        # TEST: within 10.2.0.0/16
+
+  environment                     = var.environment
+  location                        = var.location
+  resource_group_name             = var.shared_resource_group_name
+  vnet_address_space              = "10.2.0.0/16"        # TEST: 10.2.x.x (avoids conflict with shared-global 10.1.x.x)
+  vnet_address_space_ipv6         = "fd00:db8:decc::/48" # TEST: unique IPv6
+  validator_subnet_address_prefix = "10.2.2.0/23"        # TEST: within 10.2.0.0/16
 }
 
 # Create the container app environment if requested
@@ -140,11 +140,11 @@ module "validator_environment" {
   count  = var.create_environment ? 1 : 0
   source = "../../modules/validator_environment"
 
-  environment        = var.environment
-  location           = var.location
+  environment         = var.environment
+  location            = var.location
   resource_group_name = var.validator_resource_group_name
-  subnet_id          = var.create_environment ? module.shared.validator_subnet_id : ""
-  
+  subnet_id           = var.create_environment ? module.shared.validator_subnet_id : ""
+
   depends_on = [module.shared]
 }
 
@@ -153,29 +153,29 @@ module "validator_apps" {
   count  = var.create_apps ? 1 : 0
   source = "../../modules/validator_apps"
 
-  environment        = var.environment
-  location           = var.location
+  environment         = var.environment
+  location            = var.location
   resource_group_name = var.validator_resource_group_name
-  
+
   # Required by the module
-  shared_resource_group_name = var.shared_resource_group_name
-  container_app_environment_id = var.create_environment ? module.validator_environment[0].container_app_environment_id : var.container_app_environment_id
+  shared_resource_group_name               = var.shared_resource_group_name
+  container_app_environment_id             = var.create_environment ? module.validator_environment[0].container_app_environment_id : var.container_app_environment_id
   container_app_environment_default_domain = var.create_environment ? module.validator_environment[0].default_domain : var.container_app_environment_default_domain
-  
+
   # Container Images
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
-  
+
   # IP Restrictions
   app_gateway_public_ip = var.app_gateway_public_ip_address
   app_gateway_hostname  = var.app_gateway_hostname
-  
+
   # App names
   frontend_app_name = var.frontend_app_name
   backend_app_name  = var.backend_app_name
-  
+
   # Workload profile configuration - using Dedicated profile for VNet integration
   workload_profile_name = "default"
   workload_profile_type = "D4"
@@ -215,7 +215,7 @@ output "container_app_environment_name" {
 
 # VNet Peering from this environment's VNet to the shared global VNet
 resource "azurerm_virtual_network_peering" "env_to_shared" {
-  count                       = var.shared_global_vnet_id != "" ? 1 : 0
+  count                        = var.shared_global_vnet_id != "" ? 1 : 0
   name                         = "peer-${var.environment}-to-global"
   resource_group_name          = var.shared_resource_group_name
   virtual_network_name         = module.shared.virtual_network_name
@@ -223,18 +223,18 @@ resource "azurerm_virtual_network_peering" "env_to_shared" {
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
   allow_gateway_transit        = false
-  use_remote_gateways          = false  # Set to false since there's no gateway in the global VNet
+  use_remote_gateways          = false # Set to false since there's no gateway in the global VNet
 }
 
 # VNet Peering from the shared global VNet back to this environment's VNet
 resource "azurerm_virtual_network_peering" "shared_to_env" {
-  count                       = var.shared_global_vnet_name != "" ? 1 : 0
+  count                        = var.shared_global_vnet_name != "" ? 1 : 0
   name                         = "peer-global-to-${var.environment}"
   resource_group_name          = var.shared_global_resource_group_name
   virtual_network_name         = var.shared_global_vnet_name
   remote_virtual_network_id    = module.shared.virtual_network_id
   allow_forwarded_traffic      = true
   allow_virtual_network_access = true
-  allow_gateway_transit        = false  # Set to false since there's no gateway in the global VNet
+  allow_gateway_transit        = false # Set to false since there's no gateway in the global VNet
   use_remote_gateways          = false
 }

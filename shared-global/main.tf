@@ -8,6 +8,7 @@ terraform {
 }
 
 provider "azurerm" {
+  subscription_id = "7d72da57-155c-4d56-883e-0e68a747e9e1" # InformacniSystemModelovaniDat
   features {}
 }
 
@@ -15,7 +16,7 @@ provider "azurerm" {
 module "shared_global" {
   source      = "../modules/shared_global"
   location    = var.location
-  environment = var.environment  # Used for tagging only
+  environment = var.environment # Used for tagging only
 
   # Construct FQDNs from environment-specific domains (backward compatible with old variable)
   frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (
