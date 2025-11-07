@@ -25,7 +25,7 @@ variable "subnet_id" {
 resource "azurerm_resource_group" "validator" {
   name     = var.resource_group_name
   location = var.location
-  
+
   lifecycle {
     # Prevent accidental deletion of the entire resource group
     # Deleting this would:
@@ -34,7 +34,7 @@ resource "azurerm_resource_group" "validator" {
     # - Require full infrastructure rebuild
     prevent_destroy = true
   }
-  
+
   tags = {
     Environment = var.environment
     Application = "Validator"
@@ -47,7 +47,7 @@ resource "azurerm_log_analytics_workspace" "validator" {
   name                = "ismd-validator-log-workspace-${var.environment}"
   location            = var.location
   resource_group_name = azurerm_resource_group.validator.name
-  
+
   lifecycle {
     # Prevent accidental deletion of logs
     # Deleting this would:
@@ -56,7 +56,7 @@ resource "azurerm_log_analytics_workspace" "validator" {
     # - Lose audit trail and troubleshooting data
     prevent_destroy = true
   }
-  
+
   tags = {
     Environment = var.environment
     Application = "Validator"
@@ -66,18 +66,18 @@ resource "azurerm_log_analytics_workspace" "validator" {
 
 # Container App Environment
 resource "azurerm_container_app_environment" "validator" {
-  name                               = "ismd-validator-environment-${var.environment}"
-  location                           = var.location
-  resource_group_name                = azurerm_resource_group.validator.name
-  log_analytics_workspace_id         = azurerm_log_analytics_workspace.validator.id
+  name                       = "ismd-validator-environment-${var.environment}"
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.validator.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.validator.id
   # Enable VNet integration for all environments
   infrastructure_subnet_id           = var.subnet_id
   infrastructure_resource_group_name = "ME_ismd-validator-environment-${var.environment}_${azurerm_resource_group.validator.name}_${var.location}"
-  internal_load_balancer_enabled     = false  # Disabled since we're using Application Gateway
-  
+  internal_load_balancer_enabled     = false # Disabled since we're using Application Gateway
+
   # Enable zone redundancy in production only
   zone_redundancy_enabled = var.environment == "prod"
-  
+
   lifecycle {
     # Protect from accidental deletion - destroying the environment would:
     # - Stop ALL container apps running in this environment
@@ -85,7 +85,7 @@ resource "azurerm_container_app_environment" "validator" {
     # - Require complex recreation with networking setup
     prevent_destroy = true
   }
-  
+
   # Standard workload profile for all environments
   workload_profile {
     name                  = "default"
@@ -93,7 +93,7 @@ resource "azurerm_container_app_environment" "validator" {
     minimum_count         = 1
     maximum_count         = 3
   }
-  
+
   tags = {
     Environment = var.environment
     Application = "Validator"
