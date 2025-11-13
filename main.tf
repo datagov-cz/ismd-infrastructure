@@ -57,10 +57,6 @@ module "dev" {
   shared_resource_group_name    = var.shared_resource_group_name
   validator_resource_group_name = var.validator_resource_group_name
 
-  # Container Apps Environment (left empty; env module fills when creating)
-  container_app_environment_id             = ""
-  container_app_environment_default_domain = ""
-
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
@@ -74,12 +70,8 @@ module "test" {
   source = "./environments/test"
 
   # Common variables
-  environment        = "test"
-  location           = var.location
-  frontend_image     = var.frontend_image
-  frontend_image_tag = var.frontend_image_tag
-  backend_image      = var.backend_image
-  backend_image_tag  = var.backend_image_tag
+  environment = "test"
+  location    = var.location
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
@@ -94,12 +86,8 @@ module "prod" {
   source = "./environments/prod"
 
   # Common variables
-  environment        = "prod"
-  location           = var.location
-  frontend_image     = var.frontend_image
-  frontend_image_tag = var.frontend_image_tag
-  backend_image      = var.backend_image
-  backend_image_tag  = var.backend_image_tag
+  environment = "prod"
+  location    = var.location
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
