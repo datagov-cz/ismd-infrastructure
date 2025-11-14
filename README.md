@@ -4,11 +4,13 @@ This repository contains Terraform configurations for managing Azure Container A
 
 ## Architecture Overview
 
-- **Azure Container Apps**: Serverless container platform with auto-scaling
+- **Shared Container App Environment**: Consolidated environment for all validator apps across dev, test, and prod
+- **Azure Container Apps**: Serverless container platform with auto-scaling and dedicated workload profiles
 - **Application Gateway**: Shared global load balancer with WAF capabilities and dual-stack (IPv4 + IPv6) support
 - **Multi-Environment**: Dev, Test, and Prod environments with consistent configuration
-- **Networking**: VNet with properly sized subnets for Container Apps and App Gateway, with VNet peering between environments
-- **State Management**: Azure Storage backend for team collaboration
+- **Networking**: Shared VNet with properly sized subnets for Container Apps, Tool Apps, and App Gateway
+- **Decoupled Deployments**: Infrastructure managed via Terraform, container images deployed directly from application repositories
+- **State Management**: Azure Storage backend with workspace-based environment isolation
 - **Resource Protection**: Critical shared resources protected with prevent_destroy lifecycle rules
 
 ## State Management & Workspaces
@@ -36,7 +38,12 @@ This project uses Azure Storage to manage the infrastructure state for all envir
 │   ├── test/          # Test environment configuration
 │   └── prod/          # Production environment configuration
 ├── modules/
-│   ├── shared/                  # Environment-specific shared resources
+│   ├── shared/                  # Shared Container App Environment & networking
+│   │   ├── main.tf              # Container App Environment, Log Analytics
+│   │   ├── resource_group.tf   # Environment-specific resource group
+│   │   ├── networking.tf        # VNet, subnets (validator + tool apps)
+│   │   ├── outputs.tf           # Module outputs
+│   │   └── variables.tf         # Module variables
 │   ├── shared_global/           # Global shared resources (App Gateway, VNet)
 │   │   ├── appgw_base_config.tf       # App Gateway base configuration
 │   │   ├── appgw_validator_config.tf  # Validator app routing configuration
@@ -45,7 +52,6 @@ This project uses Azure Storage to manage the infrastructure state for all envir
 │   │   ├── resource_group.tf          # Global resource group
 │   │   ├── outputs.tf                 # Module outputs
 │   │   └── variables.tf               # Module variables
-│   ├── validator_environment/   # Container App Environment & Log Analytics
 │   └── validator_apps/          # Frontend & Backend Container Apps
 │       ├── backend.tf           # Backend container app
 │       ├── frontend.tf          # Frontend container app
@@ -55,8 +61,11 @@ This project uses Azure Storage to manage the infrastructure state for all envir
 ├── shared-global/               # Shared global infrastructure state
 │   ├── main.tf                  # Shared global module configuration
 │   ├── backend.tf               # Backend configuration
-│   └── variables.tf             # Input variables
+│   ├── variables.tf             # Input variables
+│   └── terraform.tfvars         # Global configuration values
 ├── .github/workflows/           # CI/CD pipelines
+│   ├── terraform.yml                  # Manual infrastructure updates
+│   └── terraform-shared-global.yml    # App Gateway management
 ├── main.tf                      # Root configuration with environment module calls
 ├── backend.tf                   # Azure Storage backend configuration
 ├── variables.tf                 # Input variable definitions
@@ -109,16 +118,19 @@ Manages global shared infrastructure that spans all environments using a **data-
 - **Maintainable**: Clear separation between data (config files) and structure (resource file)
 - **Multi-App Ready**: Architecture supports multiple applications with path-based routing (e.g., `/validator/*` for validator app)
 
-### Validator Environment Module (`modules/validator_environment/`)
+### Shared Module (`modules/shared/`)
 
-Manages the Container Apps platform infrastructure:
+Manages the shared Container App Environment and networking infrastructure for each environment:
 
-- **Resource Group**: Application-specific resources (`ismd-validator-{env}`)
+- **Resource Group**: Environment-specific shared resources (`ismd-shared-{env}`)
 - **Log Analytics Workspace**: Centralized logging and monitoring
 - **Virtual Network**: Environment-specific VNet with VNet peering to shared global VNet
-- **Container App Environment**: 
-  - All environments (Dev/Test/Prod): Dedicated D4 profile with VNet integration
-  - Zone redundancy enabled only in production
+  - Validator subnet (`/23`) - For validator application containers
+  - Tool subnet (`/23`) - Reserved for future tool application
+- **Container App Environment**: Consolidated environment shared by all applications
+  - Dedicated D4 workload profile with VNet integration
+  - Zone redundancy enabled in production
+  - Single environment per region for cost efficiency and simplified management
 
 ### Validator Apps Module (`modules/validator_apps/`)
 
@@ -150,6 +162,10 @@ Manages the application containers with a clear file structure:
 - **Resource Allocation**: Optimized CPU/memory combinations per environment
 - **Conditional Creation**: Support for phased deployments with `create_apps` variable
 - **Security**: Ingress restricted to Application Gateway public IP
+- **Decoupled Image Deployment**: `lifecycle { ignore_changes = [template[0].container[0].image] }` prevents Terraform from managing container images
+  - Container images deployed independently via `az containerapp update` from application repositories
+  - Terraform manages infrastructure only (networking, environment variables, ingress, resource allocation)
+  - Image tags can be updated without Terraform apply
 
 ### Application Gateway Architecture
 
@@ -193,15 +209,27 @@ To add a new application:
 
 ## Environments
 
-The infrastructure supports three environments with aligned configurations:
+The infrastructure supports three environments with consolidated architecture:
 
-| Environment | Profile | Scaling | Use Case | Shared Resources |
-|-------------|---------|---------|----------|------------------|
-| **dev** | Consumption | Scale to zero | Development, cost-optimized | App Gateway, Global VNet |
-| **test** | Dedicated D4 | Always-on | Testing, staging | App Gateway, Global VNet |
-| **prod** | Dedicated D4 | Always-on | Production workloads | App Gateway, Global VNet |
+| Environment | Container App Environment | Workload Profile | VNet CIDR | Use Case |
+|-------------|--------------------------|------------------|-----------|----------|
+| **dev** | `ismd-shared-environment-dev` | Dedicated D4 | 10.0.0.0/16 | Development, shared environment |
+| **test** | `ismd-shared-environment-test` | Dedicated D4 | 10.2.0.0/16 | Testing, staging |
+| **prod** | `ismd-shared-environment-prod` | Dedicated D4 | 10.3.0.0/16 | Production workloads |
 
-All environments share the same Application Gateway in the global shared resource group and use the same conditional creation and module structure for consistency and maintainability. The environments are fully aligned with identical configuration patterns.
+### Shared Resources Per Environment:
+
+- **Container App Environment**: Single shared environment for all applications in each environment
+- **VNet**: Environment-specific with two subnets:
+  - Validator subnet (`/23`) - Currently hosts validator backend and frontend
+  - Tool subnet (`/23`) - Reserved for future tool application
+- **Application Gateway**: Global, shared across all environments
+- **Resource Groups**: 
+  - `ismd-shared-{env}` - Shared Container App Environment and networking
+  - `ismd-validator-{env}` - Validator-specific resources
+  - `ismd-shared-global` - Application Gateway and global networking
+
+All environments use dedicated D4 workload profiles with VNet integration for consistent performance and security. The shared environment architecture provides cost efficiency while maintaining environment isolation.
 
 ## Usage
 
@@ -247,13 +275,11 @@ All environments share the same Application Gateway in the global shared resourc
 
 ### Deployment
 
-The infrastructure requires a specific deployment order due to dependencies between the Application Gateway and Container Apps.
-
 #### Initial Deployment (First Time Setup)
 
-**Step 1: Deploy Shared Global Infrastructure (Initial)**
+**Step 1: Deploy Shared Global Infrastructure**
 
-Deploy the Application Gateway and networking without app-specific routing:
+Deploy the Application Gateway and global networking:
 
 ```bash
 cd shared-global
@@ -263,13 +289,13 @@ terraform apply
 ```
 
 This creates:
-- Application Gateway (with base configuration)
+- Application Gateway (with base configuration and validator routing)
 - Global VNet and subnets
 - Public IP addresses (IPv4 + IPv6)
 
-**Step 2: Deploy Environment-Specific Infrastructure (Container Apps)**
+**Step 2: Deploy Environment Infrastructure**
 
-Deploy each environment to create the container apps and get their FQDNs:
+Deploy each environment to create the shared Container App Environment and applications:
 
 ```bash
 # Return to root directory
@@ -287,69 +313,157 @@ terraform apply
 ```
 
 This creates:
-- Container App Environment
-- Container Apps (frontend and backend) with auto-generated FQDNs
-- Environment-specific networking and VNet peering
+- Shared Container App Environment (`ismd-shared-environment-{env}`)
+- Container Apps (validator frontend and backend) with auto-generated FQDNs
+- Environment-specific VNet with validator and tool subnets
+- VNet peering to global VNet
 
-**Step 3: Update Shared Global with App FQDNs**
+**Step 3: Update Application Gateway with Container App FQDNs**
 
-After deploying the apps, update the shared global default variables with the container app FQDNs:
-
-1. Get the FQDNs from the terraform outputs (from step 2)
-2. Update `shared-global/variables.tf` with the actual FQDNs
-3. Re-deploy shared global:
+After deploying the apps, update the App Gateway backend pools with actual FQDNs:
 
 ```bash
+# Get FQDNs from the terraform outputs
+terraform output
+
+# Update shared-global/terraform.tfvars with the FQDNs:
+# container_app_environment_domain_dev = "livelydesert-xxx.germanywestcentral.azurecontainerapps.io"
+# container_app_environment_domain_test = "mangodune-xxx.germanywestcentral.azurecontainerapps.io"
+
 cd shared-global
 terraform plan  # Review the routing changes
 terraform apply
 ```
 
-This updates:
-- Application Gateway backend pools with actual container app FQDNs
-- Routing rules now correctly point to the deployed apps
+This updates the Application Gateway backend pools to route traffic to the deployed container apps.
 
 #### Subsequent Deployments
 
-After initial setup, you can deploy changes independently:
+After initial setup, deployments are simplified:
 
-- **Container app updates** (image changes): Deploy from root with appropriate workspace
-- **Application Gateway updates** (routing changes): Deploy from `shared-global/`
-- **New environments**: Follow the 3-step process above
+- **Infrastructure changes** (environment variables, ingress, etc.): 
+  ```bash
+  terraform workspace select <env>
+  terraform plan
+  terraform apply
+  ```
+  
+- **Container image updates**: Handled automatically by application repositories via `az containerapp update`
+  - No Terraform apply needed
+  - Images deploy independently from infrastructure
+  
+- **Application Gateway updates** (new routing rules):
+  ```bash
+  cd shared-global
+  terraform plan
+  terraform apply
+  ```
 
 ### Container Image Management
 
-The infrastructure deploys containerized applications with configurable image tags:
+Container images are **deployed independently from Terraform** using `az containerapp update`:
 
-```bash
-# Deploy with specific image versions
-terraform apply \
-  -var="frontend_image_tag=0.1.0-c255c74" \
-  -var="backend_image_tag=0.0.1-snapshot-deff379"
+#### Image Deployment Strategy:
+
+**Development Images** (`-dev` suffix):
+- Repository: `ghcr.io/org/ismd-validator-{backend|frontend}-dev`
+- Tag: `latest` (rolling tag)
+- Deployed automatically on push to dev branch
+- Command: `az containerapp update --name ismd-validator-backend-dev --image ghcr.io/org/app-dev:latest`
+
+**Production Images** (test/prod):
+- Repository: `ghcr.io/org/ismd-validator-{backend|frontend}`
+- Tag: Version numbers (e.g., `1.0.0`, `1.0.0-abc1234`)
+- TEST: Deployed automatically when pushed to main branch
+- PROD: Deployed manually via workflow_dispatch
+
+#### Image Tag Validation:
+
+Terraform variable validation allows both `latest` and semantic versioning:
+```hcl
+validation {
+  condition     = var.image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.image_tag))
+  error_message = "Tag must be 'latest' or valid version (e.g., '1.0.0' or '1.0.0-abc1234')"
+}
 ```
 
-Image variables in `terraform.tfvars`:
-- `frontend_image`: Base image URL for the frontend
-- `frontend_image_tag`: Specific version tag
-- `backend_image`: Base image URL for the backend  
-- `backend_image_tag`: Specific version tag
+#### Initial Setup Image Variables:
+
+While Terraform doesn't update images during normal operations, initial container app creation requires base image configuration in `terraform.tfvars`:
+
+```hcl
+frontend_image = "ghcr.io/org/ismd-validator-frontend-dev"
+frontend_image_tag = "latest"
+backend_image = "ghcr.io/org/ismd-validator-backend-dev"
+backend_image_tag = "latest"
+```
+
+After initial creation, images are managed via `az containerapp update` from application repositories
 
 ### GitHub Actions CI/CD
 
-The repository includes automated workflows for infrastructure and application deployment:
+The infrastructure uses a **decoupled deployment architecture** where infrastructure and application images are managed independently.
 
-#### Application Repositories:
-- **CI Workflow**: Tests on PRs and dev branch pushes
-- **Build Docker on Dev**: Builds images after successful CI on dev branch
-- **Release Version**: Creates releases to main with version management
-- **Build Docker on Main**: Builds test/production images on main branch
+#### Infrastructure Repository Workflows:
 
-#### Infrastructure Repository:
-- **Deploy Infrastructure**: Handles infrastructure deployment with environment selection
-  - Supports two-phase apply when needed (for new App Gateway deployment)
-  - Automatic detection of existing App Gateway
-  - Uses conditional module creation (`create_environment` and `create_apps` variables)
-- **Cross-Repo Integration**: App repositories trigger infrastructure deployment with updated images
+- **`terraform.yml`**: Manual infrastructure updates via `workflow_dispatch`
+  - Manages Container App infrastructure (environment variables, ingress, probes, resource allocation)
+  - Does NOT manage container images (handled by `lifecycle ignore_changes`)
+  - Runs: `shared_global_pre` → `terraform` → `shared_global_post`
+  - Triggered manually when infrastructure changes are needed
+  
+- **`terraform-shared-global.yml`**: Application Gateway management
+  - Reusable workflow for updating App Gateway routing
+  - Called by `terraform.yml` after infrastructure changes
+  - Can also be triggered manually for gateway-only updates
+
+#### Application Repository Workflows:
+
+Each application repository (backend/frontend) has independent CI/CD:
+
+1. **CI Workflow**: Tests on PRs and dev branch pushes
+2. **Build Docker on Dev**: Builds `-dev` images after successful CI
+   - Pushes to `ghcr.io/org/app-dev:latest`
+   - Triggers deployment workflow for DEV environment
+3. **Release Version**: Creates version tags and PRs from dev to main
+4. **Build Docker on Main**: Builds production images with version tags
+   - Pushes to `ghcr.io/org/app:version`
+   - Triggers deployment workflow for TEST environment
+5. **Trigger Deployment**: Deploys images directly to Azure Container Apps
+   - Uses `az containerapp update` to deploy new images
+   - No interaction with infrastructure repository
+   - Automatic: DEV (on dev push), TEST (on main push)
+   - Manual: PROD (workflow_dispatch with version selection)
+
+#### Deployment Flow:
+
+```
+Application Changes:
+  Developer pushes to dev
+    ↓
+  Build Docker (creates image)
+    ↓
+  Trigger Deployment (runs az containerapp update)
+    ↓
+  Container App updated with new image
+  
+Infrastructure Changes:
+  Developer creates PR with Terraform changes
+    ↓
+  Merge to dev branch
+    ↓
+  Manual: Run terraform.yml workflow
+    ↓
+  Infrastructure updated (Terraform apply)
+```
+
+#### Key Benefits:
+
+- **Independent Deployments**: Application images deploy without Terraform
+- **Faster Deployments**: No Terraform overhead for image updates
+- **Clear Separation**: Infrastructure changes vs application changes
+- **No Cross-Repo Secrets**: Each repo authenticates independently
+- **Simplified Workflows**: No `repository_dispatch` between repos
 
 ## Remote State Configuration
 
@@ -464,7 +578,50 @@ The Application Gateway uses a data-driven pattern that separates configuration 
 2. Update `appgw_resource.tf` to include the new config in dynamic blocks
 3. Existing application configurations remain unchanged
 
+## Architecture Evolution
+
+### Migration to Shared Environment (v2 Architecture)
+
+The infrastructure underwent a significant architectural migration to consolidate resources and decouple deployments:
+
+#### What Changed:
+
+**Before (v1):**
+- Separate Container App Environment per application per environment
+- Terraform managed both infrastructure AND container images
+- Application repositories triggered Terraform deployments via `repository_dispatch`
+- Image updates required full Terraform apply cycles
+
+**After (v2 - Current):**
+- Single shared Container App Environment per environment (all apps)
+- Terraform manages infrastructure only (lifecycle ignore_changes for images)
+- Application repositories deploy images directly via `az containerapp update`
+- Image updates are independent of infrastructure changes
+
+#### Migration Benefits:
+
+1. **Cost Efficiency**: Single Container App Environment per region instead of one per application
+2. **Faster Deployments**: Image updates complete in seconds without Terraform overhead
+3. **Simplified Architecture**: Clear separation between infrastructure and application concerns
+4. **Independent Releases**: Applications can deploy independently without infrastructure coordination
+5. **Reduced Complexity**: No cross-repository communication or shared secrets needed
+
+#### Infrastructure Changes:
+
+- **Removed**: `modules/validator_environment` (dedicated per-app environment)
+- **Added**: `modules/shared` (consolidated shared environment for all apps)
+- **Updated**: All container app definitions include `lifecycle { ignore_changes = [template[0].container[0].image] }`
+- **Subnet Planning**: Added tool subnet (`/23`) alongside validator subnet for future applications
+
+#### Workflow Changes:
+
+- **Removed**: `repository_dispatch` triggers between infrastructure and application repos
+- **Simplified**: Infrastructure workflows run manually only when infrastructure changes
+- **Added**: Direct `az containerapp update` commands in application deployment workflows
+- **Enhanced**: Image validation before deployment in application workflows
+
 ## Notes
 
 - The load balancer and IP resources that were created automatically when deploying the container application can be imported into Terraform using the `terraform import` command or by using the Azure Export for Terraform tool.
 - When adding a new application, follow the data-driven pattern: create a new configuration file and update the resource file to include it.
+- Container images should be deployed via application repository workflows, not Terraform.
