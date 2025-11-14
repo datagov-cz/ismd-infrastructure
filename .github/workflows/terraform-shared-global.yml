@@ -80,17 +80,14 @@ on:
         description: "Optional explicit PROD backend FQDN (container app)."
         required: false
         type: string
-  repository_dispatch:
-    types:
-      - update-shared-global
 
 jobs:
   terraform:
     name: 'Terraform (Shared Global)'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event_name == 'repository_dispatch' && (github.event.client_payload.environment == 'prod' && 'PROD' || github.event.client_payload.environment == 'test' && 'TEST' || 'DEV')) }}
+    environment: ${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV')) || (inputs.environment == 'prod' && 'PROD' || inputs.environment == 'test' && 'TEST' || 'DEV') }}
     concurrency:
-      group: shared-global-${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || (github.event_name == 'repository_dispatch' && github.event.client_payload.environment) || inputs.environment || 'dev' }}
+      group: shared-global-${{ github.event.inputs.environment || inputs.environment || 'dev' }}
       cancel-in-progress: false
     defaults:
       run:
@@ -138,29 +135,16 @@ jobs:
             FE_FQDN_PROD='${{ inputs.frontend_fqdn_prod }}'
             BE_FQDN_PROD='${{ inputs.backend_fqdn_prod }}'
           else
-            # Fall back to direct event inputs
-            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              ENV="${{ github.event.inputs.environment }}"
-              DOMAIN_INPUT="${{ github.event.inputs.container_app_environment_domain }}"
-              DEV_HOST="${{ github.event.inputs.dev_hostname }}"
-              TEST_HOST="${{ github.event.inputs.test_hostname }}"
-              PROD_HOST="${{ github.event.inputs.prod_hostname }}"
-              FE_FQDN_TEST="${{ github.event.inputs.frontend_fqdn_test }}"
-              BE_FQDN_TEST="${{ github.event.inputs.backend_fqdn_test }}"
-              FE_FQDN_PROD="${{ github.event.inputs.frontend_fqdn_prod }}"
-              BE_FQDN_PROD="${{ github.event.inputs.backend_fqdn_prod }}"
-            else
-              # repository_dispatch
-              ENV="${{ github.event.client_payload.environment }}"
-              DOMAIN_INPUT="${{ github.event.client_payload.container_app_environment_domain }}"
-              DEV_HOST="${{ github.event.client_payload.dev_hostname }}"
-              TEST_HOST="${{ github.event.client_payload.test_hostname }}"
-              PROD_HOST="${{ github.event.client_payload.prod_hostname }}"
-              FE_FQDN_TEST="${{ github.event.client_payload.frontend_fqdn_test }}"
-              BE_FQDN_TEST="${{ github.event.client_payload.backend_fqdn_test }}"
-              FE_FQDN_PROD="${{ github.event.client_payload.frontend_fqdn_prod }}"
-              BE_FQDN_PROD="${{ github.event.client_payload.backend_fqdn_prod }}"
-            fi
+            # Fall back to workflow_dispatch inputs
+            ENV="${{ github.event.inputs.environment }}"
+            DOMAIN_INPUT="${{ github.event.inputs.container_app_environment_domain }}"
+            DEV_HOST="${{ github.event.inputs.dev_hostname }}"
+            TEST_HOST="${{ github.event.inputs.test_hostname }}"
+            PROD_HOST="${{ github.event.inputs.prod_hostname }}"
+            FE_FQDN_TEST="${{ github.event.inputs.frontend_fqdn_test }}"
+            BE_FQDN_TEST="${{ github.event.inputs.backend_fqdn_test }}"
+            FE_FQDN_PROD="${{ github.event.inputs.frontend_fqdn_prod }}"
+            BE_FQDN_PROD="${{ github.event.inputs.backend_fqdn_prod }}"
           fi
 
           # Ensure we always have an environment (default to dev)

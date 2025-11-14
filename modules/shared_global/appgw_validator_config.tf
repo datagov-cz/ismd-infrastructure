@@ -171,18 +171,6 @@ locals {
           backend_http_settings_name = "validator-${env}-be-http-settings"
         },
         {
-          name                       = "swagger-ui-index-rule-${env}"
-          paths                      = ["/swagger-ui", "/swagger-ui/"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-swagger-ui-http-settings"
-        },
-        {
-          name                       = "validator-swagger-ui-index-rule-${env}"
-          paths                      = ["/validator/swagger-ui", "/validator/swagger-ui/", "/validator/swagger-ui/index.html"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-swagger-ui-http-settings"
-        },
-        {
           name                       = "validator-api-docs-rule-${env}"
           paths                      = ["/validator/api-docs", "/validator/api-docs/*"]
           backend_address_pool_name  = "validator-${env}-be-pool"
@@ -191,6 +179,12 @@ locals {
         {
           name                       = "validator-v3-api-docs-rule-${env}"
           paths                      = ["/validator/v3/*"]
+          backend_address_pool_name  = "validator-${env}-be-pool"
+          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
+        },
+        {
+          name                       = "validator-swagger-ui-rule-${env}"
+          paths                      = ["/validator/swagger-ui/*"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },

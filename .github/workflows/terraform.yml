@@ -1,13 +1,7 @@
 name: 'Terraform Deployment'
 
 on:
-  # Triggered from other repositories
-  repository_dispatch:
-    types:
-      - new-image-dev
-      - new-image-test
-      - new-image-prod
-  # Manual trigger for testing without PRs
+  # Manual trigger for infrastructure updates
   workflow_dispatch:
     inputs:
       environment:
@@ -19,17 +13,6 @@ on:
           - test
           - prod
         default: dev
-      component:
-        description: "Component to deploy"
-        required: true
-        type: choice
-        options:
-          - frontend
-          - backend
-      image_tag:
-        description: "Image version tag in the format MAJOR.MINOR.PATCH with optional suffix. Examples: 0.1.0-c255c74, 0.0.1-snapshot-deff379 (prefix 'v' also allowed)."
-        required: true
-        type: string
 
 jobs:
   shared_global_pre:
@@ -37,7 +20,7 @@ jobs:
     uses: datagov-cz/ismd-infrastructure/.github/workflows/terraform-shared-global.yml@dev
     secrets: inherit
     with:
-      environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'prod' || github.event.inputs.environment == 'test' && 'test' || 'dev') || (github.event.action == 'new-image-prod' && 'prod' || github.event.action == 'new-image-test' && 'test' || 'dev') }}
+      environment: ${{ github.event.inputs.environment }}
       dev_hostname: ${{ vars.DEV_HOSTNAME }}
       test_hostname: ${{ vars.TEST_HOSTNAME }}
       prod_hostname: ${{ vars.PROD_HOSTNAME }}
@@ -48,7 +31,7 @@ jobs:
     name: 'Terraform'
     runs-on: ubuntu-latest
     needs: [shared_global_pre]
-    environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV') || (github.event.action == 'new-image-prod' && 'PROD' || github.event.action == 'new-image-test' && 'TEST' || 'DEV') }}
+    environment: ${{ github.event.inputs.environment == 'prod' && 'PROD' || github.event.inputs.environment == 'test' && 'TEST' || 'DEV' }}
     outputs:
       job_status: ${{ job.status }}
     
@@ -85,14 +68,7 @@ jobs:
     - name: Select Environment
       id: select-env
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          # Manual dispatch path
-          ENV="${{ github.event.inputs.environment }}"
-        else
-          # repository_dispatch: extract env from action (new-image-<env>)
-          EVENT_TYPE="${{ github.event.action }}"
-          ENV="${EVENT_TYPE#new-image-}"
-        fi
+        ENV="${{ github.event.inputs.environment }}"
         echo "ENVIRONMENT=$ENV" >> $GITHUB_ENV
         echo "STATE_KEY=$ENV/terraform.tfstate" >> $GITHUB_ENV
     
@@ -137,116 +113,12 @@ jobs:
     - name: Terraform Workspace
       run: terraform workspace select ${{ env.ENVIRONMENT }} || terraform workspace new ${{ env.ENVIRONMENT }}
     
-    - name: Resolve Container Apps Environment Domain
-      run: |
-        ENV="${{ env.ENVIRONMENT }}"
-        CAE_NAME="ismd-validator-environment-$ENV"
-        CAE_RG="ismd-validator-$ENV"
-        DOMAIN=$(az containerapp env show -g "$CAE_RG" -n "$CAE_NAME" --query properties.defaultDomain -o tsv 2>/dev/null || true)
-        if [ -n "$DOMAIN" ]; then
-          echo "CONTAINER_ENV_DOMAIN=$DOMAIN" >> $GITHUB_ENV
-        fi
-    
-    - name: Create Variable File
-      run: |
-        # Create directory if it doesn't exist
-        mkdir -p environments/${{ env.ENVIRONMENT }}
-        
-        # Set default location
-        LOCATION="germanywestcentral"
-        
-        # Set resource group names based on environment
-        SHARED_RG="ismd-shared-${{ env.ENVIRONMENT }}"
-        VALIDATOR_RG="ismd-validator-${{ env.ENVIRONMENT }}"
-        
-        # Set image repositories based on environment
-        # Only dev images have environment suffix, test/prod use base image name
-        if [ "${{ env.ENVIRONMENT }}" = "dev" ]; then
-          FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend-dev"
-          BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend-dev"
-        else
-          FE_REPO="ghcr.io/datagov-cz/ismd-validator-frontend"
-          BE_REPO="ghcr.io/datagov-cz/ismd-validator-backend"
-        fi
-        
-        # Determine which component changed and enforce required version format for it.
-        COMPONENT="${{ github.event.client_payload.component }}"
-        if [ -z "$COMPONENT" ]; then COMPONENT="${{ github.event.inputs.component }}"; fi
-        NEW_TAG="${{ github.event.client_payload.image_tag }}"
-        if [ -z "$NEW_TAG" ]; then NEW_TAG="${{ github.event.inputs.image_tag }}"; fi
-        ENVIRONMENT="${{ env.ENVIRONMENT }}"
-        VALIDATOR_RG="ismd-validator-${{ env.ENVIRONMENT }}"
-        
-        SEMVER_RE='^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9-]+)?$'
-        
-        if [ -z "$COMPONENT" ] || [ -z "$NEW_TAG" ]; then
-          echo "Error: repository_dispatch must include component and image_tag." >&2
-          exit 1
-        fi
-        if ! echo "$NEW_TAG" | grep -Eq "$SEMVER_RE"; then
-          echo "Error: image_tag '$NEW_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.1.0-c255c74 or 0.0.1-snapshot-deff379)." >&2
-          exit 1
-        fi
-        
-        # Fetch current tags from Azure for the component that did NOT change to preserve it
-        if [ "$COMPONENT" = "frontend" ]; then
-          FE_TAG="$NEW_TAG"
-          BE_IMAGE=$(az containerapp show -g "$VALIDATOR_RG" -n "ismd-validator-backend-$ENVIRONMENT" --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
-          BE_TAG=$(echo "$BE_IMAGE" | awk -F: '{print $2}')
-          if [ -z "$BE_TAG" ]; then
-            echo "Error: Could not determine existing backend image tag. Ensure backend app exists or provide a backend tag in a separate event first." >&2
-            exit 1
-          fi
-        elif [ "$COMPONENT" = "backend" ]; then
-          BE_TAG="$NEW_TAG"
-          FE_IMAGE=$(az containerapp show -g "$VALIDATOR_RG" -n "ismd-validator-frontend-$ENVIRONMENT" --query "properties.template.containers[0].image" -o tsv 2>/dev/null || true)
-          FE_TAG=$(echo "$FE_IMAGE" | awk -F: '{print $2}')
-          if [ -z "$FE_TAG" ]; then
-            echo "Error: Could not determine existing frontend image tag. Ensure frontend app exists or provide a frontend tag in a separate event first." >&2
-            exit 1
-          fi
-        else
-          echo "Error: Unsupported component '$COMPONENT' (expected 'frontend' or 'backend')." >&2
-          exit 1
-        fi
-        
-        # Final validation of both tags
-        if ! echo "$FE_TAG" | grep -Eq "$SEMVER_RE"; then
-          echo "Error: resolved frontend tag '$FE_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.1.0-c255c74)." >&2
-          exit 1
-        fi
-        if ! echo "$BE_TAG" | grep -Eq "$SEMVER_RE"; then
-          echo "Error: resolved backend tag '$BE_TAG' doesn't match MAJOR.MINOR.PATCH with optional suffix (e.g., 0.0.1-snapshot-deff379)." >&2
-          exit 1
-        fi
-        
-        # Create dynamic tfvars file
-        cat > environments/${{ env.ENVIRONMENT }}/terraform.tfvars << EOF
-        environment = "${{ env.ENVIRONMENT }}"
-        location = "$LOCATION"
-        shared_resource_group_name = "$SHARED_RG"
-        validator_resource_group_name = "$VALIDATOR_RG"
-        
-        # Container images
-        frontend_image = "$FE_REPO"
-        frontend_image_tag = "$FE_TAG"
-        backend_image = "$BE_REPO"
-        backend_image_tag = "$BE_TAG"
-        EOF
-        
-        # Append container app environment domain if we resolved it
-        if [ -n "${CONTAINER_ENV_DOMAIN:-}" ]; then
-          echo "container_app_environment_domain = \"${CONTAINER_ENV_DOMAIN}\"" >> environments/${{ env.ENVIRONMENT }}/terraform.tfvars
-        fi
-        
-        # Show created file for debugging
-        echo "Created variable file:"
-        cat environments/${{ env.ENVIRONMENT }}/terraform.tfvars
+    # Note: Using committed terraform.tfvars files from each environment directory.
+    # Image tags are managed via lifecycle ignore_changes in Terraform.
     
     - name: Terraform Plan
       run: |
-        # Run plan with the dynamically created variable file
-        terraform plan -var-file="environments/${{ env.ENVIRONMENT }}/terraform.tfvars" -out=tfplan
+        terraform plan -out=tfplan
         
         # Display the plan for review
         echo "\n\nTerraform Plan Output:\n"
@@ -256,95 +128,14 @@ jobs:
       run: |
         terraform apply -auto-approve tfplan
 
-  get_domain:
-    name: 'Resolve Container App Environment Domain'
-    runs-on: ubuntu-latest
-    needs: [terraform]
-    outputs:
-      domain: ${{ steps.out.outputs.domain }}
-      env_lower: ${{ steps.out.outputs.env_lower }}
-    steps:
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: Resolve domain
-        id: out
-        run: |
-          # Determine environment (lowercase) from event
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV_LOWER="${{ github.event.inputs.environment }}"
-          else
-            case "${{ github.event.action }}" in
-              new-image-prod) ENV_LOWER="prod" ;;
-              new-image-test) ENV_LOWER="test" ;;
-              *) ENV_LOWER="dev" ;;
-            esac
-          fi
-          CAE_NAME="ismd-validator-environment-$ENV_LOWER"
-          CAE_RG="ismd-validator-$ENV_LOWER"
-          DOMAIN=$(az containerapp env show -g "$CAE_RG" -n "$CAE_NAME" --query properties.defaultDomain -o tsv 2>/dev/null || true)
-          echo "env_lower=$ENV_LOWER" >> $GITHUB_OUTPUT
-          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
-
   shared_global_post:
     name: 'Shared-Global Post'
-    if: needs.get_domain.outputs.domain != ''
     uses: datagov-cz/ismd-infrastructure/.github/workflows/terraform-shared-global.yml@dev
     secrets: inherit
-    needs: [get_domain]
+    needs: [terraform]
     with:
-      environment: ${{ needs.get_domain.outputs.env_lower }}
+      environment: ${{ github.event.inputs.environment }}
       dev_hostname: ${{ vars.DEV_HOSTNAME }}
       test_hostname: ${{ vars.TEST_HOSTNAME }}
       prod_hostname: ${{ vars.PROD_HOSTNAME }}
-      container_app_environment_domain: ${{ needs.get_domain.outputs.domain }}
       apply: true
-
-  report-status:
-    name: Report Deployment Status
-    runs-on: ubuntu-latest
-    needs: [shared_global_pre, terraform, get_domain, shared_global_post]
-    if: always()
-    steps:
-      - name: Set deployment state (success)
-        if: ${{ needs.terraform.outputs.job_status == 'success' }}
-        run: echo "STATE=success" >> $GITHUB_ENV
-
-      - name: Set deployment state (failure)
-        if: ${{ needs.terraform.outputs.job_status != 'success' }}
-        run: echo "STATE=failure" >> $GITHUB_ENV
-
-      - name: Compose status and context
-        id: ctx
-        run: |
-          echo "state=${STATE}" >> $GITHUB_OUTPUT
-          echo "run_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
-          # Extract environment from event (repository_dispatch or workflow_dispatch)
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            EVENT_TYPE="${{ github.event.action }}" # e.g., new-image-dev
-            ENV="${EVENT_TYPE#new-image-}"
-          else
-            ENV="${{ github.event.inputs.environment }}"
-          fi
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-      
-      - name: Notify source repository
-        uses: peter-evans/repository-dispatch@v4
-        continue-on-error: true
-        with:
-          token: ${{ secrets.SOURCE_REPO_TOKEN }}
-          repository: ${{ github.event.client_payload.source_repo }}
-          event-type: infra-deploy-complete
-          client-payload: |
-            {
-              "deployment_id": "${{ github.event.client_payload.source_deployment_id }}",
-              "state": "${{ steps.ctx.outputs.state }}",
-              "environment": "${{ steps.ctx.outputs.environment }}",
-              "infra_run_url": "${{ steps.ctx.outputs.run_url }}",
-              "component": "${{ github.event.client_payload.component }}",
-              "image_tag": "${{ github.event.client_payload.image_tag }}",
-              "infra_repo": "${{ github.repository }}",
-              "source_run_url": "${{ github.event.client_payload.source_run_url }}",
-              "pr_url": "${{ github.event.client_payload.pr_url }}"
-            }

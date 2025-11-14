@@ -57,4 +57,10 @@ resource "azurerm_container_app" "frontend" {
     Location    = var.location
     SharedRG    = var.shared_resource_group_name
   }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
+  }
 }

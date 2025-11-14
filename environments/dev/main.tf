@@ -1,18 +1,6 @@
 # Dev Environment Configuration
 
 # Variables for the dev environment
-variable "create_environment" {
-  description = "Whether to create the container app environment"
-  type        = bool
-  default     = true
-}
-
-variable "create_apps" {
-  description = "Whether to create the container apps"
-  type        = bool
-  default     = true
-}
-
 variable "environment" {
   description = "Environment name (dev, test, prod)"
   type        = string
@@ -44,12 +32,12 @@ variable "frontend_image" {
 }
 
 variable "frontend_image_tag" {
-  description = "Tag for the frontend container image (e.g., '1.0.0' or '1.0.0-abc1234' for development)"
+  description = "Tag for the frontend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
   type        = string
 
   validation {
-    condition     = can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.frontend_image_tag))
-    error_message = "The frontend_image_tag must be a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
+    condition     = var.frontend_image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.frontend_image_tag))
+    error_message = "The frontend_image_tag must be 'latest' or a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
   }
 }
 
@@ -62,12 +50,12 @@ variable "backend_image" {
 
 
 variable "backend_image_tag" {
-  description = "Tag for the backend container image (e.g., '1.0.0' or '1.0.0-abc1234' for development)"
+  description = "Tag for the backend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
   type        = string
 
   validation {
-    condition     = can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.backend_image_tag))
-    error_message = "The backend_image_tag must be a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
+    condition     = var.backend_image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.backend_image_tag))
+    error_message = "The backend_image_tag must be 'latest' or a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
   }
 }
 
@@ -110,23 +98,20 @@ variable "backend_app_name" {
   default     = "ismd-validator-backend"
 }
 
-variable "container_app_environment_id" {
-  description = "ID of the container app environment"
-  type        = string
-  default     = ""
-}
+# Validator resource group (moved from old validator_environment module)
+resource "azurerm_resource_group" "validator" {
+  name     = var.validator_resource_group_name
+  location = var.location
 
-
-variable "container_app_environment_default_domain" {
-  description = "Default domain of the container app environment"
-  type        = string
-  default     = ""
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Application = "Validator"
+  }
 }
 
 # Shared resources (networking, resource groups, etc.)
 module "shared" {
-  # Remove count to ensure stable resource addressing
-  # count  = var.create_environment ? 1 : 0
   source = "../../modules/shared"
 
   environment                     = var.environment
@@ -137,22 +122,8 @@ module "shared" {
   validator_subnet_address_prefix = "10.0.2.0/23"        # DEV: within 10.0.0.0/16 (already deployed)
 }
 
-# Create the container app environment if requested
-module "validator_environment" {
-  count  = var.create_environment ? 1 : 0
-  source = "../../modules/validator_environment"
-
-  environment         = var.environment
-  location            = var.location
-  resource_group_name = var.validator_resource_group_name
-  subnet_id           = var.create_environment ? module.shared.validator_subnet_id : ""
-
-  depends_on = [module.shared]
-}
-
-# Create the container apps if requested
+# Create validator apps using shared Container App Environment
 module "validator_apps" {
-  count  = var.create_apps ? 1 : 0
   source = "../../modules/validator_apps"
 
   environment         = var.environment
@@ -161,8 +132,8 @@ module "validator_apps" {
 
   # Required by the module
   shared_resource_group_name               = var.shared_resource_group_name
-  container_app_environment_id             = var.create_environment ? module.validator_environment[0].container_app_environment_id : var.container_app_environment_id
-  container_app_environment_default_domain = var.create_environment ? module.validator_environment[0].default_domain : var.container_app_environment_default_domain
+  container_app_environment_id             = module.shared.shared_container_app_environment_id
+  container_app_environment_default_domain = module.shared.shared_container_app_environment_default_domain
 
   # Container Images
   frontend_image     = var.frontend_image
@@ -178,11 +149,13 @@ module "validator_apps" {
   frontend_app_name = var.frontend_app_name
   backend_app_name  = var.backend_app_name
 
-  # Workload profile configuration - using Dedicated profile for VNet integration
+  # Workload profile configuration
   workload_profile_name = "default"
   workload_profile_type = "D4"
+  
   depends_on = [
-    module.validator_environment
+    module.shared,
+    azurerm_resource_group.validator
   ]
 }
 
@@ -192,7 +165,7 @@ output "shared_resource_group_name" {
 }
 
 output "validator_resource_group_name" {
-  value = length(module.validator_environment) > 0 ? module.validator_environment[0].resource_group_name : ""
+  value = azurerm_resource_group.validator.name
 }
 
 output "app_gateway_public_ip" {
@@ -200,19 +173,21 @@ output "app_gateway_public_ip" {
 }
 
 output "validator_frontend_fqdn" {
-  value = length(module.validator_apps) > 0 ? module.validator_apps[0].frontend_fqdn : ""
+  value = module.validator_apps.frontend_fqdn
 }
 
 output "validator_backend_fqdn" {
-  value = length(module.validator_apps) > 0 ? module.validator_apps[0].backend_fqdn : ""
+  value = module.validator_apps.backend_fqdn
 }
 
-output "container_app_environment_id" {
-  value = length(module.validator_environment) > 0 ? module.validator_environment[0].container_app_environment_id : ""
+output "shared_container_app_environment_id" {
+  description = "ID of the shared Container App Environment"
+  value       = module.shared.shared_container_app_environment_id
 }
 
-output "container_app_environment_name" {
-  value = length(module.validator_environment) > 0 ? module.validator_environment[0].container_app_environment_name : ""
+output "shared_container_app_environment_name" {
+  description = "Name of the shared Container App Environment"
+  value       = module.shared.shared_container_app_environment_name
 }
 
 # VNet Peering from this environment's VNet to the shared global VNet
