@@ -30,3 +30,27 @@ variable "validator_subnet_address_prefix" {
   type        = string
   default     = "10.0.2.0/23"
 }
+
+variable "tool_subnet_address_prefix" {
+  description = "Address prefix for the tool subnet (/23 minimum for Container Apps)"
+  type        = string
+  default     = "10.0.4.0/23"
+}
+
+variable "workload_profile_type" {
+  description = "Workload profile type for the shared Container App Environment"
+  type        = string
+  default     = "D4"
+}
+
+variable "workload_profile_min_count" {
+  description = "Minimum number of instances for the workload profile"
+  type        = number
+  default     = 1
+}
+
+variable "workload_profile_max_count" {
+  description = "Maximum number of instances for the workload profile"
+  type        = number
+  default     = 3
+}
