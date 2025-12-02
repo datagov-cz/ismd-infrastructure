@@ -65,4 +65,7 @@ locals {
       priority           = 101
     }
   ]
+
+  # Base redirect configurations (empty default)
+  appgw_redirect_configurations = []
 }

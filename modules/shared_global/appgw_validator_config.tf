@@ -48,7 +48,7 @@ locals {
   # Backend HTTP Settings
   validator_backend_http_settings = flatten([
     for env in local.validator_environments : [
-      # Frontend settings
+      # Frontend settings (Pass-through path, no override)
       {
         name                                = "validator-${env}-fe-http-settings"
         cookie_based_affinity               = "Disabled"
@@ -57,9 +57,9 @@ locals {
         request_timeout                     = 60
         probe_name                          = "validator-${env}-fe-probe"
         pick_host_name_from_backend_address = true
-        path                                = "/"
+        path                                = null # Do not rewrite path! App expects /validujeme prefix
       },
-      # Backend API settings (with /api/ path)
+      # Backend API settings (Pass-through path, no override)
       {
         name                                = "validator-${env}-be-http-settings"
         cookie_based_affinity               = "Disabled"
@@ -68,7 +68,7 @@ locals {
         request_timeout                     = 60
         probe_name                          = "validator-${env}-be-probe"
         pick_host_name_from_backend_address = true
-        path                                = "/api/"
+        path                                = null # Do not rewrite path! App expects /validujeme/api prefix
       },
       # Backend root settings (no path rewrite)
       {
@@ -90,7 +90,7 @@ locals {
         request_timeout                     = 60
         probe_name                          = "validator-${env}-be-probe"
         pick_host_name_from_backend_address = true
-        path                                = "/swagger-ui/index.html"
+        path                                = null
       },
       # Backend pass-through settings (no path override)
       {
@@ -157,6 +157,20 @@ locals {
     for listener in local.validator_http_listeners : listener if listener.enabled
   ]
 
+  # Redirect Configurations
+  validator_redirect_configurations = flatten([
+    for env in local.validator_environments : [
+      {
+        name                 = "redirect-root-to-validujeme-${env}"
+        redirect_type        = "Found"
+        target_url           = "https://${env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname}/validujeme"
+        target_listener_name = null
+        include_path         = false
+        include_query_string = true
+      }
+    ]
+  ])
+
   # URL Path Maps
   validator_url_path_maps = [
     for env in local.validator_environments : {
@@ -165,44 +179,37 @@ locals {
       default_backend_http_settings_name = "validator-${env}-fe-http-settings"
       path_rules = [
         {
+          name                       = "root-redirect-rule-${env}"
+          paths                      = ["/"]
+          redirect_configuration_name = "redirect-root-to-validujeme-${env}"
+        },
+        {
           name                       = "api-rule-${env}"
-          paths                      = ["/validator/api/*", "/validator/api", "/api/*", "/api"]
+          paths                      = ["/validujeme/api/*", "/validujeme/api"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-http-settings"
         },
         {
           name                       = "validator-api-docs-rule-${env}"
-          paths                      = ["/validator/api-docs", "/validator/api-docs/*"]
+          paths                      = ["/validujeme/api-docs", "/validujeme/api-docs/*"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },
         {
           name                       = "validator-v3-api-docs-rule-${env}"
-          paths                      = ["/validator/v3/*"]
+          paths                      = ["/validujeme/v3/*"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },
         {
           name                       = "validator-swagger-ui-rule-${env}"
-          paths                      = ["/validator/swagger-ui/*"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
-        },
-        {
-          name                       = "swagger-ui-rule-${env}"
-          paths                      = ["/swagger-ui/*"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
-        },
-        {
-          name                       = "openapi-v3-rule-${env}"
-          paths                      = ["/v3/*", "/v3"]
+          paths                      = ["/validujeme/swagger-ui/*", "/validujeme/swagger-ui", "/validujeme/swagger-ui.html"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },
         {
           name                       = "frontend-rule-${env}"
-          paths                      = ["/validator/*", "/validator", "/*"]
+          paths                      = ["/validujeme/*", "/validujeme"]
           backend_address_pool_name  = "validator-${env}-fe-pool"
           backend_http_settings_name = "validator-${env}-fe-http-settings"
         }
