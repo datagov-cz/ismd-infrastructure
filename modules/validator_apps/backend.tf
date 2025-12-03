@@ -74,10 +74,12 @@ resource "azurerm_container_app" "backend" {
         interval_seconds = 10
       }
       startup_probe {
-        transport        = "HTTP"
-        port             = 8080
-        path             = "/validujeme/actuator/health"
-        interval_seconds = 10
+        transport               = "HTTP"
+        port                    = 8080
+        path                    = "/validujeme/actuator/health"
+        interval_seconds        = 10
+        failure_count_threshold = 12
+        timeout                 = 5
       }
     }
   }

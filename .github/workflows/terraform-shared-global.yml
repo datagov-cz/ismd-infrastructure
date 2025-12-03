@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -167,8 +167,8 @@ jobs:
             RG="ismd-validator-$ENV"
             FE="ismd-validator-frontend-$ENV"
             BE="ismd-validator-backend-$ENV"
-            FE_FQDN=$(az containerapp show -g "$RG" -n "$FE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
-            BE_FQDN=$(az containerapp show -g "$RG" -n "$BE" --query properties.latestRevisionFqdn -o tsv 2>/dev/null || true)
+            FE_FQDN=$(az containerapp show -g "$RG" -n "$FE" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || true)
+            BE_FQDN=$(az containerapp show -g "$RG" -n "$BE" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || true)
             if [ -n "$FE_FQDN" ]; then
               echo "FE_FQDN_${ENV^^}=$FE_FQDN" >> $GITHUB_ENV
             fi
