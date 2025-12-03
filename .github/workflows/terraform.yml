@@ -41,7 +41,7 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6.0.1
     
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -117,6 +117,8 @@ jobs:
     # Image tags are managed via lifecycle ignore_changes in Terraform.
     
     - name: Terraform Plan
+      env:
+        TF_VAR_environment: ${{ env.ENVIRONMENT }}
       run: |
         terraform plan -out=tfplan
         
@@ -125,6 +127,8 @@ jobs:
         terraform show -no-color tfplan || echo "Plan creation failed"
     
     - name: Terraform Apply
+      env:
+        TF_VAR_environment: ${{ env.ENVIRONMENT }}
       run: |
         terraform apply -auto-approve tfplan
 
