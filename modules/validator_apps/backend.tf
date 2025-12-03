@@ -63,20 +63,20 @@ resource "azurerm_container_app" "backend" {
       liveness_probe {
         transport = "HTTP"
         port      = 8080
-        path      = "/actuator/health"
+        path      = "/validujeme/actuator/health"
         # Cost optimization: Longer intervals for dev environment
         interval_seconds = var.environment == "dev" ? 30 : 10
       }
       readiness_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/actuator/health"
+        path             = "/validujeme/actuator/health"
         interval_seconds = 10
       }
       startup_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/actuator/health"
+        path             = "/validujeme/actuator/health"
         interval_seconds = 10
       }
     }
