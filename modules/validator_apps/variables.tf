@@ -87,3 +87,9 @@ variable "workload_profile_type" {
   type        = string
   default     = "Consumption"
 }
+
+variable "additional_cors_origins" {
+  description = "List of additional CORS origins to allow"
+  type        = list(string)
+  default     = []
+}

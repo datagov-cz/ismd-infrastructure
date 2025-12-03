@@ -68,3 +68,9 @@ variable "backend_app_name" {
   type        = string
   default     = "ismd-validator-backend"
 }
+
+variable "additional_cors_origins" {
+  description = "List of additional CORS origins to allow"
+  type        = list(string)
+  default     = []
+}

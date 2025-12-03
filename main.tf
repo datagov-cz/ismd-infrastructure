@@ -53,6 +53,9 @@ module "dev" {
   frontend_app_name = var.frontend_app_name
   backend_app_name  = var.backend_app_name
 
+  # CORS
+  additional_cors_origins = var.additional_cors_origins
+
   # Resource groups
   shared_resource_group_name    = var.shared_resource_group_name
   validator_resource_group_name = var.validator_resource_group_name
@@ -73,6 +76,9 @@ module "test" {
   environment = "test"
   location    = var.location
 
+  # CORS
+  additional_cors_origins = var.additional_cors_origins
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
@@ -88,6 +94,9 @@ module "prod" {
   # Common variables
   environment = "prod"
   location    = var.location
+
+  # CORS
+  additional_cors_origins = var.additional_cors_origins
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
