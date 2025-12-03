@@ -174,15 +174,11 @@ locals {
   # URL Path Maps
   validator_url_path_maps = [
     for env in local.validator_environments : {
-      name                               = "path-map-${env}"
-      default_backend_address_pool_name  = "validator-${env}-fe-pool"
-      default_backend_http_settings_name = "validator-${env}-fe-http-settings"
+      name                                = "path-map-${env}"
+      default_backend_address_pool_name   = null
+      default_backend_http_settings_name  = null
+      default_redirect_configuration_name = "redirect-root-to-validujeme-${env}"
       path_rules = [
-        {
-          name                       = "root-redirect-rule-${env}"
-          paths                      = ["/"]
-          redirect_configuration_name = "redirect-root-to-validujeme-${env}"
-        },
         {
           name                       = "api-rule-${env}"
           paths                      = ["/validujeme/api/*", "/validujeme/api"]
