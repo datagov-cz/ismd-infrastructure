@@ -22,8 +22,8 @@ resource "azurerm_container_app" "frontend" {
         name = "NEXT_PUBLIC_BE_URL"
         # Include protocol for compatibility with current frontend (without interceptor)
         # Use HTTPS for TEST/PROD (accessed via HTTPS), HTTP for DEV (no cert yet)
-        # Path /validator is required for App Gateway routing
-        value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/validator" : "http://${var.app_gateway_public_ip}/validator") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/validator" : "https://${var.app_gateway_public_ip}/validator")
+        # Path /validujeme is required for App Gateway routing
+        value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/validujeme" : "http://${var.app_gateway_public_ip}/validujeme") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/validujeme" : "https://${var.app_gateway_public_ip}/validujeme")
       }
     }
   }

@@ -35,7 +35,7 @@ locals {
       {
         name                                      = "validator-${env}-be-probe"
         protocol                                  = "Http"
-        path                                      = "/actuator/health"
+        path                                      = "/validujeme/actuator/health"
         interval                                  = 30
         timeout                                   = 30
         unhealthy_threshold                       = 3
