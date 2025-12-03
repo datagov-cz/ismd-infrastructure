@@ -121,6 +121,8 @@ jobs:
         TF_VAR_environment: ${{ env.ENVIRONMENT }}
         TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
         TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
+        TF_VAR_app_gateway_hostname: ${{ env.ENVIRONMENT == 'dev' && vars.DEV_HOSTNAME || env.ENVIRONMENT == 'test' && vars.TEST_HOSTNAME || vars.PROD_HOSTNAME }}
+        TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
       run: |
         terraform plan -out=tfplan
         
@@ -133,6 +135,8 @@ jobs:
         TF_VAR_environment: ${{ env.ENVIRONMENT }}
         TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
         TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
+        TF_VAR_app_gateway_hostname: ${{ env.ENVIRONMENT == 'dev' && vars.DEV_HOSTNAME || env.ENVIRONMENT == 'test' && vars.TEST_HOSTNAME || vars.PROD_HOSTNAME }}
+        TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
       run: |
         terraform apply -auto-approve tfplan
 

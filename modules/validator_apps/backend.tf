@@ -1,5 +1,15 @@
 # Backend Container App for Validator
 
+locals {
+  base_origins = compact([
+    var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}" : "",
+    var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}" : "",
+    var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip}" : "",
+    var.app_gateway_public_ip != "" ? "https://${var.app_gateway_public_ip}" : ""
+  ])
+  all_origins = concat(local.base_origins, var.additional_cors_origins)
+}
+
 resource "azurerm_container_app" "backend" {
   name                         = "${var.backend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
@@ -49,7 +59,8 @@ resource "azurerm_container_app" "backend" {
         name = "CORS_ALLOWED_ORIGINS"
         # Support both HTTP and HTTPS for dual-protocol access
         # Include both domain and IP for environments where both are used (e.g., DEV)
-        value = var.app_gateway_hostname != "" && var.app_gateway_public_ip != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname},http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname},https://${var.app_gateway_hostname}" : var.app_gateway_public_ip != "" ? "http://${var.app_gateway_public_ip},https://${var.app_gateway_public_ip}" : ""
+        # Also includes additional origins if specified
+        value = join(",", local.all_origins)
       }
       env {
         name  = "PORT"

@@ -98,6 +98,12 @@ variable "backend_app_name" {
   default     = "ismd-validator-backend"
 }
 
+variable "additional_cors_origins" {
+  description = "List of additional CORS origins to allow"
+  type        = list(string)
+  default     = []
+}
+
 # Validator resource group (moved from old validator_environment module)
 resource "azurerm_resource_group" "validator" {
   name     = var.validator_resource_group_name
@@ -144,6 +150,9 @@ module "validator_apps" {
   # IP Restrictions
   app_gateway_public_ip = var.app_gateway_public_ip_address
   app_gateway_hostname  = var.app_gateway_hostname
+
+  # CORS
+  additional_cors_origins = var.additional_cors_origins
 
   # App names
   frontend_app_name = var.frontend_app_name
