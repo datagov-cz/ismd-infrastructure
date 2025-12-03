@@ -74,3 +74,9 @@ variable "additional_cors_origins" {
   type        = list(string)
   default     = []
 }
+
+variable "app_gateway_hostname" {
+  description = "Hostname for the environment (e.g., ismd.oha03.dia.gov.cz)"
+  type        = string
+  default     = ""
+}

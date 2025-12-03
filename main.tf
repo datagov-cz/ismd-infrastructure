@@ -55,6 +55,7 @@ module "dev" {
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
+  app_gateway_hostname    = var.app_gateway_hostname
 
   # Resource groups
   shared_resource_group_name    = var.shared_resource_group_name
@@ -78,6 +79,7 @@ module "test" {
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
+  app_gateway_hostname    = var.app_gateway_hostname
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
@@ -97,6 +99,7 @@ module "prod" {
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
+  app_gateway_hostname    = var.app_gateway_hostname
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
