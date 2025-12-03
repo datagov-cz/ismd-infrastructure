@@ -119,6 +119,8 @@ jobs:
     - name: Terraform Plan
       env:
         TF_VAR_environment: ${{ env.ENVIRONMENT }}
+        TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
+        TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
       run: |
         terraform plan -out=tfplan
         
@@ -129,6 +131,8 @@ jobs:
     - name: Terraform Apply
       env:
         TF_VAR_environment: ${{ env.ENVIRONMENT }}
+        TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
+        TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
       run: |
         terraform apply -auto-approve tfplan
 
