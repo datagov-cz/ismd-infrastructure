@@ -25,7 +25,7 @@ locals {
       {
         name                                      = "validator-${env}-fe-probe"
         protocol                                  = "Http"
-        path                                      = "/"
+        path                                      = "/validujeme"
         interval                                  = 30
         timeout                                   = 30
         unhealthy_threshold                       = 3
