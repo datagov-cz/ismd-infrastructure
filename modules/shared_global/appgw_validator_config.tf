@@ -10,11 +10,11 @@ locals {
     for env in local.validator_environments : [
       {
         name  = "validator-${env}-fe-pool"
-        fqdns = env == "dev" ? (var.frontend_fqdn != "" ? [var.frontend_fqdn] : ["${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}"]) : env == "test" ? (var.frontend_fqdn_test != "" ? [var.frontend_fqdn_test] : ["${var.frontend_app_name}-test.${var.container_app_environment_domain_test}"]) : (var.frontend_fqdn_prod != "" ? [var.frontend_fqdn_prod] : ["${var.frontend_app_name}-prod.${var.container_app_environment_domain_prod}"])
+        fqdns = env == "dev" ? (var.frontend_fqdn != "" ? [var.frontend_fqdn] : (var.container_app_environment_domain_dev != "" ? ["${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}"] : [])) : env == "test" ? (var.frontend_fqdn_test != "" ? [var.frontend_fqdn_test] : (var.container_app_environment_domain_test != "" ? ["${var.frontend_app_name}-test.${var.container_app_environment_domain_test}"] : [])) : (var.frontend_fqdn_prod != "" ? [var.frontend_fqdn_prod] : (var.container_app_environment_domain_prod != "" ? ["${var.frontend_app_name}-prod.${var.container_app_environment_domain_prod}"] : []))
       },
       {
         name  = "validator-${env}-be-pool"
-        fqdns = env == "dev" ? (var.backend_fqdn != "" ? [var.backend_fqdn] : ["${var.backend_app_name}-dev.${var.container_app_environment_domain_dev}"]) : env == "test" ? (var.backend_fqdn_test != "" ? [var.backend_fqdn_test] : ["${var.backend_app_name}-test.${var.container_app_environment_domain_test}"]) : (var.backend_fqdn_prod != "" ? [var.backend_fqdn_prod] : ["${var.backend_app_name}-prod.${var.container_app_environment_domain_prod}"])
+        fqdns = env == "dev" ? (var.backend_fqdn != "" ? [var.backend_fqdn] : (var.container_app_environment_domain_dev != "" ? ["${var.backend_app_name}-dev.${var.container_app_environment_domain_dev}"] : [])) : env == "test" ? (var.backend_fqdn_test != "" ? [var.backend_fqdn_test] : (var.container_app_environment_domain_test != "" ? ["${var.backend_app_name}-test.${var.container_app_environment_domain_test}"] : [])) : (var.backend_fqdn_prod != "" ? [var.backend_fqdn_prod] : (var.container_app_environment_domain_prod != "" ? ["${var.backend_app_name}-prod.${var.container_app_environment_domain_prod}"] : []))
       }
     ]
   ])
