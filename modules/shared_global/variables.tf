@@ -75,3 +75,33 @@ variable "ssl_certificate_keyvault_secret_id" {
   type        = string
   default     = "https://ismd-keyvault.vault.azure.net/secrets/datagov-cz"
 }
+
+variable "frontend_app_name" {
+  description = "Base name of the frontend container app"
+  type        = string
+  default     = "ismd-validator-frontend"
+}
+
+variable "backend_app_name" {
+  description = "Base name of the backend container app"
+  type        = string
+  default     = "ismd-validator-backend"
+}
+
+variable "container_app_environment_domain_dev" {
+  description = "Default domain of the DEV Container Apps environment"
+  type        = string
+  default     = ""
+}
+
+variable "container_app_environment_domain_test" {
+  description = "Default domain of the TEST Container Apps environment"
+  type        = string
+  default     = ""
+}
+
+variable "container_app_environment_domain_prod" {
+  description = "Default domain of the PROD Container Apps environment"
+  type        = string
+  default     = ""
+}

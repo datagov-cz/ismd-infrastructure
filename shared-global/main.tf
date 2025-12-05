@@ -48,6 +48,13 @@ module "shared_global" {
   dev_hostname  = var.dev_hostname
   test_hostname = var.test_hostname
   prod_hostname = var.prod_hostname
+
+  # Pass app names and environment domains to module for auto-calculation fallback
+  frontend_app_name                     = var.frontend_app_name
+  backend_app_name                      = var.backend_app_name
+  container_app_environment_domain_dev  = var.container_app_environment_domain_dev
+  container_app_environment_domain_test = var.container_app_environment_domain_test
+  container_app_environment_domain_prod = var.container_app_environment_domain_prod
 }
 
 output "resource_group_name" {
