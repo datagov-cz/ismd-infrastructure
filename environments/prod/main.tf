@@ -81,9 +81,9 @@ variable "app_gateway_public_ip_address" {
 }
 
 variable "app_gateway_hostname" {
-  description = "Hostname for the production environment (e.g., ismd.xn--slovnk-7va.gov.cz)"
+  description = "Hostname for the production environment (e.g., xn--slovnk-7va.gov.cz)"
   type        = string
-  default     = "ismd.xn--slovnk-7va.gov.cz"
+  default     = "xn--slovnk-7va.gov.cz"
 }
 
 variable "frontend_app_name" {
