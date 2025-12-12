@@ -157,19 +157,18 @@ locals {
     for listener in local.validator_http_listeners : listener if listener.enabled
   ]
 
-  # Redirect Configurations
-  validator_redirect_configurations = flatten([
-    for env in local.validator_environments : [
-      {
-        name                 = "redirect-root-to-validujeme-${env}"
-        redirect_type        = "Found"
-        target_url           = "https://${env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname}/validujeme"
-        target_listener_name = null
-        include_path         = false
-        include_query_string = true
-      }
-    ]
-  ])
+  # Redirect Configurations (use hostname if set, otherwise use IP)
+  validator_redirect_configurations = [
+    for env in local.validator_environments : {
+      name                 = "redirect-root-to-validujeme-${env}"
+      redirect_type        = "Found"
+      # Use hostname with HTTPS if set, otherwise use IP with HTTP
+      target_url           = (env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname) != "" ? "https://${env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname}/validujeme" : "http://${azurerm_public_ip.appgw.ip_address}/validujeme"
+      target_listener_name = null
+      include_path         = false
+      include_query_string = true
+    }
+  ]
 
   # URL Path Maps
   validator_url_path_maps = [
