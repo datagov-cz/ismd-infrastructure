@@ -121,11 +121,11 @@ jobs:
         TF_VAR_tool_postgres_password: ${{ secrets.TOOL_POSTGRES_PASSWORD }}
       run: |
         terraform plan -out=tfplan
-        
+
         # Display the plan for review
         echo "\n\nTerraform Plan Output:\n"
         terraform show -no-color tfplan || echo "Plan creation failed"
-    
+
     - name: Terraform Apply
       env:
         TF_VAR_environment: ${{ env.ENVIRONMENT }}
