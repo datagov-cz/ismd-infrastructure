@@ -115,11 +115,17 @@ jobs:
         run: |
           terraform plan -input=false \
             -var="environment=${{ matrix.environment }}" \
+            -var="shared_resource_group_name=ismd-shared-${{ matrix.environment }}" \
             -var="validator_resource_group_name=ismd-validator-${{ matrix.environment }}" \
+            -var="tool_resource_group_name=ismd-tool-${{ matrix.environment }}" \
             -var="frontend_image=${{ matrix.frontend_image }}" \
             -var="backend_image=${{ matrix.backend_image }}" \
             -var="frontend_image_tag=latest" \
-            -var="backend_image_tag=latest"
+            -var="backend_image_tag=latest" \
+            -var="tool_frontend_image=ghcr.io/datagov-cz/ismd-tool-frontend-${{ matrix.environment == 'dev' && 'dev' || '' }}" \
+            -var="tool_backend_image=ghcr.io/datagov-cz/ismd-tool-backend-${{ matrix.environment == 'dev' && 'dev' || '' }}" \
+            -var="tool_frontend_image_tag=latest" \
+            -var="tool_backend_image_tag=latest"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
