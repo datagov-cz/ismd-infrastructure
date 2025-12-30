@@ -25,6 +25,12 @@ variable "validator_resource_group_name" {
   default     = "ismd-validator-dev"
 }
 
+variable "tool_resource_group_name" {
+  description = "Name of the tool resource group"
+  type        = string
+  default     = "ismd-tool-dev"
+}
+
 variable "frontend_image" {
   description = "Base container image URL for the frontend (without tag)"
   type        = string
@@ -57,6 +63,30 @@ variable "backend_image_tag" {
     condition     = var.backend_image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.backend_image_tag))
     error_message = "The backend_image_tag must be 'latest' or a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
   }
+}
+
+variable "tool_frontend_image" {
+  description = "Base container image URL for the tool frontend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-tool-frontend-dev"
+}
+
+variable "tool_frontend_image_tag" {
+  description = "Tag for the tool frontend container image"
+  type        = string
+  default     = "latest"
+}
+
+variable "tool_backend_image" {
+  description = "Base container image URL for the tool backend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
+}
+
+variable "tool_backend_image_tag" {
+  description = "Tag for the tool backend container image"
+  type        = string
+  default     = "latest"
 }
 
 # Variables for connecting to the shared global network
@@ -98,10 +128,63 @@ variable "backend_app_name" {
   default     = "ismd-validator-backend"
 }
 
+variable "tool_frontend_app_name" {
+  description = "Name of the tool frontend application"
+  type        = string
+  default     = "ismd-tool-frontend"
+}
+
+variable "tool_backend_app_name" {
+  description = "Name of the tool backend application"
+  type        = string
+  default     = "ismd-tool-backend"
+}
+
+# Tool Database & Fuseki Configuration
+variable "tool_postgres_url" {
+  description = "JDBC URL for Tool PostgreSQL"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_postgres_user" {
+  description = "Tool PostgreSQL username"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_postgres_password" {
+  description = "Tool PostgreSQL password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_fuseki_url" {
+  description = "URL for Tool Fuseki"
+  type        = string
+  default     = ""
+}
+
+variable "tool_nextauth_secret" {
+  description = "NextAuth.js secret for Tool frontend"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
   type        = list(string)
   default     = []
+}
+
+variable "deploy_tool_apps" {
+  description = "Whether to deploy Tool apps (set to false to deploy only Validator)"
+  type        = bool
+  default     = true
 }
 
 # Validator resource group (moved from old validator_environment module)
@@ -113,6 +196,18 @@ resource "azurerm_resource_group" "validator" {
     Environment = var.environment
     ManagedBy   = "Terraform"
     Application = "Validator"
+  }
+}
+
+resource "azurerm_resource_group" "tool" {
+  count    = var.deploy_tool_apps ? 1 : 0
+  name     = var.tool_resource_group_name
+  location = var.location
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Application = "Tool"
   }
 }
 
@@ -168,6 +263,66 @@ module "validator_apps" {
   ]
 }
 
+# Create tool apps using shared Container App Environment
+module "tool_apps" {
+  count  = var.deploy_tool_apps ? 1 : 0
+  source = "../../modules/tool_apps"
+
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = var.tool_resource_group_name
+
+  # Required by the module
+  shared_resource_group_name               = var.shared_resource_group_name
+  container_app_environment_id             = module.shared.shared_container_app_environment_id
+  container_app_environment_default_domain = module.shared.shared_container_app_environment_default_domain
+
+  # Container Images
+  frontend_image     = var.tool_frontend_image
+  frontend_image_tag = var.tool_frontend_image_tag
+  backend_image      = var.tool_backend_image
+  backend_image_tag  = var.tool_backend_image_tag
+
+  # IP Restrictions
+  app_gateway_public_ip = var.app_gateway_public_ip_address
+  app_gateway_hostname  = var.app_gateway_hostname
+
+  # CORS
+  additional_cors_origins = var.additional_cors_origins
+
+  # App names
+  frontend_app_name = var.tool_frontend_app_name
+  backend_app_name  = var.tool_backend_app_name
+
+  # Workload profile configuration
+  workload_profile_name = "default"
+  workload_profile_type = "D4"
+
+  # Database & Fuseki Configuration
+  deploy_postgres         = true
+  deploy_fuseki           = true
+  postgres_db_name        = "ismd_tool_db"
+  postgres_admin_user     = "ismdadmin"
+  postgres_admin_password = var.tool_postgres_password
+  postgres_sku_name       = "B_Standard_B1ms"  # Burstable tier for dev
+  postgres_storage_mb     = 32768              # 32GB
+  fuseki_admin_password   = "admin123"
+  
+  # Fallback external URLs (used if deploy_postgres/fuseki = false)
+  postgres_url      = var.tool_postgres_url
+  postgres_user     = var.tool_postgres_user
+  postgres_password = var.tool_postgres_password
+  fuseki_url        = var.tool_fuseki_url
+
+  # Frontend auth
+  nextauth_secret = var.tool_nextauth_secret
+
+  depends_on = [
+    module.shared,
+    azurerm_resource_group.tool[0]
+  ]
+}
+
 # Outputs
 output "shared_resource_group_name" {
   value = module.shared.resource_group_name
@@ -187,6 +342,14 @@ output "validator_frontend_fqdn" {
 
 output "validator_backend_fqdn" {
   value = module.validator_apps.backend_fqdn
+}
+
+output "tool_frontend_fqdn" {
+  value = var.deploy_tool_apps ? module.tool_apps[0].frontend_fqdn : null
+}
+
+output "tool_backend_fqdn" {
+  value = var.deploy_tool_apps ? module.tool_apps[0].backend_fqdn : null
 }
 
 output "shared_container_app_environment_id" {

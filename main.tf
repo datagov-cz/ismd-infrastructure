@@ -60,6 +60,25 @@ module "dev" {
   # Resource groups
   shared_resource_group_name    = var.shared_resource_group_name
   validator_resource_group_name = var.validator_resource_group_name
+  tool_resource_group_name      = var.tool_resource_group_name
+
+  # Tool Apps
+  tool_frontend_image      = var.tool_frontend_image
+  tool_frontend_image_tag  = var.tool_frontend_image_tag
+  tool_backend_image       = var.tool_backend_image
+  tool_backend_image_tag   = var.tool_backend_image_tag
+  tool_frontend_app_name   = var.tool_frontend_app_name
+  tool_backend_app_name    = var.tool_backend_app_name
+
+  # Tool Database & Fuseki
+  tool_postgres_url      = var.tool_postgres_url
+  tool_postgres_user     = var.tool_postgres_user
+  tool_postgres_password = var.tool_postgres_password
+  tool_fuseki_url        = var.tool_fuseki_url
+  tool_nextauth_secret   = var.tool_nextauth_secret
+
+  # Toggle for Tool apps deployment
+  deploy_tool_apps = var.deploy_tool_apps
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
@@ -77,9 +96,40 @@ module "test" {
   environment = "test"
   location    = var.location
 
+  # Validator Apps
+  frontend_image     = var.frontend_image
+  frontend_image_tag = var.frontend_image_tag
+  backend_image      = var.backend_image
+  backend_image_tag  = var.backend_image_tag
+  frontend_app_name = var.frontend_app_name
+  backend_app_name  = var.backend_app_name
+
+  # Resource groups
+  shared_resource_group_name    = var.shared_resource_group_name
+  validator_resource_group_name = var.validator_resource_group_name
+  tool_resource_group_name      = var.tool_resource_group_name
+
+  # Tool Apps
+  tool_frontend_image      = var.tool_frontend_image
+  tool_frontend_image_tag  = var.tool_frontend_image_tag
+  tool_backend_image       = var.tool_backend_image
+  tool_backend_image_tag   = var.tool_backend_image_tag
+  tool_frontend_app_name   = var.tool_frontend_app_name
+  tool_backend_app_name    = var.tool_backend_app_name
+
+  # Tool Database & Fuseki
+  tool_postgres_url      = var.tool_postgres_url
+  tool_postgres_user     = var.tool_postgres_user
+  tool_postgres_password = var.tool_postgres_password
+  tool_fuseki_url        = var.tool_fuseki_url
+  tool_nextauth_secret   = var.tool_nextauth_secret
+
   # CORS
   additional_cors_origins = var.additional_cors_origins
   app_gateway_hostname    = var.app_gateway_hostname
+
+  # Toggle for Tool apps deployment
+  deploy_tool_apps = var.deploy_tool_apps
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
@@ -97,9 +147,40 @@ module "prod" {
   environment = "prod"
   location    = var.location
 
+  # Validator Apps
+  frontend_image     = var.frontend_image
+  frontend_image_tag = var.frontend_image_tag
+  backend_image      = var.backend_image
+  backend_image_tag  = var.backend_image_tag
+  frontend_app_name = var.frontend_app_name
+  backend_app_name  = var.backend_app_name
+
+  # Resource groups
+  shared_resource_group_name    = var.shared_resource_group_name
+  validator_resource_group_name = var.validator_resource_group_name
+  tool_resource_group_name      = var.tool_resource_group_name
+
+  # Tool Apps
+  tool_frontend_image      = var.tool_frontend_image
+  tool_frontend_image_tag  = var.tool_frontend_image_tag
+  tool_backend_image       = var.tool_backend_image
+  tool_backend_image_tag   = var.tool_backend_image_tag
+  tool_frontend_app_name   = var.tool_frontend_app_name
+  tool_backend_app_name    = var.tool_backend_app_name
+
+  # Tool Database & Fuseki
+  tool_postgres_url      = var.tool_postgres_url
+  tool_postgres_user     = var.tool_postgres_user
+  tool_postgres_password = var.tool_postgres_password
+  tool_fuseki_url        = var.tool_fuseki_url
+  tool_nextauth_secret   = var.tool_nextauth_secret
+
   # CORS
   additional_cors_origins = var.additional_cors_origins
   app_gateway_hostname    = var.app_gateway_hostname
+
+  # Toggle for Tool apps deployment
+  deploy_tool_apps = var.deploy_tool_apps
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")

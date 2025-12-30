@@ -1,0 +1,102 @@
+name: Infrastructure Plan
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write # For Azure OIDC if used, otherwise standard creds
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Common variables that might be needed
+  TF_VAR_location: "germanywestcentral"
+  
+  # Container App Environment Domains (Stable Identifiers)
+  TF_VAR_container_app_environment_domain_dev: "livelydesert-e8731aef.germanywestcentral.azurecontainerapps.io"
+  TF_VAR_container_app_environment_domain_test: "mangodune-bfe5a576.germanywestcentral.azurecontainerapps.io"
+  TF_VAR_container_app_environment_domain_prod: "ashypebble-1dbef699.germanywestcentral.azurecontainerapps.io"
+
+jobs:
+  plan-shared-global:
+    name: Plan Shared Global
+    runs-on: ubuntu-latest
+    environment: DEV # Using DEV env for access to secrets if needed
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6.0.1
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0" # Specify version matching your local/lock
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: shared-global
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: shared-global
+        run: terraform plan -input=false
+
+  plan-environments:
+    name: Plan Environment
+    runs-on: ubuntu-latest
+    # needs: plan-shared-global  <-- Removed to allow parallelism
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, test]
+        include:
+          - environment: dev
+            frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
+            backend_image: "ghcr.io/datagov-cz/ismd-validator-backend-dev"
+            # Add hostname if known, or leave empty
+          - environment: test
+            frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend"
+            backend_image: "ghcr.io/datagov-cz/ismd-validator-backend"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6.0.1
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Select Workspace
+        run: |
+          terraform workspace select ${{ matrix.environment }} || terraform workspace new ${{ matrix.environment }}
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -input=false \
+            -var="environment=${{ matrix.environment }}" \
+            -var="validator_resource_group_name=ismd-validator-${{ matrix.environment }}" \
+            -var="frontend_image=${{ matrix.frontend_image }}" \
+            -var="backend_image=${{ matrix.backend_image }}" \
+            -var="frontend_image_tag=latest" \
+            -var="backend_image_tag=latest"

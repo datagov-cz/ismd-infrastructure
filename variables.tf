@@ -45,6 +45,89 @@ variable "validator_resource_group_name" {
   type        = string
 }
 
+variable "tool_resource_group_name" {
+  description = "Name of the tool resource group"
+  type        = string
+}
+
+variable "tool_frontend_image" {
+  description = "Base container image URL for the tool frontend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-tool-frontend-dev"
+}
+
+variable "tool_frontend_image_tag" {
+  description = "Tag for the tool frontend container image"
+  type        = string
+  default     = "latest"
+}
+
+variable "tool_backend_image" {
+  description = "Base container image URL for the tool backend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
+}
+
+variable "tool_backend_image_tag" {
+  description = "Tag for the tool backend container image"
+  type        = string
+  default     = "latest"
+}
+
+variable "tool_frontend_app_name" {
+  description = "Base name of the tool frontend container app (without environment suffix)"
+  type        = string
+  default     = "ismd-tool-frontend"
+}
+
+variable "tool_backend_app_name" {
+  description = "Base name of the tool backend container app (without environment suffix)"
+  type        = string
+  default     = "ismd-tool-backend"
+}
+
+# Tool Database & Fuseki Configuration
+variable "tool_postgres_url" {
+  description = "JDBC URL for Tool PostgreSQL"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_postgres_user" {
+  description = "Tool PostgreSQL username"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_postgres_password" {
+  description = "Tool PostgreSQL password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_fuseki_url" {
+  description = "URL for Tool Fuseki"
+  type        = string
+  default     = ""
+}
+
+variable "tool_nextauth_secret" {
+  description = "NextAuth.js secret for Tool frontend"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_fuseki_admin_password" {
+  description = "Admin password for Tool Fuseki"
+  type        = string
+  sensitive   = true
+  default     = "admin123"
+}
+
 variable "subscription_id" {
   description = "The Azure subscription ID"
   type        = string
@@ -79,4 +162,10 @@ variable "app_gateway_hostname" {
   description = "Hostname for the environment (e.g., ismd.oha03.dia.gov.cz)"
   type        = string
   default     = ""
+}
+
+variable "deploy_tool_apps" {
+  description = "Whether to deploy Tool apps (set to false to deploy only Validator)"
+  type        = bool
+  default     = true
 }
