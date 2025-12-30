@@ -76,7 +76,7 @@ resource "azurerm_application_gateway" "appgw" {
   # Backend Address Pools
   # ========================================
   dynamic "backend_address_pool" {
-    for_each = local.validator_backend_pools
+    for_each = concat(local.validator_backend_pools, local.tool_backend_pools)
     content {
       name  = backend_address_pool.value.name
       fqdns = backend_address_pool.value.fqdns
@@ -87,7 +87,7 @@ resource "azurerm_application_gateway" "appgw" {
   # Health Probes
   # ========================================
   dynamic "probe" {
-    for_each = local.validator_probes
+    for_each = concat(local.validator_probes, local.tool_probes)
     content {
       name                                      = probe.value.name
       protocol                                  = probe.value.protocol
@@ -107,7 +107,7 @@ resource "azurerm_application_gateway" "appgw" {
   # Backend HTTP Settings
   # ========================================
   dynamic "backend_http_settings" {
-    for_each = local.validator_backend_http_settings
+    for_each = concat(local.validator_backend_http_settings, local.tool_backend_http_settings)
     content {
       name                                = backend_http_settings.value.name
       cookie_based_affinity               = backend_http_settings.value.cookie_based_affinity

@@ -48,21 +48,23 @@ locals {
     }
   ]
 
-  # Default request routing rules
+  # Default request routing rules (IP-based fallback - lowest priority)
+  # These should have HIGHER priority numbers (lower precedence) than hostname-based rules
+  # so that hostname-specific listeners are matched first
   appgw_default_routing_rules = [
     {
       name               = "http-ipv4-rule"
       rule_type          = "PathBasedRouting"
       http_listener_name = "http-ipv4-listener"
       url_path_map_name  = "path-map-dev"
-      priority           = 100
+      priority           = 500
     },
     {
       name               = "http-ipv6-rule"
       rule_type          = "PathBasedRouting"
       http_listener_name = "http-ipv6-listener"
       url_path_map_name  = "path-map-dev"
-      priority           = 101
+      priority           = 501
     }
   ]
 
