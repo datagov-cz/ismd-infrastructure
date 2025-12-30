@@ -1,9 +1,17 @@
 name: Infrastructure Plan
 
 on:
-  pull_request:
-    branches: [ main, dev ]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to plan (dev, test, or all)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - all
 
 permissions:
   contents: read
@@ -27,7 +35,7 @@ jobs:
   plan-shared-global:
     name: Plan Shared Global
     runs-on: ubuntu-latest
-    environment: DEV # Using DEV env for access to secrets if needed
+    # No environment needed - uses repo secrets only
     
     steps:
       - name: Checkout Code
@@ -65,19 +73,20 @@ jobs:
   plan-environments:
     name: Plan Environment
     runs-on: ubuntu-latest
-    # needs: plan-shared-global  <-- Removed to allow parallelism
+    # No environment needed - uses repo secrets only
     strategy:
       fail-fast: false
       matrix:
-        environment: [dev, test]
+        environment: ${{ inputs.environment == 'all' && fromJson('["dev", "test"]') || fromJson(format('["{0}"]', inputs.environment)) }}
         include:
           - environment: dev
             frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
             backend_image: "ghcr.io/datagov-cz/ismd-validator-backend-dev"
-            # Add hostname if known, or leave empty
+            app_gateway_hostname: ""
           - environment: test
             frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend"
             backend_image: "ghcr.io/datagov-cz/ismd-validator-backend"
+            app_gateway_hostname: "oha03.dia.gov.cz"
 
     steps:
       - name: Checkout Code
@@ -127,7 +136,8 @@ jobs:
             -var="tool_frontend_image_tag=latest" \
             -var="tool_backend_image_tag=latest" \
             -var="tool_postgres_password=${{ secrets.TOOL_POSTGRES_PASSWORD }}" \
-            -var="tool_nextauth_secret=${{ secrets.TOOL_NEXTAUTH_SECRET }}"
+            -var="tool_nextauth_secret=${{ secrets.TOOL_NEXTAUTH_SECRET }}" \
+            -var="app_gateway_hostname=${{ matrix.app_gateway_hostname }}"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
