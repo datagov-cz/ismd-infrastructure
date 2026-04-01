@@ -175,6 +175,92 @@ variable "tool_nextauth_secret" {
   default     = ""
 }
 
+variable "tool_base_path" {
+  description = "Optional base path prefix for tool app routes (e.g. /popisujeme). Use empty string for root deployment."
+  type        = string
+  default     = "/popisujeme"
+}
+
+variable "tool_deploy_keycloak" {
+  description = "Whether to deploy Keycloak in tool apps"
+  type        = bool
+  default     = true
+}
+
+variable "tool_enable_caais" {
+  description = "Whether to enable CAAIS integration for Keycloak"
+  type        = bool
+  default     = true
+}
+
+variable "tool_keycloak_image" {
+  description = "Base image for Keycloak container app"
+  type        = string
+  default     = "quay.io/keycloak/keycloak"
+}
+
+variable "tool_keycloak_image_tag" {
+  description = "Tag for Keycloak container app image"
+  type        = string
+  default     = "24.0.2"
+}
+
+variable "tool_keycloak_app_name" {
+  description = "Base name for Keycloak container app"
+  type        = string
+  default     = "ismd-tool-keycloak"
+}
+
+variable "tool_keycloak_admin_user" {
+  description = "Keycloak admin username"
+  type        = string
+  default     = "admin"
+}
+
+variable "tool_keycloak_admin_password" {
+  description = "Keycloak admin password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_keycloak_hostname" {
+  description = "Optional Keycloak hostname for admin and public endpoints"
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_realm" {
+  description = "Keycloak realm used by tool apps"
+  type        = string
+  default     = "ismd"
+}
+
+variable "tool_keycloak_issuer_uri" {
+  description = "Optional explicit Keycloak issuer URI override"
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_client_id" {
+  description = "OIDC client ID used by tool apps"
+  type        = string
+  default     = "ismd-app"
+}
+
+variable "tool_keycloak_client_secret" {
+  description = "OIDC client secret used by tool apps"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_caais_client_id" {
+  description = "CAAIS client ID configured in Keycloak"
+  type        = string
+  default     = ""
+}
+
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
   type        = list(string)
@@ -256,7 +342,7 @@ module "validator_apps" {
   # Workload profile configuration
   workload_profile_name = "default"
   workload_profile_type = "D4"
-  
+
   depends_on = [
     module.shared,
     azurerm_resource_group.validator
@@ -304,10 +390,10 @@ module "tool_apps" {
   postgres_db_name        = "ismd_tool_db"
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password
-  postgres_sku_name       = "B_Standard_B1ms"  # Burstable tier for dev
-  postgres_storage_mb     = 32768              # 32GB
+  postgres_sku_name       = "B_Standard_B1ms" # Burstable tier for dev
+  postgres_storage_mb     = 32768             # 32GB
   fuseki_admin_password   = "admin123"
-  
+
   # Fallback external URLs (used if deploy_postgres/fuseki = false)
   postgres_url      = var.tool_postgres_url
   postgres_user     = var.tool_postgres_user
@@ -316,6 +402,22 @@ module "tool_apps" {
 
   # Frontend auth
   nextauth_secret = var.tool_nextauth_secret
+  tool_base_path  = var.tool_base_path
+
+  # Keycloak / CAAIS
+  deploy_keycloak         = var.tool_deploy_keycloak
+  enable_caais            = var.tool_enable_caais
+  keycloak_image          = var.tool_keycloak_image
+  keycloak_image_tag      = var.tool_keycloak_image_tag
+  keycloak_app_name       = var.tool_keycloak_app_name
+  keycloak_admin_user     = var.tool_keycloak_admin_user
+  keycloak_admin_password = var.tool_keycloak_admin_password
+  keycloak_hostname       = var.tool_keycloak_hostname
+  keycloak_realm          = var.tool_keycloak_realm
+  keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
+  keycloak_client_id      = var.tool_keycloak_client_id
+  keycloak_client_secret  = var.tool_keycloak_client_secret
+  caais_client_id         = var.tool_caais_client_id
 
   depends_on = [
     module.shared,

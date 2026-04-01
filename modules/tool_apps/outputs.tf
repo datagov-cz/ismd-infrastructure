@@ -51,3 +51,28 @@ output "fuseki_name" {
   description = "The name of the Fuseki container app"
   value       = var.deploy_fuseki ? azurerm_container_app.fuseki[0].name : null
 }
+
+output "keycloak_name" {
+  description = "The name of the Keycloak container app"
+  value       = var.deploy_keycloak ? azurerm_container_app.keycloak[0].name : null
+}
+
+output "keycloak_fqdn" {
+  description = "The FQDN of the Keycloak container app"
+  value       = var.deploy_keycloak ? azurerm_container_app.keycloak[0].ingress[0].fqdn : null
+}
+
+output "keycloak_issuer_uri" {
+  description = "The Keycloak issuer URI used by frontend/backend"
+  value       = local.keycloak_issuer_uri
+}
+
+output "keycloak_public_base_url" {
+  description = "The public Keycloak base URL exposed through the gateway"
+  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}/auth" : null
+}
+
+output "keycloak_caais_broker_callback_template" {
+  description = "Template callback URL to register in CAAIS (replace <idp-alias> with the Keycloak broker alias)"
+  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}/auth/realms/${var.keycloak_realm}/broker/<idp-alias>/endpoint" : null
+}

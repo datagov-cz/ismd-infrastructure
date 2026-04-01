@@ -115,7 +115,7 @@ locals {
         frontend_ip_configuration_name = "appGwPublicFrontendIpIPv4"
         frontend_port_name             = "port_80"
         protocol                       = "Http"
-        host_name = env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname
+        host_name                      = env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname
         ssl_certificate_name           = null
         enabled                        = env == "dev" ? var.dev_hostname != "" : env == "test" ? var.test_hostname != "" : var.prod_hostname != ""
       },
@@ -160,8 +160,8 @@ locals {
   # Redirect Configurations (use hostname if set, otherwise use IP)
   validator_redirect_configurations = [
     for env in local.validator_environments : {
-      name                 = "redirect-root-to-validujeme-${env}"
-      redirect_type        = "Found"
+      name          = "redirect-root-to-validujeme-${env}"
+      redirect_type = "Found"
       # Use hostname with HTTPS if set, otherwise use IP with HTTP
       target_url           = (env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname) != "" ? "https://${env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname}/validujeme" : "http://${azurerm_public_ip.appgw.ip_address}/validujeme"
       target_listener_name = null

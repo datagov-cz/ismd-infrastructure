@@ -4,6 +4,11 @@
 locals {
   # Environment-specific settings for tool
   tool_environments = ["dev", "test", "prod"]
+  tool_hostnames = {
+    dev  = var.dev_hostname
+    test = var.test_hostname
+    prod = var.prod_hostname
+  }
 
   # Tool Backend Address Pools
   tool_backend_pools = flatten([
@@ -15,8 +20,23 @@ locals {
       {
         name  = "tool-${env}-be-pool"
         fqdns = var.container_app_environment_domain_dev != "" && env == "dev" ? ["ismd-tool-backend-dev.${var.container_app_environment_domain_dev}"] : var.container_app_environment_domain_test != "" && env == "test" ? ["ismd-tool-backend-test.${var.container_app_environment_domain_test}"] : var.container_app_environment_domain_prod != "" && env == "prod" ? ["ismd-tool-backend-prod.${var.container_app_environment_domain_prod}"] : []
+      },
+      {
+        name  = "tool-${env}-keycloak-pool"
+        fqdns = var.container_app_environment_domain_dev != "" && env == "dev" ? ["ismd-tool-keycloak-dev.${var.container_app_environment_domain_dev}"] : var.container_app_environment_domain_test != "" && env == "test" ? ["ismd-tool-keycloak-test.${var.container_app_environment_domain_test}"] : var.container_app_environment_domain_prod != "" && env == "prod" ? ["ismd-tool-keycloak-prod.${var.container_app_environment_domain_prod}"] : []
       }
     ]
+  ])
+
+  tool_keycloak_rewrite_rule_sets = flatten([
+    for env in local.tool_environments : (
+      local.tool_hostnames[env] != "" && length(regexall("^[\\x20-\\x7E]+$", local.tool_hostnames[env])) > 0 ? [
+        {
+          name      = "tool-keycloak-headers-${env}"
+          host_name = local.tool_hostnames[env]
+        }
+      ] : []
+    )
   ])
 
   # Tool Health Probes
@@ -36,6 +56,16 @@ locals {
         name                                      = "tool-${env}-be-probe"
         protocol                                  = "Http"
         path                                      = "/popisujeme/actuator/health"
+        interval                                  = 30
+        timeout                                   = 30
+        unhealthy_threshold                       = 3
+        pick_host_name_from_backend_http_settings = true
+        match_status_codes                        = ["200-399"]
+      },
+      {
+        name                                      = "tool-${env}-keycloak-probe"
+        protocol                                  = "Http"
+        path                                      = "/auth/health/ready"
         interval                                  = 30
         timeout                                   = 30
         unhealthy_threshold                       = 3
@@ -80,6 +110,18 @@ locals {
         probe_name                          = "tool-${env}-be-probe"
         pick_host_name_from_backend_address = true
         path                                = null
+      },
+      # Keycloak settings
+      {
+        name                                = "tool-${env}-keycloak-http-settings"
+        cookie_based_affinity               = "Disabled"
+        port                                = 80
+        protocol                            = "Http"
+        request_timeout                     = 60
+        probe_name                          = "tool-${env}-keycloak-probe"
+        pick_host_name_from_backend_address = false
+        host_name                           = env == "dev" && var.container_app_environment_domain_dev != "" ? "ismd-tool-keycloak-dev.${var.container_app_environment_domain_dev}" : env == "test" && var.container_app_environment_domain_test != "" ? "ismd-tool-keycloak-test.${var.container_app_environment_domain_test}" : env == "prod" && var.container_app_environment_domain_prod != "" ? "ismd-tool-keycloak-prod.${var.container_app_environment_domain_prod}" : null
+        path                                = null
       }
     ]
   ])
@@ -87,6 +129,19 @@ locals {
   # Tool path rules to be added to existing URL path maps
   tool_path_rules = {
     for env in local.tool_environments : env => [
+      {
+        name                       = "tool-keycloak-rule-${env}"
+        paths                      = ["/auth", "/auth/*"]
+        backend_address_pool_name  = "tool-${env}-keycloak-pool"
+        backend_http_settings_name = "tool-${env}-keycloak-http-settings"
+        rewrite_rule_set_name      = local.tool_hostnames[env] != "" && length(regexall("^[\\x20-\\x7E]+$", local.tool_hostnames[env])) > 0 ? "tool-keycloak-headers-${env}" : null
+      },
+      {
+        name                       = "tool-nextauth-rule-${env}"
+        paths                      = ["/popisujeme/api/auth", "/popisujeme/api/auth/*"]
+        backend_address_pool_name  = "tool-${env}-fe-pool"
+        backend_http_settings_name = "tool-${env}-fe-http-settings"
+      },
       {
         name                       = "tool-api-rule-${env}"
         paths                      = ["/popisujeme/api/*", "/popisujeme/api"]

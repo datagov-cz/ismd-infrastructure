@@ -9,7 +9,7 @@ terraform {
 
 provider "azurerm" {
   subscription_id = "7d72da57-155c-4d56-883e-0e68a747e9e1" # InformacniSystemModelovaniDat
-  
+
   features {
     # Allow the provider to delete resources that exist in the state but not in the configuration
     # This is useful for cleaning up resources that are no longer needed
@@ -63,19 +63,33 @@ module "dev" {
   tool_resource_group_name      = var.tool_resource_group_name
 
   # Tool Apps
-  tool_frontend_image      = var.tool_frontend_image
-  tool_frontend_image_tag  = var.tool_frontend_image_tag
-  tool_backend_image       = var.tool_backend_image
-  tool_backend_image_tag   = var.tool_backend_image_tag
-  tool_frontend_app_name   = var.tool_frontend_app_name
-  tool_backend_app_name    = var.tool_backend_app_name
+  tool_frontend_image     = var.tool_frontend_image
+  tool_frontend_image_tag = var.tool_frontend_image_tag
+  tool_backend_image      = var.tool_backend_image
+  tool_backend_image_tag  = var.tool_backend_image_tag
+  tool_frontend_app_name  = var.tool_frontend_app_name
+  tool_backend_app_name   = var.tool_backend_app_name
 
   # Tool Database & Fuseki
-  tool_postgres_url      = var.tool_postgres_url
-  tool_postgres_user     = var.tool_postgres_user
-  tool_postgres_password = var.tool_postgres_password
-  tool_fuseki_url        = var.tool_fuseki_url
-  tool_nextauth_secret   = var.tool_nextauth_secret
+  tool_postgres_url            = var.tool_postgres_url
+  tool_postgres_user           = var.tool_postgres_user
+  tool_postgres_password       = var.tool_postgres_password
+  tool_fuseki_url              = var.tool_fuseki_url
+  tool_nextauth_secret         = var.tool_nextauth_secret
+  tool_base_path               = var.tool_base_path
+  tool_deploy_keycloak         = var.tool_deploy_keycloak
+  tool_enable_caais            = var.tool_enable_caais
+  tool_keycloak_image          = var.tool_keycloak_image
+  tool_keycloak_image_tag      = var.tool_keycloak_image_tag
+  tool_keycloak_app_name       = var.tool_keycloak_app_name
+  tool_keycloak_admin_user     = var.tool_keycloak_admin_user
+  tool_keycloak_admin_password = var.tool_keycloak_admin_password
+  tool_keycloak_hostname       = var.tool_keycloak_hostname
+  tool_keycloak_realm          = var.tool_keycloak_realm
+  tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
+  tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_client_secret  = var.tool_keycloak_client_secret
+  tool_caais_client_id         = var.tool_caais_client_id
 
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
@@ -101,8 +115,8 @@ module "test" {
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
-  frontend_app_name = var.frontend_app_name
-  backend_app_name  = var.backend_app_name
+  frontend_app_name  = var.frontend_app_name
+  backend_app_name   = var.backend_app_name
 
   # Resource groups
   shared_resource_group_name    = var.shared_resource_group_name
@@ -110,19 +124,33 @@ module "test" {
   tool_resource_group_name      = var.tool_resource_group_name
 
   # Tool Apps
-  tool_frontend_image      = var.tool_frontend_image
-  tool_frontend_image_tag  = var.tool_frontend_image_tag
-  tool_backend_image       = var.tool_backend_image
-  tool_backend_image_tag   = var.tool_backend_image_tag
-  tool_frontend_app_name   = var.tool_frontend_app_name
-  tool_backend_app_name    = var.tool_backend_app_name
+  tool_frontend_image     = var.tool_frontend_image
+  tool_frontend_image_tag = var.tool_frontend_image_tag
+  tool_backend_image      = var.tool_backend_image
+  tool_backend_image_tag  = var.tool_backend_image_tag
+  tool_frontend_app_name  = var.tool_frontend_app_name
+  tool_backend_app_name   = var.tool_backend_app_name
 
   # Tool Database & Fuseki
-  tool_postgres_url      = var.tool_postgres_url
-  tool_postgres_user     = var.tool_postgres_user
-  tool_postgres_password = var.tool_postgres_password
-  tool_fuseki_url        = var.tool_fuseki_url
-  tool_nextauth_secret   = var.tool_nextauth_secret
+  tool_postgres_url            = var.tool_postgres_url
+  tool_postgres_user           = var.tool_postgres_user
+  tool_postgres_password       = var.tool_postgres_password
+  tool_fuseki_url              = var.tool_fuseki_url
+  tool_nextauth_secret         = var.tool_nextauth_secret
+  tool_base_path               = var.tool_base_path
+  tool_deploy_keycloak         = var.tool_deploy_keycloak
+  tool_enable_caais            = var.tool_enable_caais
+  tool_keycloak_image          = var.tool_keycloak_image
+  tool_keycloak_image_tag      = var.tool_keycloak_image_tag
+  tool_keycloak_app_name       = var.tool_keycloak_app_name
+  tool_keycloak_admin_user     = var.tool_keycloak_admin_user
+  tool_keycloak_admin_password = var.tool_keycloak_admin_password
+  tool_keycloak_hostname       = var.tool_keycloak_hostname
+  tool_keycloak_realm          = var.tool_keycloak_realm
+  tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
+  tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_client_secret  = var.tool_keycloak_client_secret
+  tool_caais_client_id         = var.tool_caais_client_id
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
@@ -152,8 +180,8 @@ module "prod" {
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
-  frontend_app_name = var.frontend_app_name
-  backend_app_name  = var.backend_app_name
+  frontend_app_name  = var.frontend_app_name
+  backend_app_name   = var.backend_app_name
 
   # Resource groups
   shared_resource_group_name    = var.shared_resource_group_name
@@ -161,19 +189,33 @@ module "prod" {
   tool_resource_group_name      = var.tool_resource_group_name
 
   # Tool Apps
-  tool_frontend_image      = var.tool_frontend_image
-  tool_frontend_image_tag  = var.tool_frontend_image_tag
-  tool_backend_image       = var.tool_backend_image
-  tool_backend_image_tag   = var.tool_backend_image_tag
-  tool_frontend_app_name   = var.tool_frontend_app_name
-  tool_backend_app_name    = var.tool_backend_app_name
+  tool_frontend_image     = var.tool_frontend_image
+  tool_frontend_image_tag = var.tool_frontend_image_tag
+  tool_backend_image      = var.tool_backend_image
+  tool_backend_image_tag  = var.tool_backend_image_tag
+  tool_frontend_app_name  = var.tool_frontend_app_name
+  tool_backend_app_name   = var.tool_backend_app_name
 
   # Tool Database & Fuseki
-  tool_postgres_url      = var.tool_postgres_url
-  tool_postgres_user     = var.tool_postgres_user
-  tool_postgres_password = var.tool_postgres_password
-  tool_fuseki_url        = var.tool_fuseki_url
-  tool_nextauth_secret   = var.tool_nextauth_secret
+  tool_postgres_url            = var.tool_postgres_url
+  tool_postgres_user           = var.tool_postgres_user
+  tool_postgres_password       = var.tool_postgres_password
+  tool_fuseki_url              = var.tool_fuseki_url
+  tool_nextauth_secret         = var.tool_nextauth_secret
+  tool_base_path               = var.tool_base_path
+  tool_deploy_keycloak         = var.tool_deploy_keycloak
+  tool_enable_caais            = var.tool_enable_caais
+  tool_keycloak_image          = var.tool_keycloak_image
+  tool_keycloak_image_tag      = var.tool_keycloak_image_tag
+  tool_keycloak_app_name       = var.tool_keycloak_app_name
+  tool_keycloak_admin_user     = var.tool_keycloak_admin_user
+  tool_keycloak_admin_password = var.tool_keycloak_admin_password
+  tool_keycloak_hostname       = var.tool_keycloak_hostname
+  tool_keycloak_realm          = var.tool_keycloak_realm
+  tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
+  tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_client_secret  = var.tool_keycloak_client_secret
+  tool_caais_client_id         = var.tool_caais_client_id
 
   # CORS
   additional_cors_origins = var.additional_cors_origins

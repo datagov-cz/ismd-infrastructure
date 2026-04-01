@@ -116,6 +116,7 @@ resource "azurerm_application_gateway" "appgw" {
       request_timeout                     = backend_http_settings.value.request_timeout
       probe_name                          = backend_http_settings.value.probe_name
       pick_host_name_from_backend_address = backend_http_settings.value.pick_host_name_from_backend_address
+      host_name                           = try(backend_http_settings.value.host_name, null)
       path                                = backend_http_settings.value.path
     }
   }
@@ -166,24 +167,76 @@ resource "azurerm_application_gateway" "appgw" {
   }
 
   # ========================================
+  # Rewrite Rule Sets (Keycloak headers)
+  # ========================================
+  dynamic "rewrite_rule_set" {
+    for_each = local.tool_keycloak_rewrite_rule_sets
+    content {
+      name = rewrite_rule_set.value.name
+
+      rewrite_rule {
+        name          = "set-forwarded-headers"
+        rule_sequence = 1
+
+        request_header_configuration {
+          header_name  = "X-Forwarded-Proto"
+          header_value = "https"
+        }
+
+        request_header_configuration {
+          header_name  = "X-Forwarded-Host"
+          header_value = rewrite_rule_set.value.host_name
+        }
+
+        request_header_configuration {
+          header_name  = "X-Forwarded-Port"
+          header_value = "443"
+        }
+
+        request_header_configuration {
+          header_name  = "Forwarded"
+          header_value = "proto=https;host=${rewrite_rule_set.value.host_name}"
+        }
+
+        response_header_configuration {
+          header_name  = "X-AppGW-Rewrite"
+          header_value = "keycloak"
+        }
+
+        response_header_configuration {
+          header_name  = "X-AppGW-Forwarded-Proto"
+          header_value = "https"
+        }
+
+        response_header_configuration {
+          header_name  = "X-Frame-Options"
+          header_value = ""
+        }
+
+      }
+    }
+  }
+
+  # ========================================
   # URL Path Maps
   # ========================================
   dynamic "url_path_map" {
     for_each = local.validator_url_path_maps
     content {
-      name                               = url_path_map.value.name
-      default_backend_address_pool_name  = url_path_map.value.default_backend_address_pool_name
-      default_backend_http_settings_name = url_path_map.value.default_backend_http_settings_name
+      name                                = url_path_map.value.name
+      default_backend_address_pool_name   = url_path_map.value.default_backend_address_pool_name
+      default_backend_http_settings_name  = url_path_map.value.default_backend_http_settings_name
       default_redirect_configuration_name = try(url_path_map.value.default_redirect_configuration_name, null)
 
       dynamic "path_rule" {
         for_each = url_path_map.value.path_rules
         content {
-          name                       = path_rule.value.name
-          paths                      = path_rule.value.paths
-          backend_address_pool_name  = try(path_rule.value.backend_address_pool_name, null)
-          backend_http_settings_name = try(path_rule.value.backend_http_settings_name, null)
+          name                        = path_rule.value.name
+          paths                       = path_rule.value.paths
+          backend_address_pool_name   = try(path_rule.value.backend_address_pool_name, null)
+          backend_http_settings_name  = try(path_rule.value.backend_http_settings_name, null)
           redirect_configuration_name = try(path_rule.value.redirect_configuration_name, null)
+          rewrite_rule_set_name       = try(path_rule.value.rewrite_rule_set_name, null)
         }
       }
     }

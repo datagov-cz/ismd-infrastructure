@@ -54,7 +54,7 @@ resource "azurerm_container_app" "backend" {
       memory = "1Gi"
 
       env {
-        name = "CORS_ALLOWED_ORIGINS"
+        name  = "CORS_ALLOWED_ORIGINS"
         value = join(",", local.all_origins)
       }
       env {
@@ -81,10 +81,22 @@ resource "azurerm_container_app" "backend" {
         name  = "FUSEKI_URL"
         value = var.deploy_fuseki ? "http://ismd-tool-fuseki-${var.environment}:3030" : var.fuseki_url
       }
+      env {
+        name  = "KEYCLOAK_ISSUER_URI"
+        value = local.keycloak_issuer_uri
+      }
+      env {
+        name  = "KEYCLOAK_CLIENT_ID"
+        value = var.keycloak_client_id
+      }
+      env {
+        name        = "KEYCLOAK_CLIENT_SECRET"
+        secret_name = "keycloak-client-secret"
+      }
       liveness_probe {
-        transport = "HTTP"
-        port      = 8080
-        path      = "/popisujeme/actuator/health"
+        transport        = "HTTP"
+        port             = 8080
+        path             = "/popisujeme/actuator/health"
         interval_seconds = var.environment == "dev" ? 30 : 10
       }
       readiness_probe {
@@ -107,6 +119,11 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "postgres-password"
     value = var.deploy_postgres ? var.postgres_admin_password : var.postgres_password
+  }
+
+  secret {
+    name  = "keycloak-client-secret"
+    value = var.keycloak_client_secret
   }
 
   tags = {

@@ -121,11 +121,97 @@ variable "tool_nextauth_secret" {
   default     = ""
 }
 
+variable "tool_base_path" {
+  description = "Optional base path prefix for tool app routes (e.g. /popisujeme). Use empty string for root deployment."
+  type        = string
+  default     = "/popisujeme"
+}
+
 variable "tool_fuseki_admin_password" {
   description = "Admin password for Tool Fuseki"
   type        = string
   sensitive   = true
   default     = "admin123"
+}
+
+variable "tool_deploy_keycloak" {
+  description = "Whether to deploy Keycloak in tool apps"
+  type        = bool
+  default     = true
+}
+
+variable "tool_enable_caais" {
+  description = "Whether to enable CAAIS integration for Keycloak"
+  type        = bool
+  default     = true
+}
+
+variable "tool_keycloak_image" {
+  description = "Base image for Keycloak container app"
+  type        = string
+  default     = "quay.io/keycloak/keycloak"
+}
+
+variable "tool_keycloak_image_tag" {
+  description = "Tag for Keycloak container app image"
+  type        = string
+  default     = "24.0.2"
+}
+
+variable "tool_keycloak_app_name" {
+  description = "Base name for Keycloak container app"
+  type        = string
+  default     = "ismd-tool-keycloak"
+}
+
+variable "tool_keycloak_admin_user" {
+  description = "Keycloak admin username"
+  type        = string
+  default     = "admin"
+}
+
+variable "tool_keycloak_admin_password" {
+  description = "Keycloak admin password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_keycloak_hostname" {
+  description = "Optional Keycloak hostname for admin and public endpoints"
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_realm" {
+  description = "Keycloak realm used by tool apps"
+  type        = string
+  default     = "ismd"
+}
+
+variable "tool_keycloak_issuer_uri" {
+  description = "Optional explicit Keycloak issuer URI override"
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_client_id" {
+  description = "OIDC client ID used by tool apps"
+  type        = string
+  default     = "ismd-app"
+}
+
+variable "tool_keycloak_client_secret" {
+  description = "OIDC client secret used by tool apps"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_caais_client_id" {
+  description = "CAAIS client ID configured in Keycloak"
+  type        = string
+  default     = ""
 }
 
 variable "subscription_id" {
