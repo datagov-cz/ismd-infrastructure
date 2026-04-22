@@ -24,11 +24,6 @@ variable "container_app_environment_id" {
   type        = string
 }
 
-variable "container_app_environment_default_domain" {
-  description = "Default domain of the container app environment"
-  type        = string
-}
-
 # Application Gateway Configuration
 variable "app_gateway_public_ip" {
   description = "Public IP address of the Application Gateway"
@@ -78,12 +73,6 @@ variable "backend_app_name" {
 # Workload Profile Configuration
 variable "workload_profile_name" {
   description = "Name of the workload profile to use for the container apps"
-  type        = string
-  default     = "Consumption"
-}
-
-variable "workload_profile_type" {
-  description = "Type of the workload profile (e.g., 'Consumption', 'D4')"
   type        = string
   default     = "Consumption"
 }

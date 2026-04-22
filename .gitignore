@@ -10,6 +10,9 @@
 *.tfplan
 *.tfvars
 
+# Terraform plan output (human-readable, for local review only)
+plan.*.txt
+
 # Temporary and debug files
 *.log
 

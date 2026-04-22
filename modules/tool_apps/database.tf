@@ -128,18 +128,13 @@ resource "azurerm_container_app" "fuseki" {
 
     container {
       name   = "fuseki"
-      image  = "secoresearch/fuseki:latest"
+      image  = var.fuseki_image
       cpu    = 0.5
       memory = "1Gi"
 
-      env {
-        name        = "ADMIN_PASSWORD"
-        secret_name = "fuseki-admin-password"
-      }
-
       volume_mounts {
         name = "fuseki-data"
-        path = "/fuseki/databases"
+        path = "/opt/fuseki/run/databases"
       }
 
       liveness_probe {
@@ -162,11 +157,6 @@ resource "azurerm_container_app" "fuseki" {
       storage_type = "AzureFile"
       storage_name = azurerm_container_app_environment_storage.fuseki[0].name
     }
-  }
-
-  secret {
-    name  = "fuseki-admin-password"
-    value = var.fuseki_admin_password
   }
 
   ingress {
@@ -211,5 +201,5 @@ output "postgres_fqdn" {
 
 output "fuseki_internal_url" {
   description = "Internal URL for Fuseki"
-  value       = var.deploy_fuseki ? "http://ismd-tool-fuseki-${var.environment}:3030" : var.fuseki_url
+  value       = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ds" : var.fuseki_url
 }

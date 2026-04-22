@@ -65,7 +65,7 @@ locals {
       {
         name                                      = "tool-${env}-keycloak-probe"
         protocol                                  = "Http"
-        path                                      = "/auth/health/ready"
+        path                                      = "/popisujeme/auth/health/ready"
         interval                                  = 30
         timeout                                   = 30
         unhealthy_threshold                       = 3
@@ -89,7 +89,7 @@ locals {
         pick_host_name_from_backend_address = true
         path                                = null
       },
-      # Backend API settings
+      # Backend API settings (rewrites /popisujeme/be/api/* → /popisujeme/api/*)
       {
         name                                = "tool-${env}-be-http-settings"
         cookie_based_affinity               = "Disabled"
@@ -98,7 +98,7 @@ locals {
         request_timeout                     = 60
         probe_name                          = "tool-${env}-be-probe"
         pick_host_name_from_backend_address = true
-        path                                = null
+        path                                = "/popisujeme/api/"
       },
       # Backend pass-through settings
       {
@@ -131,22 +131,16 @@ locals {
     for env in local.tool_environments : env => [
       {
         name                       = "tool-keycloak-rule-${env}"
-        paths                      = ["/auth", "/auth/*"]
+        paths                      = ["/popisujeme/auth", "/popisujeme/auth/*"]
         backend_address_pool_name  = "tool-${env}-keycloak-pool"
         backend_http_settings_name = "tool-${env}-keycloak-http-settings"
         rewrite_rule_set_name      = local.tool_hostnames[env] != "" && length(regexall("^[\\x20-\\x7E]+$", local.tool_hostnames[env])) > 0 ? "tool-keycloak-headers-${env}" : null
       },
       {
-        name                       = "tool-nextauth-rule-${env}"
-        paths                      = ["/popisujeme/api/auth", "/popisujeme/api/auth/*"]
-        backend_address_pool_name  = "tool-${env}-fe-pool"
-        backend_http_settings_name = "tool-${env}-fe-http-settings"
-      },
-      {
         name                       = "tool-api-rule-${env}"
         paths                      = ["/popisujeme/api/*", "/popisujeme/api"]
-        backend_address_pool_name  = "tool-${env}-be-pool"
-        backend_http_settings_name = "tool-${env}-be-http-settings"
+        backend_address_pool_name  = "tool-${env}-fe-pool"
+        backend_http_settings_name = "tool-${env}-fe-http-settings"
       },
       {
         name                       = "tool-api-docs-rule-${env}"

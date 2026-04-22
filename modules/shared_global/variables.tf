@@ -3,11 +3,6 @@ variable "location" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name (dev, test, prod)"
-  type        = string
-}
-
 variable "domain_name_label" {
   description = "The domain name label for the IPv6 public IP"
   type        = string

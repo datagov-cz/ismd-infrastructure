@@ -4,11 +4,12 @@ locals {
   keycloak_jdbc_url = var.deploy_postgres ? "jdbc:postgresql://ismd-tool-postgres-${var.environment}.postgres.database.azure.com:5432/${var.keycloak_db_name}?sslmode=require" : var.keycloak_postgres_url
   keycloak_fqdn     = var.deploy_keycloak ? azurerm_container_app.keycloak[0].ingress[0].fqdn : ""
 
-  # Prefer stable public hostnames (App Gateway / custom domain) over ACA-generated FQDNs.
-  keycloak_hostname_effective = trimspace(var.keycloak_hostname) != "" ? trimspace(var.keycloak_hostname) : (trimspace(var.app_gateway_hostname) != "" ? trimspace(var.app_gateway_hostname) : "")
+  # Only enforce a strict hostname when explicitly set via keycloak_hostname.
+  # Falling back to app_gateway_hostname breaks direct admin console access.
+  keycloak_hostname_effective = trimspace(var.keycloak_hostname)
 
   keycloak_issuer_host = local.keycloak_hostname_effective != "" ? local.keycloak_hostname_effective : local.keycloak_fqdn
-  keycloak_issuer_uri  = var.keycloak_issuer_uri != "" ? var.keycloak_issuer_uri : (var.deploy_keycloak ? "https://${local.keycloak_issuer_host}/auth/realms/${var.keycloak_realm}" : "")
+  keycloak_issuer_uri  = var.keycloak_issuer_uri != "" ? var.keycloak_issuer_uri : (var.deploy_keycloak ? "https://${local.keycloak_issuer_host}/popisujeme/auth/realms/${var.keycloak_realm}" : "")
 }
 
 resource "azurerm_container_app" "keycloak" {
@@ -34,12 +35,10 @@ resource "azurerm_container_app" "keycloak" {
         "start",
         "--http-enabled=true",
         "--http-port=8080",
-        "--proxy-headers=xforwarded"
+        "--proxy-headers=forwarded"
       ], local.keycloak_hostname_effective == "" ? [] : [
         "--hostname=${local.keycloak_hostname_effective}",
-        "--hostname-admin=${local.keycloak_hostname_effective}",
-        "--hostname-strict=true",
-        "--hostname-strict-https=true"
+        "--hostname-admin=${local.keycloak_hostname_effective}"
       ])
 
       env {
@@ -59,13 +58,13 @@ resource "azurerm_container_app" "keycloak" {
         value = "0.0.0.0"
       }
       env {
+        # Keep strict mode off — Keycloak accepts requests from any hostname.
+        # This avoids redirect loops when accessed directly or via App Gateway.
+        # URL generation is controlled by KC_HOSTNAME + KC_HOSTNAME_STRICT_HTTPS instead.
         name  = "KC_HOSTNAME_STRICT"
-        value = local.keycloak_hostname_effective == "" ? "false" : "true"
+        value = "false"
       }
-      env {
-        name  = "KC_HOSTNAME_STRICT_HTTPS"
-        value = local.keycloak_hostname_effective == "" ? "false" : "true"
-      }
+
       env {
         name  = "KC_HOSTNAME"
         value = local.keycloak_hostname_effective
@@ -74,9 +73,10 @@ resource "azurerm_container_app" "keycloak" {
         name  = "KC_HOSTNAME_ADMIN"
         value = local.keycloak_hostname_effective
       }
+
       env {
         name  = "KC_HTTP_RELATIVE_PATH"
-        value = "/auth"
+        value = "/popisujeme/auth"
       }
       env {
         name  = "PORT"
@@ -118,21 +118,21 @@ resource "azurerm_container_app" "keycloak" {
       liveness_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/auth/health/live"
+        path             = "/popisujeme/auth/health/live"
         interval_seconds = 30
       }
 
       readiness_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/auth/health/ready"
+        path             = "/popisujeme/auth/health/ready"
         interval_seconds = 10
       }
 
       startup_probe {
         transport               = "HTTP"
         port                    = 8080
-        path                    = "/auth/health/ready"
+        path                    = "/popisujeme/auth/health/ready"
         interval_seconds        = 15
         failure_count_threshold = 30
         timeout                 = 5

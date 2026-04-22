@@ -26,9 +26,8 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name = "NEXT_PUBLIC_BE_URL"
-        # Include protocol and optional tool base path prefix
-        value = local.tool_frontend_base_url
+        name  = "BE_URL"
+        value = "http://${azurerm_container_app.backend.name}${local.tool_base_path}"
       }
       env {
         name  = "NEXT_PUBLIC_BASE_PATH"
@@ -57,6 +56,32 @@ resource "azurerm_container_app" "frontend" {
       env {
         name        = "NEXTAUTH_SECRET"
         secret_name = "nextauth-secret"
+      }
+
+      liveness_probe {
+        transport               = "HTTP"
+        port                    = 3000
+        path                    = "/popisujeme"
+        interval_seconds        = 10
+        failure_count_threshold = 3
+        timeout                 = 5
+      }
+
+      readiness_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        success_count_threshold = 1
+        timeout                 = 5
+      }
+
+      startup_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        timeout                 = 3
       }
     }
   }

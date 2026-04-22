@@ -1,53 +1,73 @@
+# Test Environment — variable declarations
+
+variable "environment" {
+  description = "Environment name (dev, test, prod)"
+  type        = string
+  default     = "test"
+}
+
 variable "location" {
-  description = "The Azure region to deploy to"
+  description = "Azure region for resources"
   type        = string
   default     = "germanywestcentral"
-}
-
-variable "frontend_image" {
-  description = "Base container image URL for the frontend (without tag)"
-  type        = string
-  default     = "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
-}
-
-variable "frontend_image_tag" {
-  description = "Tag for the frontend container image"
-  type        = string
-  default     = "latest"
-}
-
-variable "backend_image" {
-  description = "Base container image URL for the backend (without tag)"
-  type        = string
-  default     = "ghcr.io/datagov-cz/ismd-validator-backend-dev"
-}
-
-variable "backend_image_tag" {
-  description = "Tag for the backend container image"
-  type        = string
-  default     = "latest"
 }
 
 variable "shared_resource_group_name" {
   description = "Name of the shared resource group"
   type        = string
-  default     = "ismd-shared-tfstate"
+  default     = "ismd-shared-test"
 }
 
 variable "validator_resource_group_name" {
   description = "Name of the validator resource group"
   type        = string
+  default     = "ismd-validator-test"
 }
 
 variable "tool_resource_group_name" {
   description = "Name of the tool resource group"
   type        = string
+  default     = "ismd-tool-test"
+}
+
+variable "frontend_image" {
+  description = "Base container image URL for the frontend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-validator-frontend"
+}
+
+variable "frontend_image_tag" {
+  description = "Tag for the frontend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
+  type        = string
+  default     = "latest"
+
+  validation {
+    condition     = var.frontend_image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.frontend_image_tag))
+    error_message = "The frontend_image_tag must be 'latest' or a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
+  }
+}
+
+variable "backend_image" {
+  description = "Base container image URL for the backend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-validator-backend"
+}
+
+variable "backend_image_tag" {
+  description = "Tag for the backend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
+  type        = string
+  default     = "latest"
+
+  validation {
+    condition     = var.backend_image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.backend_image_tag))
+    error_message = "The backend_image_tag must be 'latest' or a valid version number (e.g., '1.0.0' or '1.0.0-abc1234')."
+  }
 }
 
 variable "tool_frontend_image" {
   description = "Base container image URL for the tool frontend (without tag)"
   type        = string
-  default     = "ghcr.io/datagov-cz/ismd-tool-frontend-dev"
+  default     = "ghcr.io/datagov-cz/ismd-tool-frontend"
 }
 
 variable "tool_frontend_image_tag" {
@@ -59,7 +79,7 @@ variable "tool_frontend_image_tag" {
 variable "tool_backend_image" {
   description = "Base container image URL for the tool backend (without tag)"
   type        = string
-  default     = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
+  default     = "ghcr.io/datagov-cz/ismd-tool-backend"
 }
 
 variable "tool_backend_image_tag" {
@@ -68,14 +88,53 @@ variable "tool_backend_image_tag" {
   default     = "latest"
 }
 
+# Variables for connecting to the shared global network
+variable "shared_global_vnet_id" {
+  description = "ID of the shared global VNet"
+  type        = string
+}
+
+variable "shared_global_vnet_name" {
+  description = "Name of the shared global VNet"
+  type        = string
+}
+
+variable "shared_global_resource_group_name" {
+  description = "Name of the shared global resource group"
+  type        = string
+}
+
+variable "app_gateway_public_ip_address" {
+  description = "Public IP address of the shared Application Gateway"
+  type        = string
+}
+
+variable "app_gateway_hostname" {
+  description = "Hostname for the test environment"
+  type        = string
+  default     = "oha03.dia.gov.cz"
+}
+
+variable "frontend_app_name" {
+  description = "Name of the frontend application"
+  type        = string
+  default     = "ismd-validator-frontend"
+}
+
+variable "backend_app_name" {
+  description = "Name of the backend application"
+  type        = string
+  default     = "ismd-validator-backend"
+}
+
 variable "tool_frontend_app_name" {
-  description = "Base name of the tool frontend container app (without environment suffix)"
+  description = "Name of the tool frontend application"
   type        = string
   default     = "ismd-tool-frontend"
 }
 
 variable "tool_backend_app_name" {
-  description = "Base name of the tool backend container app (without environment suffix)"
+  description = "Name of the tool backend application"
   type        = string
   default     = "ismd-tool-backend"
 }
@@ -201,28 +260,10 @@ variable "tool_caais_client_id" {
   default     = ""
 }
 
-variable "frontend_app_name" {
-  description = "Base name of the frontend container app (without environment suffix)"
-  type        = string
-  default     = "ismd-validator-frontend"
-}
-
-variable "backend_app_name" {
-  description = "Base name of the backend container app (without environment suffix)"
-  type        = string
-  default     = "ismd-validator-backend"
-}
-
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
   type        = list(string)
   default     = []
-}
-
-variable "app_gateway_hostname" {
-  description = "Hostname for the environment (e.g., ismd.oha03.dia.gov.cz)"
-  type        = string
-  default     = ""
 }
 
 variable "deploy_tool_apps" {
