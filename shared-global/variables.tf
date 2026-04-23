@@ -1,8 +1,3 @@
-variable "environment" {
-  description = "Environment name (dev, test, prod). Note: current gateway config is environment-specific; run this stack for one environment at a time."
-  type        = string
-}
-
 variable "location" {
   description = "Azure region"
   type        = string

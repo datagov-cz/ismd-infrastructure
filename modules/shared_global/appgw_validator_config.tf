@@ -70,39 +70,6 @@ locals {
         pick_host_name_from_backend_address = true
         path                                = null # Do not rewrite path! App expects /validujeme/api prefix
       },
-      # Backend root settings (no path rewrite)
-      {
-        name                                = "validator-${env}-be-root-http-settings"
-        cookie_based_affinity               = "Disabled"
-        port                                = 80
-        protocol                            = "Http"
-        request_timeout                     = 60
-        probe_name                          = "validator-${env}-be-probe"
-        pick_host_name_from_backend_address = true
-        path                                = "/"
-      },
-      # Backend swagger UI settings (for /swagger-ui paths)
-      {
-        name                                = "validator-${env}-be-swagger-ui-http-settings"
-        cookie_based_affinity               = "Disabled"
-        port                                = 80
-        protocol                            = "Http"
-        request_timeout                     = 60
-        probe_name                          = "validator-${env}-be-probe"
-        pick_host_name_from_backend_address = true
-        path                                = null
-      },
-      # Backend pass-through settings (no path override)
-      {
-        name                                = "validator-${env}-be-pass-http-settings"
-        cookie_based_affinity               = "Disabled"
-        port                                = 80
-        protocol                            = "Http"
-        request_timeout                     = 60
-        probe_name                          = "validator-${env}-be-probe"
-        pick_host_name_from_backend_address = true
-        path                                = null
-      }
     ]
   ])
 
@@ -183,24 +150,6 @@ locals {
           paths                      = ["/validujeme/api/*", "/validujeme/api"]
           backend_address_pool_name  = "validator-${env}-be-pool"
           backend_http_settings_name = "validator-${env}-be-http-settings"
-        },
-        {
-          name                       = "validator-api-docs-rule-${env}"
-          paths                      = ["/validujeme/api-docs", "/validujeme/api-docs/*"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
-        },
-        {
-          name                       = "validator-v3-api-docs-rule-${env}"
-          paths                      = ["/validujeme/v3/*"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
-        },
-        {
-          name                       = "validator-swagger-ui-rule-${env}"
-          paths                      = ["/validujeme/swagger-ui/*", "/validujeme/swagger-ui", "/validujeme/swagger-ui.html"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-pass-http-settings"
         },
         {
           name                       = "frontend-rule-${env}"

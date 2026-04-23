@@ -179,15 +179,11 @@ The Application Gateway is part of the `shared_global` module. Routing configura
 - **Health Probes**: Custom paths (`/actuator/health` for Spring Boot backends)
 - **Path-Based Routing**: Environment-specific URL path maps
   - `/validujeme/api/*` → Validator backend API
-  - `/validujeme/api-docs` → Validator API documentation (Swagger UI)
-  - `/validujeme/swagger-ui/*` → Validator Swagger UI resources
   - `/validujeme/*` → Validator frontend
   - `/popisujeme/auth`, `/popisujeme/auth/*` → Tool Keycloak
-  - `/popisujeme/api/*` → Tool frontend (Next.js API routes)
-  - `/popisujeme/api-docs`, `/popisujeme/v3/*` → Tool backend (pass-through)
-  - `/popisujeme/swagger-ui/*` → Tool backend Swagger UI
-  - `/popisujeme/actuator/*` → Tool backend actuator
+  - `/popisujeme/api/*` → Tool frontend (Next.js API routes incl. NextAuth)
   - `/popisujeme/*` → Tool frontend
+  > Note: Tool backend has internal ingress only — not reachable from App Gateway. Swagger UI and API docs are proxied through the tool frontend via Next.js rewrites.
 - **Hostname-Based Routing**: Support for custom domains per environment
 - **Lifecycle Protection**: `prevent_destroy` enabled on gateway and public IPs
 
