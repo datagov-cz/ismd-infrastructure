@@ -4,7 +4,7 @@ This repository contains Terraform configurations for managing Azure Container A
 
 ## Architecture Overview
 
-- **Shared Container App Environment**: Consolidated environment for all validator apps across dev, test, and prod
+- **Shared Container App Environment**: Consolidated environment for all applications (validator and tool) across dev, test, and prod
 - **Azure Container Apps**: Serverless container platform with auto-scaling and dedicated workload profiles
 - **Application Gateway**: Shared global load balancer with WAF capabilities and dual-stack (IPv4 + IPv6) support
 - **Multi-Environment**: Dev, Test, and Prod environments with consistent configuration
@@ -13,56 +13,63 @@ This repository contains Terraform configurations for managing Azure Container A
 - **State Management**: Azure Storage backend with workspace-based environment isolation
 - **Resource Protection**: Critical shared resources protected with prevent_destroy lifecycle rules
 
-## State Management & Workspaces
+## State Management
 
-This project uses Azure Storage to manage the infrastructure state for all environments. Environment separation is handled using **Terraform Workspaces**, with each workspace storing its state in a separate blob.
-
-### Workspace Configuration
-
-- **Separate State Files**: Each environment (dev, test, prod) has its own state file stored as a separate blob in the `tfstate` container.
-- **Workspace-Based State Files**: Terraform automatically creates workspace-specific state files with the naming convention `ismd.tfstateenv:<workspace>` (e.g., `ismd.tfstateenv:dev`, `ismd.tfstateenv:test`).
-- **Backend Configuration**: The `backend.tf` file is configured with a base key. Terraform appends the workspace name to create the full path.
-- **Switching Environments**: To work on a specific environment, you must switch to the corresponding workspace.
-
-### State Storage
+State is stored in Azure Storage. Each environment has its own blob, isolated via Terraform workspaces (`ismd.tfstateenv:dev`, `ismd.tfstateenv:test`, `ismd.tfstateenv:prod`).
 
 - **Resource Group**: `ismd-shared-tfstate`
 - **Storage Account**: `ismdtfstate`
 - **Container**: `tfstate`
 
+Use `load_env_vars.sh` / `load_env_vars.ps1` to switch workspaces — it calls `terraform workspace select` automatically.
+
 ## Directory Structure
 
 ```
 ├── environments/
-│   ├── dev/           # Development environment configuration
-│   ├── test/          # Test environment configuration
-│   └── prod/          # Production environment configuration
+│   ├── dev/                 # Development environment configuration
+│   │   ├── main.tf          # Module calls and workspace wiring
+│   │   ├── networking.tf    # VNet peering
+│   │   ├── outputs.tf       # Environment outputs
+│   │   ├── resource_groups.tf  # Resource group definitions
+│   │   └── variables.tf     # Environment-specific variable defaults
+│   ├── test/                # Test environment configuration (same structure)
+│   └── prod/                # Production environment configuration (same structure)
 ├── modules/
 │   ├── shared/                  # Shared Container App Environment & networking
-│   │   ├── main.tf              # Container App Environment, Log Analytics
-│   │   ├── resource_group.tf   # Environment-specific resource group
-│   │   ├── networking.tf        # VNet, subnets (validator + tool apps)
+│   │   ├── main.tf              # Container App Environment, Log Analytics, VNet
 │   │   ├── outputs.tf           # Module outputs
 │   │   └── variables.tf         # Module variables
 │   ├── shared_global/           # Global shared resources (App Gateway, VNet)
 │   │   ├── appgw_base_config.tf       # App Gateway base configuration
 │   │   ├── appgw_validator_config.tf  # Validator app routing configuration
+│   │   ├── appgw_tool_config.tf       # Tool app routing configuration
 │   │   ├── appgw_resource.tf          # App Gateway resource (dynamic blocks)
 │   │   ├── networking.tf              # VNet, subnets, public IPs
 │   │   ├── resource_group.tf          # Global resource group
 │   │   ├── outputs.tf                 # Module outputs
 │   │   └── variables.tf               # Module variables
-│   └── validator_apps/          # Frontend & Backend Container Apps
-│       ├── backend.tf           # Backend container app
-│       ├── frontend.tf          # Frontend container app
+│   ├── validator_apps/          # Validator Frontend & Backend Container Apps
+│   │   ├── backend.tf           # Backend container app
+│   │   ├── frontend.tf          # Frontend container app
+│   │   ├── outputs.tf           # Module outputs
+│   │   ├── variables.tf         # Module variables
+│   │   └── main.tf              # Documentation
+│   └── tool_apps/               # Tool Frontend, Backend, Database & Keycloak Container Apps
+│       ├── backend.tf           # Tool backend container app
+│       ├── frontend.tf          # Tool frontend container app
+│       ├── database.tf          # PostgreSQL flexible server
+│       ├── keycloak.tf          # Keycloak container app
 │       ├── outputs.tf           # Module outputs
-│       ├── variables.tf         # Module variables
+│       ├── variables.tf         # Core module variables
+│       ├── variables_database.tf  # Database-specific variables
+│       ├── variables_keycloak.tf  # Keycloak-specific variables
 │       └── main.tf              # Documentation
 ├── shared-global/               # Shared global infrastructure state
 │   ├── main.tf                  # Shared global module configuration
 │   ├── backend.tf               # Backend configuration
 │   ├── variables.tf             # Input variables
-│   └── terraform.tfvars         # Global configuration values
+│   └── terraform.tfvars         # Global configuration values (gitignored — not committed)
 ├── .github/workflows/           # CI/CD pipelines
 │   ├── terraform.yml                  # Manual infrastructure updates
 │   └── terraform-shared-global.yml    # App Gateway management
@@ -80,7 +87,7 @@ This project uses Azure Storage to manage the infrastructure state for all envir
 
 ### Shared Global Module (`modules/shared_global/`)
 
-Manages global shared infrastructure that spans all environments using a **data-driven configuration pattern**.
+Manages the Application Gateway, global VNet, and public IPs — resources shared across all environments.
 
 #### Files:
 
@@ -100,7 +107,7 @@ Manages global shared infrastructure that spans all environments using a **data-
   
 - **`appgw_resource.tf`**: Main Application Gateway resource
   - Uses dynamic blocks to generate configuration from data files
-  - Combines base config + validator config
+  - Combines base config + validator config + tool config
   
 - **`networking.tf`**: Network resources
   - Global VNet with dedicated CIDR (IPv4 + IPv6 dual-stack)
@@ -110,13 +117,7 @@ Manages global shared infrastructure that spans all environments using a **data-
 - **`resource_group.tf`**: Resource group definition
   - Global shared resources container (`ismd-shared-global`)
 
-#### Key Features:
-
-- **Data-Driven Architecture**: Configuration defined as data structures, generated via dynamic blocks
-- **DRY Principle**: No repetition - patterns defined once and applied to all environments
-- **Easy Extension**: Add new applications by creating additional config files (e.g., `appgw_tool_config.tf`)
-- **Maintainable**: Clear separation between data (config files) and structure (resource file)
-- **Multi-App Ready**: Architecture supports multiple applications with path-based routing (e.g., `/validator/*` for validator app)
+To add routing for a new application, create a new `appgw_<app>_config.tf` file and update `appgw_resource.tf` to include it — existing configs are unchanged.
 
 ### Shared Module (`modules/shared/`)
 
@@ -125,64 +126,49 @@ Manages the shared Container App Environment and networking infrastructure for e
 - **Resource Group**: Environment-specific shared resources (`ismd-shared-{env}`)
 - **Log Analytics Workspace**: Centralized logging and monitoring
 - **Virtual Network**: Environment-specific VNet with VNet peering to shared global VNet
-  - Validator subnet (`/23`) - For validator application containers
-  - Tool subnet (`/23`) - Reserved for future tool application
-- **Container App Environment**: Consolidated environment shared by all applications
+  - Validator subnet (`/23`) - Hosts validator backend and frontend
+  - Tool subnet (`/23`) - Hosts tool backend, frontend, and Keycloak
+- **Container App Environment**: Single environment per region shared by all applications
   - Dedicated D4 workload profile with VNet integration
   - Zone redundancy enabled in production
-  - Single environment per region for cost efficiency and simplified management
 
 ### Validator Apps Module (`modules/validator_apps/`)
 
-Manages the application containers with a clear file structure:
+Manages the validator frontend and backend container apps.
 
 #### Files:
 
-- **`backend.tf`**: Backend container app definition
-  - Spring Boot API with Spring Actuator health checks
-  - Ingress restricted to Application Gateway IP
-  - CORS configuration for frontend access
-  - Internal port 8080 configuration
-  
-- **`frontend.tf`**: Frontend container app definition
-  - Next.js application
-  - Ingress restricted to Application Gateway IP
-  - Backend URL configuration via environment variable
-  
-- **`outputs.tf`**: Module outputs
-  - FQDNs, URLs, and resource names for both apps
-  
+- **`backend.tf`**: Spring Boot API — Spring Actuator health checks, ingress restricted to App Gateway IP, CORS, port 8080
+- **`frontend.tf`**: Next.js app — ingress restricted to App Gateway IP, backend URL injected via env var
+- **`outputs.tf`**: FQDNs, URLs, and resource names for both apps
 - **`variables.tf`**: Input variables
-  - Organized by category (core, gateway, images, workload profile)
 
-#### Key Features:
+`create_apps` can be set to `false` to skip container app creation while still provisioning networking — useful for bootstrapping a new environment before images are ready.
 
-- **Clear Separation**: Each container app in its own file for easy maintenance
-- **Environment Variables**: Automatic configuration for inter-service communication
-- **Resource Allocation**: Optimized CPU/memory combinations per environment
-- **Conditional Creation**: Support for phased deployments with `create_apps` variable
-- **Security**: Ingress restricted to Application Gateway public IP
-- **Decoupled Image Deployment**: `lifecycle { ignore_changes = [template[0].container[0].image] }` prevents Terraform from managing container images
-  - Container images deployed independently via `az containerapp update` from application repositories
-  - Terraform manages infrastructure only (networking, environment variables, ingress, resource allocation)
-  - Image tags can be updated without Terraform apply
+Container images are intentionally excluded from Terraform management via `lifecycle { ignore_changes = [template[0].container[0].image] }`. Images are deployed independently from application repositories using `az containerapp update`. Terraform only manages infrastructure (networking, env vars, ingress, resource allocation).
+
+### Tool Apps Module (`modules/tool_apps/`)
+
+Manages the full tool application stack: frontend, backend, PostgreSQL Flexible Server, and Keycloak.
+
+#### Files:
+
+- **`backend.tf`**: Tool backend container app (Spring Boot, path `/popisujeme`)
+- **`frontend.tf`**: Tool frontend container app (Next.js, path `/popisujeme`)
+- **`database.tf`**: PostgreSQL Flexible Server for tool data
+- **`keycloak.tf`**: Keycloak container app for tool authentication (path `/popisujeme/auth`)
+- **`outputs.tf`**: Module outputs (FQDNs, URLs, resource names)
+- **`variables.tf`**: Core module variables
+- **`variables_database.tf`**: Database-specific variables (password, SKU, storage)
+- **`variables_keycloak.tf`**: Keycloak-specific variables (admin password, client secret, realm config)
+
+Keycloak runs as a Container App in the same environment as the tool and is routed by the App Gateway at `/popisujeme/auth`. It can be disabled via `deploy_keycloak = false`.
+
+Same `lifecycle { ignore_changes }` image pattern as the validator module — see above.
 
 ### Application Gateway Architecture
 
-The Application Gateway is now part of the `shared_global` module and uses a **data-driven dynamic blocks pattern**:
-
-#### How It Works:
-
-1. **Configuration Files Define Data**:
-   - `appgw_base_config.tf` defines static configuration (ports, IPs, SSL certs)
-   - `appgw_validator_config.tf` defines validator app routing data (pools, probes, listeners)
-   - Additional config files can be added for new applications
-
-2. **Resource File Generates Configuration**:
-   - `appgw_resource.tf` uses Terraform dynamic blocks
-   - Reads data from config files using `local` variables
-   - Generates all backend pools, probes, listeners, and routing rules
-   - Single `azurerm_application_gateway` resource with dynamic structure
+The Application Gateway is part of the `shared_global` module. Routing configuration is split across per-application files (`appgw_*_config.tf`) which define locals; `appgw_resource.tf` consumes them via dynamic blocks to produce a single `azurerm_application_gateway` resource.
 
 #### Features:
 
@@ -192,10 +178,16 @@ The Application Gateway is now part of the `shared_global` module and uses a **d
 - **TLS 1.2+ enforcement** with Key Vault certificate integration
 - **Health Probes**: Custom paths (`/actuator/health` for Spring Boot backends)
 - **Path-Based Routing**: Environment-specific URL path maps
-  - `/validator/api/*` → Backend API
-  - `/validator/api-docs` → Backend API documentation (Swagger UI)
-  - `/validator/swagger-ui/*` → Backend Swagger UI resources
-  - `/validator/*` → Frontend
+  - `/validujeme/api/*` → Validator backend API
+  - `/validujeme/api-docs` → Validator API documentation (Swagger UI)
+  - `/validujeme/swagger-ui/*` → Validator Swagger UI resources
+  - `/validujeme/*` → Validator frontend
+  - `/popisujeme/auth`, `/popisujeme/auth/*` → Tool Keycloak
+  - `/popisujeme/api/*` → Tool frontend (Next.js API routes)
+  - `/popisujeme/api-docs`, `/popisujeme/v3/*` → Tool backend (pass-through)
+  - `/popisujeme/swagger-ui/*` → Tool backend Swagger UI
+  - `/popisujeme/actuator/*` → Tool backend actuator
+  - `/popisujeme/*` → Tool frontend
 - **Hostname-Based Routing**: Support for custom domains per environment
 - **Lifecycle Protection**: `prevent_destroy` enabled on gateway and public IPs
 
@@ -203,7 +195,7 @@ The Application Gateway is now part of the `shared_global` module and uses a **d
 
 To add a new application:
 
-1. Create a new configuration file in `modules/shared_global/` (e.g., `appgw_newapp_config.tf`)
+1. Create a new configuration file in `modules/shared_global/` (e.g., `appgw_newapp_config.tf`) — see `appgw_tool_config.tf` as a reference
 2. Update `modules/shared_global/appgw_resource.tf` to include the new config in dynamic blocks
 3. No changes needed to existing application configurations
 
@@ -221,12 +213,13 @@ The infrastructure supports three environments with consolidated architecture:
 
 - **Container App Environment**: Single shared environment for all applications in each environment
 - **VNet**: Environment-specific with two subnets:
-  - Validator subnet (`/23`) - Currently hosts validator backend and frontend
-  - Tool subnet (`/23`) - Reserved for future tool application
+  - Validator subnet (`/23`) - Hosts validator backend and frontend
+  - Tool subnet (`/23`) - Hosts tool backend, frontend, and Keycloak
 - **Application Gateway**: Global, shared across all environments
 - **Resource Groups**: 
   - `ismd-shared-{env}` - Shared Container App Environment and networking
   - `ismd-validator-{env}` - Validator-specific resources
+  - `ismd-tool-{env}` - Tool-specific resources (container apps, database, Keycloak)
   - `ismd-shared-global` - Application Gateway and global networking
 
 All environments use dedicated D4 workload profiles with VNet integration for consistent performance and security. The shared environment architecture provides cost efficiency while maintaining environment isolation.
@@ -244,34 +237,52 @@ All environments use dedicated D4 workload profiles with VNet integration for co
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd infrastructure
+   cd <repo-directory>
    ```
 
-2. **Configure variables**:
+2. **Authenticate to Azure**:
+
    ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your specific values
+   az login                          # interactive login
+   az login --tenant <tenant-id>     # if you need to specify tenant
+   az account show                   # verify correct subscription
    ```
 
-3. **Authenticate to Azure**:
-
-   Uses your Azure AD account with interactive login:
-   ```powershell
-   # Login to Azure (will prompt for subscription selection)
-   az login
-   
-   # If you need to specify tenant
-   az login --tenant <tenant-id>
-   
-   # Verify you're logged in and using the correct subscription
-   az account show
-   ```
-   
    **Required Azure RBAC permissions:**
    - `Contributor` role on the subscription
    - `Storage Blob Data Contributor` on the tfstate storage account (`ismdtfstate`)
-   
-   These two roles provide all necessary permissions to deploy and manage the infrastructure.
+
+   > **Note:** If `ARM_CLIENT_SECRET` is present in your environment it will override `az login` and authenticate as a service principal instead. This is intentional in CI but should not be set for local development.
+
+3. **Configure variables**:
+
+   Non-sensitive config (resource group names, image tags, hostnames) lives in `environments/<env>/terraform.tfvars` and is committed to the repo. No setup needed here.
+
+   Sensitive variables (Postgres password, Keycloak secrets, NextAuth secret) are loaded from a `.env.<env>` file which is gitignored:
+   ```bash
+   # bash
+   cp .env.example .env.dev
+   ```
+   ```powershell
+   # PowerShell
+   Copy-Item .env.example .env.dev
+   ```
+   Fill in values in `.env.dev`.
+
+4. **Load secrets and select workspace**:
+
+   ```bash
+   # bash
+   source load_env_vars.sh dev
+   ```
+   ```powershell
+   # PowerShell
+   . .\load_env_vars.ps1 dev
+   ```
+
+   Run once per shell session before any `terraform` commands. Use `dev`, `test`, or `prod` as the argument. This exports all `TF_VAR_*` secrets and switches the Terraform workspace.
+
+   In CI, secrets are injected automatically from GitHub Actions secrets — the load scripts are not used.
 
 ### Deployment
 
@@ -282,7 +293,7 @@ All environments use dedicated D4 workload profiles with VNet integration for co
 Deploy the Application Gateway and global networking:
 
 ```bash
-cd shared-global
+cd shared-global  # subdirectory within the repo root
 terraform init
 terraform plan
 terraform apply
@@ -298,14 +309,15 @@ This creates:
 Deploy each environment to create the shared Container App Environment and applications:
 
 ```bash
-# Return to root directory
+# Return to repo root
 cd ..
 
 # Initialize Terraform (only needed once)
 terraform init
 
-# Select workspace (environment)
-terraform workspace select dev   # or test, or prod
+# Load secrets and switch workspace (if not already done)
+source load_env_vars.sh dev        # bash
+# . .\load_env_vars.ps1 dev        # PowerShell
 
 # Plan and apply changes
 terraform plan
@@ -314,7 +326,8 @@ terraform apply
 
 This creates:
 - Shared Container App Environment (`ismd-shared-environment-{env}`)
-- Container Apps (validator frontend and backend) with auto-generated FQDNs
+- Container Apps (validator frontend, validator backend, tool frontend, tool backend, Keycloak) with auto-generated FQDNs
+- PostgreSQL Flexible Server for the tool
 - Environment-specific VNet with validator and tool subnets
 - VNet peering to global VNet
 
@@ -341,9 +354,9 @@ This updates the Application Gateway backend pools to route traffic to the deplo
 
 After initial setup, deployments are simplified:
 
-- **Infrastructure changes** (environment variables, ingress, etc.): 
+- **Infrastructure changes** (environment variables, ingress, etc.):
   ```bash
-  terraform workspace select <env>
+  source load_env_vars.sh <env>   # bash — or: . .\load_env_vars.ps1 <env>
   terraform plan
   terraform apply
   ```
@@ -366,39 +379,21 @@ Container images are **deployed independently from Terraform** using `az contain
 #### Image Deployment Strategy:
 
 **Development Images** (`-dev` suffix):
-- Repository: `ghcr.io/org/ismd-validator-{backend|frontend}-dev`
+- Validator: `ghcr.io/org/ismd-validator-{backend|frontend}-dev:latest`
+- Tool: `ghcr.io/org/ismd-tool-{backend|frontend}-dev:latest`
 - Tag: `latest` (rolling tag)
 - Deployed automatically on push to dev branch
-- Command: `az containerapp update --name ismd-validator-backend-dev --image ghcr.io/org/app-dev:latest`
 
 **Production Images** (test/prod):
-- Repository: `ghcr.io/org/ismd-validator-{backend|frontend}`
+- Validator: `ghcr.io/org/ismd-validator-{backend|frontend}:<version>`
+- Tool: `ghcr.io/org/ismd-tool-{backend|frontend}:<version>`
 - Tag: Version numbers (e.g., `1.0.0`, `1.0.0-abc1234`)
 - TEST: Deployed automatically when pushed to main branch
 - PROD: Deployed manually via workflow_dispatch
 
-#### Image Tag Validation:
+Note: Keycloak uses an upstream image managed via the `keycloak_image` Terraform variable, not a built image.
 
-Terraform variable validation allows both `latest` and semantic versioning:
-```hcl
-validation {
-  condition     = var.image_tag == "latest" || can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9-]+)?$", var.image_tag))
-  error_message = "Tag must be 'latest' or valid version (e.g., '1.0.0' or '1.0.0-abc1234')"
-}
-```
-
-#### Initial Setup Image Variables:
-
-While Terraform doesn't update images during normal operations, initial container app creation requires base image configuration in `terraform.tfvars`:
-
-```hcl
-frontend_image = "ghcr.io/org/ismd-validator-frontend-dev"
-frontend_image_tag = "latest"
-backend_image = "ghcr.io/org/ismd-validator-backend-dev"
-backend_image_tag = "latest"
-```
-
-After initial creation, images are managed via `az containerapp update` from application repositories
+Image tag variables validate that the value is either `latest` or a valid semver string (e.g. `1.0.0`, `1.0.0-abc1234`). Initial values are set in `environments/<env>/terraform.tfvars` and are only used on first `terraform apply` — subsequent image updates go through `az containerapp update`.
 
 ### GitHub Actions CI/CD
 
@@ -419,7 +414,7 @@ The infrastructure uses a **decoupled deployment architecture** where infrastruc
 
 #### Application Repository Workflows:
 
-Each application repository (backend/frontend) has independent CI/CD:
+Each of the four application repositories (validator-backend, validator-frontend, tool-backend, tool-frontend) has independent CI/CD:
 
 1. **CI Workflow**: Tests on PRs and dev branch pushes
 2. **Build Docker on Dev**: Builds `-dev` images after successful CI
@@ -457,34 +452,6 @@ Infrastructure Changes:
   Infrastructure updated (Terraform apply)
 ```
 
-#### Key Benefits:
-
-- **Independent Deployments**: Application images deploy without Terraform
-- **Faster Deployments**: No Terraform overhead for image updates
-- **Clear Separation**: Infrastructure changes vs application changes
-- **No Cross-Repo Secrets**: Each repo authenticates independently
-- **Simplified Workflows**: No `repository_dispatch` between repos
-
-## Remote State Configuration
-
-Terraform state is stored in Azure Storage:
-
-```hcl
-terraform {
-  backend "azurerm" {
-    resource_group_name  = "ismd-shared-tfstate"
-    storage_account_name = "ismdtfstate"
-    container_name       = "tfstate"
-    key                  = "workspace.dev.tfstate"
-  }
-}
-```
-
-**Workspace-based state management**:
-- Each environment uses the same backend configuration
-- Terraform workspaces isolate state between environments
-- State files are automatically managed per workspace
-
 ## Docker Compose Configuration
 
 Local development files for testing the application stack:
@@ -505,11 +472,18 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 ### Environment Variables
 
-Key configuration managed through Terraform:
+Key variables managed through Terraform across all container apps:
 
-- **CORS_ALLOWED_ORIGINS**: Backend CORS configuration
-- **NEXT_PUBLIC_BE_URL**: Frontend-to-backend communication URL
-- **PORT**: Container port configuration (8080)
+**Validator:**
+- `CORS_ALLOWED_ORIGINS` — allowed origins for the backend
+- `NEXT_PUBLIC_BE_URL` — frontend-to-backend URL
+- `PORT` — container port (8080)
+
+**Tool:**
+- `SPRING_DATASOURCE_URL` / `_USERNAME` / `_PASSWORD` — PostgreSQL connection
+- `NEXTAUTH_SECRET` — NextAuth.js session secret
+- `KEYCLOAK_CLIENT_ID` / `_SECRET` — OIDC client credentials
+- `NEXT_PUBLIC_BASE_PATH` — subpath prefix (`/popisujeme`)
 
 ### Security Features
 
@@ -531,10 +505,12 @@ Key configuration managed through Terraform:
    - Path-based routing rules must be in correct order (most specific first)
 
 3. **Resource Import**:
+
+   Resources created outside of Terraform (e.g. auto-created load balancers or IPs) can be imported rather than recreated:
    ```bash
-   # Import existing resources to avoid destruction
    terraform import module.dev[0].azurerm_resource_group.shared /subscriptions/.../resourceGroups/...
    ```
+   The Azure Export for Terraform tool can also generate import blocks for existing resources.
 
 4. **CORS Issues**:
    - Verify `pick_host_name_from_backend_address = true` in App Gateway backend settings
@@ -561,22 +537,6 @@ terraform apply plan.tfplan
 - [Azure Container Apps Documentation](https://docs.microsoft.com/en-us/azure/container-apps/)
 - [Azure Application Gateway Documentation](https://docs.microsoft.com/en-us/azure/application-gateway/)
 - [Terraform Azure Provider Documentation](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-
-## Architecture Patterns
-
-### Data-Driven Configuration with Dynamic Blocks
-
-The Application Gateway uses a data-driven pattern that separates configuration data from resource structure:
-
-- **Configuration files** (`appgw_*_config.tf`) define data in `locals`
-- **Resource file** (`appgw_resource.tf`) uses dynamic blocks to generate configuration
-- **Benefits**: Easy to add new applications without modifying existing configuration
-
-#### Adding a New Application
-
-1. Create `modules/shared_global/appgw_newapp_config.tf` with configuration data
-2. Update `appgw_resource.tf` to include the new config in dynamic blocks
-3. Existing application configurations remain unchanged
 
 ## Architecture Evolution
 
@@ -608,10 +568,10 @@ The infrastructure underwent a significant architectural migration to consolidat
 
 #### Infrastructure Changes:
 
-- **Removed**: `modules/validator_environment` (dedicated per-app environment)
 - **Added**: `modules/shared` (consolidated shared environment for all apps)
+- **Added**: `modules/tool_apps` (tool backend, frontend, database, and Keycloak)
 - **Updated**: All container app definitions include `lifecycle { ignore_changes = [template[0].container[0].image] }`
-- **Subnet Planning**: Added tool subnet (`/23`) alongside validator subnet for future applications
+- **Subnet Planning**: Two `/23` subnets per environment — one for validator, one for tool apps
 
 #### Workflow Changes:
 
@@ -620,8 +580,3 @@ The infrastructure underwent a significant architectural migration to consolidat
 - **Added**: Direct `az containerapp update` commands in application deployment workflows
 - **Enhanced**: Image validation before deployment in application workflows
 
-## Notes
-
-- The load balancer and IP resources that were created automatically when deploying the container application can be imported into Terraform using the `terraform import` command or by using the Azure Export for Terraform tool.
-- When adding a new application, follow the data-driven pattern: create a new configuration file and update the resource file to include it.
-- Container images should be deployed via application repository workflows, not Terraform.
