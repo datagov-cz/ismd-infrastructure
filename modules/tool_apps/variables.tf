@@ -1,3 +1,6 @@
+# Tool Apps Module — core variable declarations
+# Database vars: variables_database.tf | Keycloak/CAAIS vars: variables_keycloak.tf
+
 # Core Environment Variables
 variable "environment" {
   description = "Environment name (dev, test, prod)"
@@ -82,96 +85,13 @@ variable "workload_profile_name" {
   default     = "Consumption"
 }
 
-variable "workload_profile_type" {
-  description = "Type of the workload profile (e.g., 'Consumption', 'D4')"
-  type        = string
-  default     = "Consumption"
-}
-
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
   type        = list(string)
   default     = []
 }
 
-# Database & Fuseki Configuration
-variable "postgres_url" {
-  description = "JDBC URL for PostgreSQL"
-  type        = string
-  sensitive   = true
-  default     = "" # Optional until DB is ready
-}
-
-variable "postgres_user" {
-  description = "PostgreSQL username"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "postgres_password" {
-  description = "PostgreSQL password"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "fuseki_url" {
-  description = "URL for Apache Jena Fuseki (external, if not deploying Fuseki container)"
-  type        = string
-  default     = ""
-}
-
-# Database deployment options
-variable "deploy_postgres" {
-  description = "Whether to deploy Azure Database for PostgreSQL Flexible Server"
-  type        = bool
-  default     = true
-}
-
-variable "deploy_fuseki" {
-  description = "Whether to deploy Fuseki as a container app"
-  type        = bool
-  default     = true
-}
-
-variable "postgres_db_name" {
-  description = "Name of the PostgreSQL database"
-  type        = string
-  default     = "ismd_tool_db"
-}
-
-variable "postgres_admin_user" {
-  description = "PostgreSQL admin username"
-  type        = string
-  default     = "ismdadmin"
-}
-
-variable "postgres_admin_password" {
-  description = "PostgreSQL admin password"
-  type        = string
-  sensitive   = true
-}
-
-variable "postgres_sku_name" {
-  description = "SKU name for PostgreSQL Flexible Server (e.g., B_Standard_B1ms for burstable)"
-  type        = string
-  default     = "B_Standard_B1ms"
-}
-
-variable "postgres_storage_mb" {
-  description = "Storage size in MB for PostgreSQL"
-  type        = number
-  default     = 32768  # 32GB
-}
-
-variable "fuseki_admin_password" {
-  description = "Fuseki admin password"
-  type        = string
-  sensitive   = true
-  default     = "admin123"
-}
-
+# Frontend auth and routing
 variable "nextauth_secret" {
   description = "NextAuth.js secret for session encryption"
   type        = string
@@ -179,3 +99,8 @@ variable "nextauth_secret" {
   default     = ""
 }
 
+variable "tool_base_path" {
+  description = "Optional base path prefix for tool app routes (e.g. /popisujeme). Use empty string for root deployment."
+  type        = string
+  default     = "/popisujeme"
+}

@@ -46,7 +46,7 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
     
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -54,7 +54,7 @@ jobs:
         terraform_version: '1.11.3'
     
     - name: Azure Login
-      uses: azure/login@v2
+      uses: azure/login@v3
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     
@@ -111,7 +111,6 @@ jobs:
     
     - name: Terraform Plan
       env:
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
         TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
         TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
         TF_VAR_tool_resource_group_name: ismd-tool-${{ env.ENVIRONMENT }}
@@ -119,16 +118,18 @@ jobs:
         TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
         TF_VAR_deploy_tool_apps: ${{ github.event.inputs.deploy_tool_apps }}
         TF_VAR_tool_postgres_password: ${{ secrets.TOOL_POSTGRES_PASSWORD }}
+        TF_VAR_tool_nextauth_secret: ${{ secrets.TOOL_NEXTAUTH_SECRET }}
+        TF_VAR_tool_keycloak_admin_password: ${{ secrets.TOOL_KEYCLOAK_ADMIN_PASSWORD }}
+        TF_VAR_tool_keycloak_client_secret: ${{ secrets.TOOL_KEYCLOAK_CLIENT_SECRET }}
       run: |
         terraform plan -out=tfplan
-        
+
         # Display the plan for review
         echo "\n\nTerraform Plan Output:\n"
         terraform show -no-color tfplan || echo "Plan creation failed"
-    
+
     - name: Terraform Apply
       env:
-        TF_VAR_environment: ${{ env.ENVIRONMENT }}
         TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
         TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
         TF_VAR_tool_resource_group_name: ismd-tool-${{ env.ENVIRONMENT }}
@@ -136,6 +137,9 @@ jobs:
         TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
         TF_VAR_deploy_tool_apps: ${{ github.event.inputs.deploy_tool_apps }}
         TF_VAR_tool_postgres_password: ${{ secrets.TOOL_POSTGRES_PASSWORD }}
+        TF_VAR_tool_nextauth_secret: ${{ secrets.TOOL_NEXTAUTH_SECRET }}
+        TF_VAR_tool_keycloak_admin_password: ${{ secrets.TOOL_KEYCLOAK_ADMIN_PASSWORD }}
+        TF_VAR_tool_keycloak_client_secret: ${{ secrets.TOOL_KEYCLOAK_CLIENT_SECRET }}
       run: |
         terraform apply -auto-approve tfplan
 

@@ -14,9 +14,8 @@ provider "azurerm" {
 
 # Shared Global (App Gateway + Global VNet) - Manages all environments in one deployment
 module "shared_global" {
-  source      = "../modules/shared_global"
-  location    = var.location
-  environment = var.environment # Used for tagging only
+  source   = "../modules/shared_global"
+  location = var.location
 
   # Construct FQDNs from environment-specific domains (backward compatible with old variable)
   frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (

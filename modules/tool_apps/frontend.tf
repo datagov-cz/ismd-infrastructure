@@ -1,5 +1,14 @@
 # Frontend Container App for Tool
 
+locals {
+  tool_frontend_scheme = var.environment == "dev" && var.app_gateway_hostname == "" ? "http" : "https"
+  tool_frontend_host   = var.app_gateway_hostname != "" ? var.app_gateway_hostname : var.app_gateway_public_ip
+  tool_base_path       = trimspace(var.tool_base_path) == "" ? "" : (startswith(trimspace(var.tool_base_path), "/") ? trimsuffix(trimspace(var.tool_base_path), "/") : "/${trimsuffix(trimspace(var.tool_base_path), "/")}")
+
+  tool_frontend_base_url = "${local.tool_frontend_scheme}://${local.tool_frontend_host}${local.tool_base_path}"
+  tool_nextauth_url      = "${local.tool_frontend_base_url}/api/auth"
+}
+
 resource "azurerm_container_app" "frontend" {
   name                         = "${var.frontend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
@@ -17,9 +26,28 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name = "NEXT_PUBLIC_BE_URL"
-        # Include protocol and /popisujeme path
-        value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/popisujeme" : "http://${var.app_gateway_public_ip}/popisujeme") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/popisujeme" : "https://${var.app_gateway_public_ip}/popisujeme")
+        name  = "BE_URL"
+        value = "http://${azurerm_container_app.backend.name}${local.tool_base_path}"
+      }
+      env {
+        name  = "NEXT_PUBLIC_BASE_PATH"
+        value = local.tool_base_path
+      }
+      env {
+        name  = "KEYCLOAK_ISSUER"
+        value = local.keycloak_issuer_uri
+      }
+      env {
+        name  = "KEYCLOAK_CLIENT_ID"
+        value = var.keycloak_client_id
+      }
+      env {
+        name        = "KEYCLOAK_CLIENT_SECRET"
+        secret_name = "keycloak-client-secret"
+      }
+      env {
+        name  = "NEXTAUTH_URL"
+        value = local.tool_nextauth_url
       }
       env {
         name  = "NODE_ENV"
@@ -29,12 +57,43 @@ resource "azurerm_container_app" "frontend" {
         name        = "NEXTAUTH_SECRET"
         secret_name = "nextauth-secret"
       }
+
+      liveness_probe {
+        transport               = "HTTP"
+        port                    = 3000
+        path                    = "/popisujeme"
+        interval_seconds        = 10
+        failure_count_threshold = 3
+        timeout                 = 5
+      }
+
+      readiness_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        success_count_threshold = 1
+        timeout                 = 5
+      }
+
+      startup_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        timeout                 = 3
+      }
     }
   }
 
   secret {
     name  = "nextauth-secret"
     value = var.nextauth_secret
+  }
+
+  secret {
+    name  = "keycloak-client-secret"
+    value = var.keycloak_client_secret
   }
 
   ingress {

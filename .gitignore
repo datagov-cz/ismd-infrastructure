@@ -8,7 +8,11 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
-*.tfvars
+terraform.tfvars
+!environments/*/terraform.tfvars
+
+# Terraform plan output (human-readable, for local review only)
+plan.*.txt
 
 # Temporary and debug files
 *.log
@@ -16,4 +20,3 @@
 # Local environment files
 .env*
 .env.local
-/load_env_vars.ps1

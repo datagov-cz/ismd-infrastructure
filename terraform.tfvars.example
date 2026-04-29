@@ -1,13 +1,79 @@
-# Example configuration for dev environment
-# Copy this file to terraform.tfvars and update with your values
+# Terraform variable template
+# Copy this file to terraform.tfvars and fill in values for your target environment.
+# terraform.tfvars is gitignored — never commit it.
+#
+# Sensitive variables (marked below) should be passed via TF_VAR_* environment variables
+# rather than stored in a tfvars file:
+#   export TF_VAR_tool_postgres_password="..."
+#   export TF_VAR_tool_nextauth_secret="..."
+#   export TF_VAR_tool_keycloak_admin_password="..."
+#   export TF_VAR_tool_keycloak_client_secret="..."
 
-environment = "dev"
+# ── Environment ────────────────────────────────────────────────────────────────
+
 location = "germanywestcentral"
-shared_resource_group_name = "ismd-shared-dev"
-validator_resource_group_name = "ismd-validator-dev"
 
-# Container images
-frontend_image = "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
-frontend_image_tag = "0.1.0-c255c74"
-backend_image = "ghcr.io/datagov-cz/ismd-validator-backend-dev"
-backend_image_tag = "0.0.1-snapshot-deff379"
+# ── Resource Groups ────────────────────────────────────────────────────────────
+
+shared_resource_group_name    = "ismd-shared-<env>"      # e.g. ismd-shared-dev
+validator_resource_group_name = "ismd-validator-<env>"
+tool_resource_group_name      = "ismd-tool-<env>"
+
+# ── App Gateway ────────────────────────────────────────────────────────────────
+
+app_gateway_hostname   = ""   # e.g. ismd.example.gov.cz — leave empty if not yet provisioned
+tool_keycloak_hostname = ""   # usually same as app_gateway_hostname
+
+# ── Validator Images ───────────────────────────────────────────────────────────
+
+frontend_image     = "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
+frontend_image_tag = "latest"
+backend_image      = "ghcr.io/datagov-cz/ismd-validator-backend-dev"
+backend_image_tag  = "latest"
+
+frontend_app_name = "ismd-validator-frontend"
+backend_app_name  = "ismd-validator-backend"
+
+# ── Tool Images ────────────────────────────────────────────────────────────────
+
+tool_frontend_image     = "ghcr.io/datagov-cz/ismd-tool-frontend-dev"
+tool_frontend_image_tag = "latest"
+tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
+tool_backend_image_tag  = "latest"
+
+tool_frontend_app_name = "ismd-tool-frontend"
+tool_backend_app_name  = "ismd-tool-backend"
+
+# ── Tool Deployment Toggles ────────────────────────────────────────────────────
+
+deploy_tool_apps     = true
+tool_deploy_keycloak = true
+tool_enable_caais    = false  # set true only when CAAIS integration is configured
+
+# ── Tool Database (Fuseki) ─────────────────────────────────────────────────────
+
+tool_fuseki_url = ""   # leave empty to use the Container App provisioned by Terraform
+
+# ── Tool Secrets (use TF_VAR_* env vars instead of storing here) ──────────────
+
+# tool_postgres_password       = ""   # SENSITIVE — use TF_VAR_tool_postgres_password
+# tool_postgres_url            = ""   # SENSITIVE — use TF_VAR_tool_postgres_url
+# tool_postgres_user           = ""   # SENSITIVE — use TF_VAR_tool_postgres_user
+# tool_nextauth_secret         = ""   # SENSITIVE — use TF_VAR_tool_nextauth_secret
+
+# ── Keycloak ───────────────────────────────────────────────────────────────────
+
+tool_keycloak_image     = "quay.io/keycloak/keycloak"
+tool_keycloak_image_tag = "24.0.2"
+tool_keycloak_app_name  = "ismd-tool-keycloak"
+tool_keycloak_admin_user = "admin"
+tool_keycloak_realm      = "ismd"
+tool_keycloak_client_id  = "ismd-app"
+tool_caais_client_id     = ""   # set when tool_enable_caais = true
+
+# tool_keycloak_admin_password = ""   # SENSITIVE — use TF_VAR_tool_keycloak_admin_password
+# tool_keycloak_client_secret  = ""   # SENSITIVE — use TF_VAR_tool_keycloak_client_secret
+
+# ── CORS ───────────────────────────────────────────────────────────────────────
+
+additional_cors_origins = []

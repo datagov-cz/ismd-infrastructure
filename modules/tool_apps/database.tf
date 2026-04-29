@@ -37,7 +37,7 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   lifecycle {
     prevent_destroy = false
     ignore_changes = [
-      zone  # Zone cannot be changed after creation
+      zone # Zone cannot be changed after creation
     ]
   }
 }
@@ -46,6 +46,14 @@ resource "azurerm_postgresql_flexible_server" "tool" {
 resource "azurerm_postgresql_flexible_server_database" "tool" {
   count     = var.deploy_postgres ? 1 : 0
   name      = var.postgres_db_name
+  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  charset   = "UTF8"
+  collation = "en_US.utf8"
+}
+
+resource "azurerm_postgresql_flexible_server_database" "keycloak" {
+  count     = var.deploy_postgres && var.deploy_keycloak ? 1 : 0
+  name      = var.keycloak_db_name
   server_id = azurerm_postgresql_flexible_server.tool[0].id
   charset   = "UTF8"
   collation = "en_US.utf8"
@@ -91,7 +99,7 @@ resource "azurerm_storage_share" "fuseki_data" {
   count              = var.deploy_fuseki ? 1 : 0
   name               = "fuseki-data"
   storage_account_id = azurerm_storage_account.fuseki[0].id
-  quota              = 5  # 5GB should be enough for dev
+  quota              = 5 # 5GB should be enough for dev
 }
 
 # Container App Environment Storage for Fuseki
@@ -104,7 +112,6 @@ resource "azurerm_container_app_environment_storage" "fuseki" {
   access_key                   = azurerm_storage_account.fuseki[0].primary_access_key
   access_mode                  = "ReadWrite"
 }
-
 # Fuseki Container App for Tool
 resource "azurerm_container_app" "fuseki" {
   count                        = var.deploy_fuseki ? 1 : 0
@@ -121,18 +128,13 @@ resource "azurerm_container_app" "fuseki" {
 
     container {
       name   = "fuseki"
-      image  = "secoresearch/fuseki:latest"
+      image  = var.fuseki_image
       cpu    = 0.5
       memory = "1Gi"
 
-      env {
-        name        = "ADMIN_PASSWORD"
-        secret_name = "fuseki-admin-password"
-      }
-
       volume_mounts {
         name = "fuseki-data"
-        path = "/fuseki/databases"
+        path = "/opt/fuseki/run/databases"
       }
 
       liveness_probe {
@@ -155,11 +157,6 @@ resource "azurerm_container_app" "fuseki" {
       storage_type = "AzureFile"
       storage_name = azurerm_container_app_environment_storage.fuseki[0].name
     }
-  }
-
-  secret {
-    name  = "fuseki-admin-password"
-    value = var.fuseki_admin_password
   }
 
   ingress {
@@ -204,5 +201,5 @@ output "postgres_fqdn" {
 
 output "fuseki_internal_url" {
   description = "Internal URL for Fuseki"
-  value       = var.deploy_fuseki ? "http://ismd-tool-fuseki-${var.environment}:3030" : var.fuseki_url
+  value       = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ds" : var.fuseki_url
 }

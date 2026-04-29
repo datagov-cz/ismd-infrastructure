@@ -25,6 +25,31 @@ resource "azurerm_container_app" "frontend" {
         # Path /validujeme is required for App Gateway routing
         value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/validujeme" : "http://${var.app_gateway_public_ip}/validujeme") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/validujeme" : "https://${var.app_gateway_public_ip}/validujeme")
       }
+
+      liveness_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 10
+        failure_count_threshold = 3
+        timeout                 = 5
+      }
+
+      readiness_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        success_count_threshold = 1
+        timeout                 = 5
+      }
+
+      startup_probe {
+        transport               = "TCP"
+        port                    = 3000
+        interval_seconds        = 8
+        failure_count_threshold = 30
+        timeout                 = 3
+      }
     }
   }
 
