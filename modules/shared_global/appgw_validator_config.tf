@@ -6,72 +6,44 @@ locals {
   validator_environments = ["dev", "test", "prod"]
 
   # Backend Address Pools
-  validator_backend_pools = flatten([
-    for env in local.validator_environments : [
-      {
-        name  = "validator-${env}-fe-pool"
-        fqdns = env == "dev" ? (var.frontend_fqdn != "" ? [var.frontend_fqdn] : (var.container_app_environment_domain_dev != "" ? ["${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}"] : [])) : env == "test" ? (var.frontend_fqdn_test != "" ? [var.frontend_fqdn_test] : (var.container_app_environment_domain_test != "" ? ["${var.frontend_app_name}-test.${var.container_app_environment_domain_test}"] : [])) : (var.frontend_fqdn_prod != "" ? [var.frontend_fqdn_prod] : (var.container_app_environment_domain_prod != "" ? ["${var.frontend_app_name}-prod.${var.container_app_environment_domain_prod}"] : []))
-      },
-      {
-        name  = "validator-${env}-be-pool"
-        fqdns = env == "dev" ? (var.backend_fqdn != "" ? [var.backend_fqdn] : (var.container_app_environment_domain_dev != "" ? ["${var.backend_app_name}-dev.${var.container_app_environment_domain_dev}"] : [])) : env == "test" ? (var.backend_fqdn_test != "" ? [var.backend_fqdn_test] : (var.container_app_environment_domain_test != "" ? ["${var.backend_app_name}-test.${var.container_app_environment_domain_test}"] : [])) : (var.backend_fqdn_prod != "" ? [var.backend_fqdn_prod] : (var.container_app_environment_domain_prod != "" ? ["${var.backend_app_name}-prod.${var.container_app_environment_domain_prod}"] : []))
-      }
-    ]
-  ])
+  # Note: be-pool removed — validator backend now has internal ingress only (BFF pattern).
+  # All traffic routes through the Next.js frontend; App Gateway only needs fe-pool.
+  validator_backend_pools = [
+    for env in local.validator_environments : {
+      name  = "validator-${env}-fe-pool"
+      fqdns = env == "dev" ? (var.frontend_fqdn != "" ? [var.frontend_fqdn] : (var.container_app_environment_domain_dev != "" ? ["${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}"] : [])) : env == "test" ? (var.frontend_fqdn_test != "" ? [var.frontend_fqdn_test] : (var.container_app_environment_domain_test != "" ? ["${var.frontend_app_name}-test.${var.container_app_environment_domain_test}"] : [])) : (var.frontend_fqdn_prod != "" ? [var.frontend_fqdn_prod] : (var.container_app_environment_domain_prod != "" ? ["${var.frontend_app_name}-prod.${var.container_app_environment_domain_prod}"] : []))
+    }
+  ]
 
   # Health Probes
-  validator_probes = flatten([
-    for env in local.validator_environments : [
-      {
-        name                                      = "validator-${env}-fe-probe"
-        protocol                                  = "Http"
-        path                                      = "/validujeme"
-        interval                                  = 30
-        timeout                                   = 30
-        unhealthy_threshold                       = 3
-        pick_host_name_from_backend_http_settings = true
-        match_status_codes                        = ["200-399"]
-      },
-      {
-        name                                      = "validator-${env}-be-probe"
-        protocol                                  = "Http"
-        path                                      = "/validujeme/actuator/health"
-        interval                                  = 30
-        timeout                                   = 30
-        unhealthy_threshold                       = 3
-        pick_host_name_from_backend_http_settings = true
-        match_status_codes                        = ["200-399"]
-      }
-    ]
-  ])
+  # Note: be-probe removed — backend is internal only, unreachable from App Gateway.
+  validator_probes = [
+    for env in local.validator_environments : {
+      name                                      = "validator-${env}-fe-probe"
+      protocol                                  = "Http"
+      path                                      = "/validujeme"
+      interval                                  = 30
+      timeout                                   = 30
+      unhealthy_threshold                       = 3
+      pick_host_name_from_backend_http_settings = true
+      match_status_codes                        = ["200-399"]
+    }
+  ]
 
   # Backend HTTP Settings
-  validator_backend_http_settings = flatten([
-    for env in local.validator_environments : [
-      # Frontend settings (Pass-through path, no override)
-      {
-        name                                = "validator-${env}-fe-http-settings"
-        cookie_based_affinity               = "Disabled"
-        port                                = 80
-        protocol                            = "Http"
-        request_timeout                     = 60
-        probe_name                          = "validator-${env}-fe-probe"
-        pick_host_name_from_backend_address = true
-        path                                = null # Do not rewrite path! App expects /validujeme prefix
-      },
-      # Backend API settings (Pass-through path, no override)
-      {
-        name                                = "validator-${env}-be-http-settings"
-        cookie_based_affinity               = "Disabled"
-        port                                = 80
-        protocol                            = "Http"
-        request_timeout                     = 60
-        probe_name                          = "validator-${env}-be-probe"
-        pick_host_name_from_backend_address = true
-        path                                = null # Do not rewrite path! App expects /validujeme/api prefix
-      },
-    ]
-  ])
+  # Note: be-http-settings removed — backend is internal only, all traffic goes through frontend.
+  validator_backend_http_settings = [
+    for env in local.validator_environments : {
+      name                                = "validator-${env}-fe-http-settings"
+      cookie_based_affinity               = "Disabled"
+      port                                = 80
+      protocol                            = "Http"
+      request_timeout                     = 60
+      probe_name                          = "validator-${env}-fe-probe"
+      pick_host_name_from_backend_address = true
+      path                                = null # Do not rewrite path — app expects /validujeme prefix
+    }
+  ]
 
   # HTTP Listeners (hostname-based)
   validator_http_listeners = flatten([
@@ -144,13 +116,9 @@ locals {
       default_backend_address_pool_name   = null
       default_backend_http_settings_name  = null
       default_redirect_configuration_name = "redirect-root-to-validujeme-${env}"
+      # api-rule removed — backend is internal only. All /validujeme/* routes to frontend;
+      # Next.js rewrites proxy /validujeme/api/* → backend server-side.
       path_rules = concat([
-        {
-          name                       = "api-rule-${env}"
-          paths                      = ["/validujeme/api/*", "/validujeme/api"]
-          backend_address_pool_name  = "validator-${env}-be-pool"
-          backend_http_settings_name = "validator-${env}-be-http-settings"
-        },
         {
           name                       = "frontend-rule-${env}"
           paths                      = ["/validujeme/*", "/validujeme"]
