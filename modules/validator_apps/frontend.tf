@@ -19,11 +19,10 @@ resource "azurerm_container_app" "frontend" {
       cpu    = 0.5
       memory = "1Gi"
       env {
-        name = "NEXT_PUBLIC_BE_URL"
-        # Include protocol for compatibility with current frontend (without interceptor)
-        # Use HTTPS for TEST/PROD (accessed via HTTPS), HTTP for DEV (no cert yet)
-        # Path /validujeme is required for App Gateway routing
-        value = var.environment == "dev" ? (var.app_gateway_hostname != "" ? "http://${var.app_gateway_hostname}/validujeme" : "http://${var.app_gateway_public_ip}/validujeme") : (var.app_gateway_hostname != "" ? "https://${var.app_gateway_hostname}/validujeme" : "https://${var.app_gateway_public_ip}/validujeme")
+        # Server-side only — Next.js rewrites proxy /validujeme/api/* → backend internally.
+        # Backend has internal ingress only; never exposed to the browser.
+        name  = "BE_URL"
+        value = "http://${azurerm_container_app.backend.name}/validujeme"
       }
 
       liveness_probe {

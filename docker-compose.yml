@@ -41,7 +41,7 @@
 #
 # Environment Variables:
 # ---------------------
-# NEXT_PUBLIC_BE_URL: Backend hostname with port (protocol added dynamically by frontend)
+# BE_URL: Backend base URL used server-side by Next.js rewrites (BFF pattern, not exposed to browser)
 # NODE_ENV: Node.js environment (development/production)
 # SPRING_PROFILES_ACTIVE: Spring profile (localhost/development/production)
 #
@@ -69,7 +69,7 @@ services:
     image: ghcr.io/datagov-cz/ismd-validator-frontend:latest
     container_name: ismd-validator-frontend
     environment:
-      - NEXT_PUBLIC_BE_URL=localhost:8080
+      - BE_URL=http://ismd-validator-backend:8080/validujeme
       - NODE_ENV=production
     ports:
       - "3000:3000"

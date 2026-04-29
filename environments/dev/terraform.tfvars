@@ -1,4 +1,5 @@
-environment                   = "dev"
+# Dev environment configuration
+
 location                      = "germanywestcentral"
 shared_resource_group_name    = "ismd-shared-dev"
 validator_resource_group_name = "ismd-validator-dev"
@@ -17,7 +18,7 @@ tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
 tool_backend_image_tag  = "0.0.1-a9a5d5b"
 
 # App Gateway - DEV hostname (HTTPS)
-app_gateway_hostname = "oha03.dia.gov.cz"
+app_gateway_hostname   = "oha03.dia.gov.cz"
 tool_keycloak_hostname = "oha03.dia.gov.cz"
 
 deploy_tool_apps = true

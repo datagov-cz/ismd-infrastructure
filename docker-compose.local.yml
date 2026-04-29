@@ -46,7 +46,7 @@ services:
     image: ismd-validator-frontend-local
     pull_policy: never
     environment:
-      - NEXT_PUBLIC_BE_URL=localhost:8080
+      - BE_URL=http://ismd-validator-backend:8080/validujeme
       - NODE_ENV=development
     depends_on:
       - ismd-validator-backend

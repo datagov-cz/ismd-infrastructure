@@ -26,24 +26,14 @@ resource "azurerm_container_app" "backend" {
   }
 
   ingress {
-    external_enabled = true
+    # Internal only — all browser traffic goes through Next.js frontend (BFF pattern)
+    external_enabled = false
     target_port      = 8080
     transport        = "auto"
 
     traffic_weight {
       latest_revision = true
       percentage      = 100
-    }
-    allow_insecure_connections = true
-
-    # Restrict ingress to Application Gateway public IP (only when known)
-    dynamic "ip_security_restriction" {
-      for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
-      content {
-        name             = "AllowAppGateway"
-        ip_address_range = "${ip_security_restriction.value}/32"
-        action           = "Allow"
-      }
     }
   }
 

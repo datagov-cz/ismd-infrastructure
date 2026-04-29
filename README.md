@@ -2,6 +2,28 @@
 
 This repository contains Terraform configurations for managing Azure Container Apps infrastructure with Application Gateway across multiple environments (dev, test, prod).
 
+## Common Gotchas
+
+> Read this before your first `terraform plan` — these are the things that have actually caught us out.
+
+- **`load_env_vars.sh` must be sourced, not executed.** Running `./load_env_vars.sh dev` does nothing useful — env vars get set in a subshell and disappear immediately. Use one of these:
+  ```bash
+  source load_env_vars.sh dev    # bash
+  . ./load_env_vars.sh dev       # bash (shorthand)
+  . .\load_env_vars.ps1 dev      # PowerShell
+  ```
+  Symptom if you forget: `terraform plan` fails with `expected "administrator_password" to not be an empty string` (or similar empty-var errors).
+
+- **PowerShell and WSL bash have separate environments.** Sourcing the loader in PowerShell does not propagate vars to your WSL bash session. You must source the appropriate script in whichever shell you actually run `terraform` from.
+
+- **Verify env vars before planning:**
+  ```bash
+  env | grep TF_VAR_
+  ```
+  If this is empty, you forgot to source the loader.
+
+- **Workspace must match the environment.** The loader handles this automatically, but if you run `terraform workspace select` manually, make sure you're on the right one (`dev` / `test` / `prod`) before planning or applying.
+
 ## Architecture Overview
 
 - **Shared Container App Environment**: Consolidated environment for all applications (validator and tool) across dev, test, and prod
@@ -472,7 +494,7 @@ Key variables managed through Terraform across all container apps:
 
 **Validator:**
 - `CORS_ALLOWED_ORIGINS` — allowed origins for the backend
-- `NEXT_PUBLIC_BE_URL` — frontend-to-backend URL
+- `BE_URL` — backend base URL used server-side by Next.js rewrites (BFF pattern, not exposed to browser)
 - `PORT` — container port (8080)
 
 **Tool:**
