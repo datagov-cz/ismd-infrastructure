@@ -1,0 +1,16 @@
+# ==============================================
+# ISMD - Frontends Aggregator (Optional)
+# ==============================================
+# Adds containerized frontends to the base aggregator. Use only when you
+# want both UIs running in containers; for active FE development run
+# `npm run dev` locally instead.
+#
+# Usage:
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.frontends.yml \
+#                  --profile full-backend up
+# ==============================================
+
+include:
+  - path: ../frontend/docker-compose.yml
+  - path: ../tool-frontend/docker-compose.yml

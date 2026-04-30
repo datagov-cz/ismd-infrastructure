@@ -20,7 +20,9 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   geo_redundant_backup_enabled = var.environment == "prod"
 
   # Zone redundancy for prod only
-  zone = var.environment == "prod" ? "1" : null
+  # NOTE: Hardcoded to "1" for dev to match existing server state.
+  # Change this only if recreating the server.
+  zone = "1"
 
   # Public access for simplicity (can be restricted later with firewall rules)
   public_network_access_enabled = true
@@ -30,15 +32,6 @@ resource "azurerm_postgresql_flexible_server" "tool" {
     Application = "Tool"
     Component   = "Database"
     ManagedBy   = "Terraform"
-  }
-
-  # Note: prevent_destroy cannot use variables, set to false for now
-  # For prod, consider using a separate module or manual protection
-  lifecycle {
-    prevent_destroy = false
-    ignore_changes = [
-      zone # Zone cannot be changed after creation
-    ]
   }
 }
 
@@ -197,6 +190,14 @@ output "postgres_jdbc_url" {
 output "postgres_fqdn" {
   description = "FQDN of the PostgreSQL Flexible Server"
   value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].fqdn : null
+}
+
+# Enable unaccent extension at the server level
+resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
+  count     = var.deploy_postgres ? 1 : 0
+  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  name      = "azure.extensions"
+  value     = "UNACCENT"
 }
 
 output "fuseki_internal_url" {
