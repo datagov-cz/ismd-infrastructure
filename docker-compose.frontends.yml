@@ -12,5 +12,5 @@
 # ==============================================
 
 include:
-  - path: ../frontend/docker-compose.yml
-  - path: ../tool-frontend/docker-compose.yml
+  - path: ../ismd-validator-frontend/docker-compose.yml
+  - path: ../ismd-tool-frontend/docker-compose.yml

@@ -4,14 +4,14 @@
 # Pulls compose definitions from each repo. Assumes sibling-repo layout:
 #
 #   <parent>/
-#   ├── backend/             (validator BE)
-#   ├── tool-backend/        (tool BE + postgres + keycloak + fuseki)
-#   ├── frontend/            (validator FE — only via docker-compose.frontends.yml)
-#   ├── tool-frontend/       (tool FE     — only via docker-compose.frontends.yml)
-#   └── infrastructure/      (this file)
+#   ├── ismd-validator-backend/   (validator BE)
+#   ├── ismd-tool-backend/        (tool BE + postgres + keycloak + fuseki)
+#   ├── ismd-validator-frontend/  (validator FE — only via docker-compose.frontends.yml)
+#   ├── ismd-tool-frontend/     (tool FE     — only via docker-compose.frontends.yml)
+#   └── ismd-infrastructure/    (this file)
 #
 # Quick start (FE developer running both backends + deps in containers):
-#   cd infrastructure
+#   cd ismd-infrastructure
 #   docker compose --profile full-backend up
 #
 # Add containerized frontends (optional):
@@ -21,13 +21,13 @@
 #
 # Build all images from local source instead of pulling:
 #   docker compose -f docker-compose.yml \
-#                  -f ../backend/docker-compose.build.yml \
-#                  -f ../tool-backend/docker-compose.build.yml \
+#                  -f ../ismd-validator-backend/docker-compose.build.yml \
+#                  -f ../ismd-tool-backend/docker-compose.build.yml \
 #                  --profile full-backend up --build
 #
 # Requires Docker Compose v2.20+ (for `include:` directive).
 # ==============================================
 
 include:
-  - path: ../backend/docker-compose.yml
-  - path: ../tool-backend/docker-compose.yml
+  - path: ../ismd-validator-backend/docker-compose.yml
+  - path: ../ismd-tool-backend/docker-compose.yml

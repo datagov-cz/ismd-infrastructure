@@ -2,17 +2,29 @@
 
 Aggregates per-repo compose files into a single dev environment.
 
+## Which Repos Do I Need?
+
+| I'm working on... | Repos needed | Compose entrypoint |
+|-------------------|--------------|-------------------|
+| **Validator backend** | `ismd-validator-backend/` only | `cd ismd-validator-backend && docker compose up` |
+| **Tool backend** | `ismd-tool-backend/` only | `cd ismd-tool-backend && docker compose --profile full-backend up` |
+| **Validator frontend** | `ismd-validator-backend/` + your FE repo | `cd ismd-validator-backend && docker compose up` then `npm run dev` in `ismd-validator-frontend/` |
+| **Tool frontend** | `ismd-tool-backend/` + your FE repo | `cd ismd-tool-backend && docker compose --profile full-backend up` then `npm run dev` in `ismd-tool-frontend/` |
+| **Both frontends** (or full stack) | **All repos** + `ismd-infrastructure/` | `cd ismd-infrastructure && docker compose --profile full-backend up` |
+
+Backend repos are **self-sufficient** — you only need `ismd-infrastructure/` when aggregating multiple repos.
+
 ## Prerequisites
 
 - **Docker Compose v2.20+** (for the `include:` directive — Docker Desktop ≥ 4.22)
-- All four app repos cloned as **siblings** of `infrastructure/`:
+- All four app repos cloned as **siblings** of `ismd-infrastructure/`:
   ```
   <parent>/
-  ├── backend/             # validator BE
-  ├── tool-backend/        # tool BE + postgres + keycloak + fuseki
-  ├── frontend/            # validator FE
-  ├── tool-frontend/       # tool FE
-  └── infrastructure/      # this repo
+  ├── ismd-validator-backend/   # validator BE
+  ├── ismd-tool-backend/        # tool BE + postgres + keycloak + fuseki
+  ├── ismd-validator-frontend/  # validator FE
+  ├── ismd-tool-frontend/     # tool FE
+  └── ismd-infrastructure/    # this repo
   ```
 
 ## Quick Start (Frontend Developer)
@@ -24,10 +36,15 @@ cp compose.env.example .env   # one-time
 docker compose --profile full-backend up
 ```
 
-Then in your FE repo (`frontend/` or `tool-frontend/`) run `npm run dev` against:
+Then in your FE repo (`ismd-validator-frontend/` or `ismd-tool-frontend/`) run `npm run dev` against:
 - Validator BE: `http://localhost:8082`
 - Tool BE: `http://localhost:8081`
 - Keycloak: `http://localhost:8080`
+
+Stop:
+```bash
+docker compose --profile full-backend down
+```
 
 ## Optional: Run Frontends in Containers Too
 
@@ -40,14 +57,21 @@ docker compose -f docker-compose.yml \
 - Validator FE: `http://localhost:3000`
 - Tool FE: `http://localhost:3001`
 
+Stop:
+```bash
+docker compose -f docker-compose.yml \
+               -f docker-compose.frontends.yml \
+               --profile full-backend down
+```
+
 ## Build All Images Locally (No GHCR pulls)
 
 Requires `GITHUB_TOKEN` + `GITHUB_ACTOR` in `.env` (Maven access to GitHub Packages):
 
 ```bash
 docker compose -f docker-compose.yml \
-               -f ../backend/docker-compose.build.yml \
-               -f ../tool-backend/docker-compose.build.yml \
+               -f ../ismd-validator-backend/docker-compose.build.yml \
+               -f ../ismd-tool-backend/docker-compose.build.yml \
                --profile full-backend up --build
 ```
 
@@ -57,10 +81,10 @@ Each repo's `docker-compose.yml` works on its own:
 
 | Repo | `docker compose up` runs |
 |------|---------------------------|
-| `backend/` | validator BE only |
-| `tool-backend/` | postgres + keycloak + fuseki (no BE; add `--profile full-backend` for BE) |
-| `frontend/` | validator FE only |
-| `tool-frontend/` | tool FE only |
+| `ismd-validator-backend/` | validator BE only |
+| `ismd-tool-backend/` | postgres + keycloak + fuseki (no BE; add `--profile full-backend` for BE) |
+| `ismd-validator-frontend/` | validator FE only |
+| `ismd-tool-frontend/` | tool FE only |
 
 Add `-f docker-compose.build.yml` in any repo to build instead of pull.
 
