@@ -180,6 +180,32 @@ variable "tool_base_path" {
   default     = "/popisujeme"
 }
 
+variable "tool_site_status" {
+  description = "Frontend gating mode for the Tool app: 'live', 'coming_soon', or 'maintenance'."
+  type        = string
+  default     = "live"
+}
+
+variable "validator_site_status" {
+  description = "Frontend gating mode for the Validator app: 'live', 'coming_soon', or 'maintenance'."
+  type        = string
+  default     = "live"
+}
+
+variable "tool_site_preview_secret" {
+  description = "Bypass secret for the Tool app's Coming Soon / Maintenance gate. Empty disables the bypass."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "validator_site_preview_secret" {
+  description = "Bypass secret for the Validator app's Coming Soon / Maintenance gate. Empty disables the bypass."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "tool_deploy_keycloak" {
   description = "Whether to deploy Keycloak in tool apps"
   type        = bool

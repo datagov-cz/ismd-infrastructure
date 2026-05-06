@@ -270,6 +270,19 @@ resource "azurerm_application_gateway" "appgw" {
     }
   }
 
+  # ========================================
+  # Custom Error Pages
+  # ========================================
+  custom_error_configuration {
+    status_code           = "HttpStatus502"
+    custom_error_page_url = "${azurerm_storage_account.error_pages.primary_web_endpoint}502.html"
+  }
+
+  custom_error_configuration {
+    status_code           = "HttpStatus403"
+    custom_error_page_url = "${azurerm_storage_account.error_pages.primary_web_endpoint}403.html"
+  }
+
   tags = {
     environment = "shared"
   }

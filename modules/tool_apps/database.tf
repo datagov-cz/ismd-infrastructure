@@ -97,6 +97,7 @@ resource "azurerm_storage_account" "fuseki" {
   location                 = var.location
   account_tier             = "Standard"
   account_replication_type = var.environment == "prod" ? "GRS" : "LRS"
+  min_tls_version          = "TLS1_2"
 
   tags = {
     Environment = var.environment

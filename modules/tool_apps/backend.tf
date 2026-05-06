@@ -63,7 +63,7 @@ resource "azurerm_container_app" "backend" {
         value = "8080"
       }
       env {
-        name  = "SPRING_PROFILES_ACTIVE"
+        name = "SPRING_PROFILES_ACTIVE"
         # TODO: switch test back to "stage" once stage profile reads env vars (FUSEKI_URL, CORS_ALLOWED_ORIGINS)
         value = var.environment == "prod" ? "production" : "dev"
       }

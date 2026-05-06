@@ -22,8 +22,8 @@ module "validator_apps" {
   resource_group_name = var.validator_resource_group_name
 
   # Required by the module
-  shared_resource_group_name               = var.shared_resource_group_name
-  container_app_environment_id             = module.shared.shared_container_app_environment_id
+  shared_resource_group_name   = var.shared_resource_group_name
+  container_app_environment_id = module.shared.shared_container_app_environment_id
   # Container Images
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
@@ -43,6 +43,10 @@ module "validator_apps" {
 
   # Workload profile configuration
   workload_profile_name = "default"
+
+  # Frontend gating (live | coming_soon | maintenance)
+  site_status         = var.validator_site_status
+  site_preview_secret = var.validator_site_preview_secret
 
   depends_on = [
     module.shared,
@@ -102,6 +106,10 @@ module "tool_apps" {
   # Frontend auth
   nextauth_secret = var.tool_nextauth_secret
   tool_base_path  = var.tool_base_path
+
+  # Frontend gating (live | coming_soon | maintenance)
+  site_status         = var.tool_site_status
+  site_preview_secret = var.tool_site_preview_secret
 
   # Keycloak / CAAIS
   deploy_keycloak         = var.tool_deploy_keycloak
