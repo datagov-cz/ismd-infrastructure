@@ -1,0 +1,145 @@
+name: Infrastructure Plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to plan (dev, test, or all)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - all
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write # For Azure OIDC if used, otherwise standard creds
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Common variables that might be needed
+  TF_VAR_location: "germanywestcentral"
+  
+  # Container App Environment Domains (Stable Identifiers)
+  TF_VAR_container_app_environment_domain_dev: "livelydesert-e8731aef.germanywestcentral.azurecontainerapps.io"
+  TF_VAR_container_app_environment_domain_test: "mangodune-bfe5a576.germanywestcentral.azurecontainerapps.io"
+  TF_VAR_container_app_environment_domain_prod: "ashypebble-1dbef699.germanywestcentral.azurecontainerapps.io"
+
+jobs:
+  plan-shared-global:
+    name: Plan Shared Global
+    runs-on: ubuntu-latest
+    # No environment needed - uses repo secrets only
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.9.0" # Specify version matching your local/lock
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: shared-global
+        run: terraform init
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Terraform Plan
+        working-directory: shared-global
+        run: terraform plan -input=false
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  plan-environments:
+    name: Plan Environment
+    runs-on: ubuntu-latest
+    # No environment needed - uses repo secrets only
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ inputs.environment == 'all' && fromJson('["dev", "test"]') || fromJson(format('["{0}"]', inputs.environment)) }}
+        include:
+          - environment: dev
+            frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend-dev"
+            backend_image: "ghcr.io/datagov-cz/ismd-validator-backend-dev"
+            app_gateway_hostname: ""
+          - environment: test
+            frontend_image: "ghcr.io/datagov-cz/ismd-validator-frontend"
+            backend_image: "ghcr.io/datagov-cz/ismd-validator-backend"
+            app_gateway_hostname: "oha03.dia.gov.cz"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Select Workspace
+        run: |
+          terraform workspace select ${{ matrix.environment }} || terraform workspace new ${{ matrix.environment }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -input=false \
+            -var="environment=${{ matrix.environment }}" \
+            -var="shared_resource_group_name=ismd-shared-${{ matrix.environment }}" \
+            -var="validator_resource_group_name=ismd-validator-${{ matrix.environment }}" \
+            -var="tool_resource_group_name=ismd-tool-${{ matrix.environment }}" \
+            -var="frontend_image=${{ matrix.frontend_image }}" \
+            -var="backend_image=${{ matrix.backend_image }}" \
+            -var="frontend_image_tag=latest" \
+            -var="backend_image_tag=latest" \
+            -var="tool_frontend_image=ghcr.io/datagov-cz/ismd-tool-frontend-${{ matrix.environment == 'dev' && 'dev' || '' }}" \
+            -var="tool_backend_image=ghcr.io/datagov-cz/ismd-tool-backend-${{ matrix.environment == 'dev' && 'dev' || '' }}" \
+            -var="tool_frontend_image_tag=latest" \
+            -var="tool_backend_image_tag=latest" \
+            -var="tool_postgres_password=${{ secrets.TOOL_POSTGRES_PASSWORD }}" \
+            -var="tool_nextauth_secret=${{ secrets.TOOL_NEXTAUTH_SECRET }}" \
+            -var="app_gateway_hostname=${{ matrix.app_gateway_hostname }}"
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}

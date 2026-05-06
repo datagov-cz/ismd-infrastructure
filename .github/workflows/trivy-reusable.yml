@@ -1,0 +1,88 @@
+name: Reusable Trivy Image Scan
+
+# Reusable Trivy image vulnerability scanner.
+# Called by app repos (frontend, tool-frontend, backend, tool-backend) to scan
+# their published GHCR images. SARIF output is uploaded to the *calling* repo's
+# Security -> Code scanning tab so findings stay scoped per-app.
+#
+# Owned by devops/infra. To change scanner config, severity filters, or actions
+# pins, edit this file and bump the @<ref> in the calling stub workflows.
+
+on:
+  workflow_call:
+    inputs:
+      image_ref:
+        description: 'Full GHCR image reference to scan, e.g. ghcr.io/datagov-cz/ismd-tool-backend-dev:latest'
+        required: true
+        type: string
+      severity:
+        description: 'Comma-separated severities to report'
+        required: false
+        type: string
+        default: 'CRITICAL,HIGH'
+      ignore_unfixed:
+        description: 'Skip CVEs with no fix available'
+        required: false
+        type: boolean
+        default: true
+      soft_fail:
+        description: 'If true, the workflow does not fail on findings (baseline phase)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  trivy:
+    name: Trivy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read         # to pull from GHCR
+      security-events: write # to upload SARIF to the caller repo
+
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ inputs.image_ref }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: ${{ inputs.severity }}
+          ignore-unfixed: ${{ inputs.ignore_unfixed }}
+          scanners: vuln
+          exit-code: ${{ inputs.soft_fail && '0' || '1' }}
+        env:
+          # Use trivy-db proxy to avoid GHCR rate limits on the public DB image
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      - name: Also run a human-readable scan (logs only)
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ inputs.image_ref }}
+          format: table
+          severity: ${{ inputs.severity }}
+          ignore-unfixed: ${{ inputs.ignore_unfixed }}
+          scanners: vuln
+          exit-code: '0'
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db

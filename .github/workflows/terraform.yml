@@ -13,6 +13,11 @@ on:
           - test
           - prod
         default: dev
+      deploy_tool_apps:
+        description: "Deploy Tool apps (in addition to Validator)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   shared_global_pre:
@@ -41,29 +46,17 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@v4
       with:
         terraform_version: '1.11.3'
     
     - name: Azure Login
-      uses: azure/login@v2
+      uses: azure/login@v3
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
-    - name: Export ARM credentials for Terraform
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-      run: |
-        echo "ARM_CLIENT_ID=$ARM_CLIENT_ID" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=$ARM_CLIENT_SECRET" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$ARM_SUBSCRIPTION_ID" >> $GITHUB_ENV
-        echo "ARM_TENANT_ID=$ARM_TENANT_ID" >> $GITHUB_ENV
     
     - name: Select Environment
       id: select-env
@@ -117,14 +110,36 @@ jobs:
     # Image tags are managed via lifecycle ignore_changes in Terraform.
     
     - name: Terraform Plan
+      env:
+        TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
+        TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
+        TF_VAR_tool_resource_group_name: ismd-tool-${{ env.ENVIRONMENT }}
+        TF_VAR_app_gateway_hostname: ${{ env.ENVIRONMENT == 'dev' && (vars.DEV_HOSTNAME || '') || env.ENVIRONMENT == 'test' && (vars.TEST_HOSTNAME || '') || (vars.PROD_HOSTNAME || '') }}
+        TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
+        TF_VAR_deploy_tool_apps: ${{ github.event.inputs.deploy_tool_apps }}
+        TF_VAR_tool_postgres_password: ${{ secrets.TOOL_POSTGRES_PASSWORD }}
+        TF_VAR_tool_nextauth_secret: ${{ secrets.TOOL_NEXTAUTH_SECRET }}
+        TF_VAR_tool_keycloak_admin_password: ${{ secrets.TOOL_KEYCLOAK_ADMIN_PASSWORD }}
+        TF_VAR_tool_keycloak_client_secret: ${{ secrets.TOOL_KEYCLOAK_CLIENT_SECRET }}
       run: |
         terraform plan -out=tfplan
-        
+
         # Display the plan for review
         echo "\n\nTerraform Plan Output:\n"
         terraform show -no-color tfplan || echo "Plan creation failed"
-    
+
     - name: Terraform Apply
+      env:
+        TF_VAR_validator_resource_group_name: ismd-validator-${{ env.ENVIRONMENT }}
+        TF_VAR_shared_resource_group_name: ismd-shared-${{ env.ENVIRONMENT }}
+        TF_VAR_tool_resource_group_name: ismd-tool-${{ env.ENVIRONMENT }}
+        TF_VAR_app_gateway_hostname: ${{ env.ENVIRONMENT == 'dev' && (vars.DEV_HOSTNAME || '') || env.ENVIRONMENT == 'test' && (vars.TEST_HOSTNAME || '') || (vars.PROD_HOSTNAME || '') }}
+        TF_VAR_additional_cors_origins: ${{ vars.ADDITIONAL_CORS_ORIGINS || '[]' }}
+        TF_VAR_deploy_tool_apps: ${{ github.event.inputs.deploy_tool_apps }}
+        TF_VAR_tool_postgres_password: ${{ secrets.TOOL_POSTGRES_PASSWORD }}
+        TF_VAR_tool_nextauth_secret: ${{ secrets.TOOL_NEXTAUTH_SECRET }}
+        TF_VAR_tool_keycloak_admin_password: ${{ secrets.TOOL_KEYCLOAK_ADMIN_PASSWORD }}
+        TF_VAR_tool_keycloak_client_secret: ${{ secrets.TOOL_KEYCLOAK_CLIENT_SECRET }}
       run: |
         terraform apply -auto-approve tfplan
 
