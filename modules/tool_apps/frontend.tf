@@ -57,6 +57,17 @@ resource "azurerm_container_app" "frontend" {
         name        = "NEXTAUTH_SECRET"
         secret_name = "nextauth-secret"
       }
+      env {
+        name  = "SITE_STATUS"
+        value = var.site_status
+      }
+      dynamic "env" {
+        for_each = var.site_preview_secret != "" ? [1] : []
+        content {
+          name        = "SITE_PREVIEW_SECRET"
+          secret_name = "site-preview-secret"
+        }
+      }
 
       liveness_probe {
         transport               = "HTTP"
@@ -68,8 +79,9 @@ resource "azurerm_container_app" "frontend" {
       }
 
       readiness_probe {
-        transport               = "TCP"
+        transport               = "HTTP"
         port                    = 3000
+        path                    = "/popisujeme"
         interval_seconds        = 8
         failure_count_threshold = 30
         success_count_threshold = 1
@@ -94,6 +106,14 @@ resource "azurerm_container_app" "frontend" {
   secret {
     name  = "keycloak-client-secret"
     value = var.keycloak_client_secret
+  }
+
+  dynamic "secret" {
+    for_each = var.site_preview_secret != "" ? [1] : []
+    content {
+      name  = "site-preview-secret"
+      value = var.site_preview_secret
+    }
   }
 
   ingress {
