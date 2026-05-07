@@ -1,0 +1,26 @@
+# ==============================================
+# ISMD - Full-Stack Aggregator (Backends + Frontends + Shared Infra)
+# ==============================================
+# One-shot entrypoint that brings up both backends, both frontends, and
+# all shared dependencies (postgres, keycloak, fuseki). Requires all four
+# app repos cloned as siblings of ismd-infrastructure/.
+#
+# Usage:
+#   docker compose -f docker-compose.full-stack.yml --profile full-backend up
+#
+# Build all images locally instead of pulling from GHCR:
+#   docker compose -f docker-compose.full-stack.yml \
+#                  -f ../ismd-validator-backend/docker-compose.build.yml \
+#                  -f ../ismd-tool-backend/docker-compose.build.yml \
+#                  -f ../ismd-validator-frontend/docker-compose.build.yml \
+#                  -f ../ismd-tool-frontend/docker-compose.build.yml \
+#                  --profile full-backend up --build
+#
+# For BE-only dev (no FE repos required), use docker-compose.yml instead.
+# ==============================================
+
+include:
+  - path: ${VALIDATOR_BACKEND_PATH:-../ismd-validator-backend}/docker-compose.yml
+  - path: ${TOOL_BACKEND_PATH:-../ismd-tool-backend}/docker-compose.yml
+  - path: ${VALIDATOR_FRONTEND_PATH:-../ismd-validator-frontend}/docker-compose.yml
+  - path: ${TOOL_FRONTEND_PATH:-../ismd-tool-frontend}/docker-compose.yml

@@ -10,7 +10,7 @@ Aggregates per-repo compose files into a single dev environment.
 | **Tool backend** | `ismd-tool-backend/` only | `cd ismd-tool-backend && docker compose --profile full-backend up` |
 | **Validator frontend** | `ismd-validator-backend/` + your FE repo | `cd ismd-validator-backend && docker compose up` then `npm run dev` in `ismd-validator-frontend/` |
 | **Tool frontend** | `ismd-tool-backend/` + your FE repo | `cd ismd-tool-backend && docker compose --profile full-backend up` then `npm run dev` in `ismd-tool-frontend/` |
-| **Both frontends** (or full stack) | **All repos** + `ismd-infrastructure/` | `cd ismd-infrastructure && docker compose --profile full-backend up` |
+| **Both frontends** (or full stack) | **All repos** + `ismd-infrastructure/` | `cd ismd-infrastructure && docker compose -f docker-compose.full-stack.yml --profile full-backend up` |
 
 Backend repos are **self-sufficient** — you only need `ismd-infrastructure/` when aggregating multiple repos.
 
@@ -25,6 +25,13 @@ Backend repos are **self-sufficient** — you only need `ismd-infrastructure/` w
   ├── ismd-validator-frontend/  # validator FE
   ├── ismd-tool-frontend/     # tool FE
   └── ismd-infrastructure/    # this repo
+  ```
+  If your local folders use different names, override the paths in `.env`:
+  ```
+  VALIDATOR_BACKEND_PATH=../backend
+  TOOL_BACKEND_PATH=../tool-backend
+  VALIDATOR_FRONTEND_PATH=../frontend
+  TOOL_FRONTEND_PATH=../tool-frontend
   ```
 
 ## Quick Start (Frontend Developer)
@@ -46,22 +53,33 @@ Stop:
 docker compose --profile full-backend down
 ```
 
-## Optional: Run Frontends in Containers Too
+## Full Stack (Both Backends + Both Frontends)
+
+Requires all four app repos cloned as siblings.
+
+```bash
+docker compose -f docker-compose.full-stack.yml --profile full-backend up
+```
+
+- Validator FE: `http://localhost:3000`
+- Tool FE: `http://localhost:3001`
+- Validator BE: `http://localhost:8082`
+- Tool BE: `http://localhost:8081`
+- Keycloak: `http://localhost:8080`
+
+Stop:
+```bash
+docker compose -f docker-compose.full-stack.yml --profile full-backend down
+```
+
+### Add Frontends to a BE-Only Stack
+
+If you're already using the base `docker-compose.yml` and want to layer frontends on top without switching to `docker-compose.full-stack.yml`:
 
 ```bash
 docker compose -f docker-compose.yml \
                -f docker-compose.frontends.yml \
                --profile full-backend up
-```
-
-- Validator FE: `http://localhost:3000`
-- Tool FE: `http://localhost:3001`
-
-Stop:
-```bash
-docker compose -f docker-compose.yml \
-               -f docker-compose.frontends.yml \
-               --profile full-backend down
 ```
 
 ## Build All Images Locally (No GHCR pulls)
@@ -94,6 +112,7 @@ Copy `compose.env.example` to `.env`. Compose auto-loads it.
 
 | Var | Default | Purpose |
 |---|---|---|
+| `VALIDATOR_BACKEND_PATH` / `TOOL_BACKEND_PATH` / `VALIDATOR_FRONTEND_PATH` / `TOOL_FRONTEND_PATH` | `../ismd-<svc>-<role>` | Sibling repo paths — override if your local folder names differ from the canonical `ismd-*` layout |
 | `VALIDATOR_BACKEND_IMAGE` / `TOOL_BACKEND_IMAGE` | `ghcr.io/datagov-cz/ismd-<svc>-backend-dev:latest` | Backend image override (pin a tag, swap to a fork, etc.) |
 | `VALIDATOR_FRONTEND_IMAGE` / `TOOL_FRONTEND_IMAGE` | `ghcr.io/datagov-cz/ismd-<svc>-frontend-dev:latest` | Frontend image override (only used with `docker-compose.frontends.yml`) |
 | `*_PULL_POLICY` | `missing` | `missing` = pull only if absent, `always` = re-pull every `up`, `never` = require local image |
