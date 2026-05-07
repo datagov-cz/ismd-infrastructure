@@ -18,11 +18,21 @@ resource "azurerm_container_app" "frontend" {
       image  = "${var.frontend_image}:${var.frontend_image_tag}"
       cpu    = 0.5
       memory = "1Gi"
-      env {
-        # Server-side only — Next.js rewrites proxy /validujeme/api/* → backend internally.
-        # Backend has internal ingress only; never exposed to the browser.
-        name  = "BE_URL"
-        value = "http://${azurerm_container_app.backend.name}/validujeme"
+      # BFF (use_bff=true): server-side BE_URL, Next.js proxies /validujeme/api/* → internal backend.
+      # Legacy (use_bff=false): NEXT_PUBLIC_BE_URL baked at build time, browser hits backend directly via AppGW.
+      dynamic "env" {
+        for_each = var.use_bff ? [1] : []
+        content {
+          name  = "BE_URL"
+          value = "http://${azurerm_container_app.backend.name}/validujeme"
+        }
+      }
+      dynamic "env" {
+        for_each = var.use_bff ? [] : [1]
+        content {
+          name  = "NEXT_PUBLIC_BE_URL"
+          value = var.public_be_url
+        }
       }
       env {
         name  = "SITE_STATUS"
