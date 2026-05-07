@@ -18,8 +18,8 @@ tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
 tool_backend_image_tag  = "latest"
 
 # App Gateway hostname for TEST
-app_gateway_hostname   = "xn--slovnk-test-scb.gov.cz"
-tool_keycloak_hostname = "xn--slovnk-test-scb.gov.cz"
+app_gateway_hostname   = "xn--slovnk-test-scb.dia.gov.cz"
+tool_keycloak_hostname = "xn--slovnk-test-scb.dia.gov.cz"
 
 # App names
 frontend_app_name = "ismd-validator-frontend"
