@@ -106,6 +106,20 @@ Each repo's `docker-compose.yml` works on its own:
 
 Add `-f docker-compose.build.yml` in any repo to build instead of pull.
 
+## Keeping Images Fresh
+
+Default `pull_policy: missing` means GHCR is hit only on the first `up`. Subsequent `up`s use whatever copy is already on your host — even if a newer `:latest` exists upstream.
+
+If you want the latest dev images:
+
+```bash
+# Per-up refresh (recommended): pulls only what changed
+docker compose -f docker-compose.full-stack.yml --profile full-backend pull
+docker compose -f docker-compose.full-stack.yml --profile full-backend up
+```
+
+Or set `*_PULL_POLICY=always` in `.env` if you'd rather re-fetch on every `up` automatically (costs a round-trip per service even when nothing changed).
+
 ## Environment Variables
 
 Copy `compose.env.example` to `.env`. Compose auto-loads it.
