@@ -36,7 +36,7 @@ resource "azurerm_container_app" "keycloak" {
         "--http-enabled=true",
         "--http-port=8080",
         "--proxy-headers=forwarded"
-      ], local.keycloak_hostname_effective == "" ? [] : [
+        ], local.keycloak_hostname_effective == "" ? [] : [
         "--hostname=${local.keycloak_hostname_effective}",
         "--hostname-admin=${local.keycloak_hostname_effective}"
       ])

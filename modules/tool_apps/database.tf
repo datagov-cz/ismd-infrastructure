@@ -35,6 +35,18 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   }
 }
 
+# Allow the unaccent extension at the server level so the application can
+# CREATE EXTENSION unaccent in the ismd_schema. The repositories in
+# ismd-tool-backend (ConceptMetadataRepository, OntologyMetadataRepository)
+# call ismd_schema.unaccent(...) for diacritic-insensitive search over
+# Czech text — without this, those queries fail at runtime.
+resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
+  count     = var.deploy_postgres ? 1 : 0
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  value     = "UNACCENT"
+}
+
 # Create the application database
 resource "azurerm_postgresql_flexible_server_database" "tool" {
   count     = var.deploy_postgres ? 1 : 0
@@ -78,6 +90,7 @@ resource "azurerm_storage_account" "fuseki" {
   location                 = var.location
   account_tier             = "Standard"
   account_replication_type = var.environment == "prod" ? "GRS" : "LRS"
+  min_tls_version          = "TLS1_2"
 
   tags = {
     Environment = var.environment
@@ -202,5 +215,5 @@ resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
 
 output "fuseki_internal_url" {
   description = "Internal URL for Fuseki"
-  value       = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ds" : var.fuseki_url
+  value       = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ismd-tool-dataset" : var.fuseki_url
 }

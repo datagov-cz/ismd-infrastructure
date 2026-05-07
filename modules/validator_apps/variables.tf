@@ -82,3 +82,24 @@ variable "additional_cors_origins" {
   type        = list(string)
   default     = []
 }
+
+variable "site_status" {
+  description = "Frontend gating mode. 'live' serves the app normally; 'coming_soon' and 'maintenance' rewrite all traffic to the matching gated page (the Next.js middleware reads this env var)."
+  type        = string
+  default     = "live"
+  validation {
+    condition     = contains(["live", "coming_soon", "maintenance"], var.site_status)
+    error_message = "site_status must be one of: live, coming_soon, maintenance."
+  }
+}
+
+variable "site_preview_secret" {
+  description = "Shared secret for bypassing the Coming Soon / Maintenance gate. When non-empty, visiting any URL with ?nahled=<secret> sets a long-lived bypass cookie. Leave empty to disable the bypass entirely. Must not equal the literal 'ne' (reserved for cookie clearing)."
+  type        = string
+  sensitive   = true
+  default     = ""
+  validation {
+    condition     = var.site_preview_secret != "ne"
+    error_message = "site_preview_secret must not equal the literal 'ne' (reserved for cookie clearing via ?nahled=ne)."
+  }
+}

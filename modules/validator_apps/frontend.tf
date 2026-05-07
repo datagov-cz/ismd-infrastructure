@@ -24,18 +24,31 @@ resource "azurerm_container_app" "frontend" {
         name  = "BE_URL"
         value = "http://${azurerm_container_app.backend.name}/validujeme"
       }
+      env {
+        name  = "SITE_STATUS"
+        value = var.site_status
+      }
+      dynamic "env" {
+        for_each = var.site_preview_secret != "" ? [1] : []
+        content {
+          name        = "SITE_PREVIEW_SECRET"
+          secret_name = "site-preview-secret"
+        }
+      }
 
       liveness_probe {
-        transport               = "TCP"
+        transport               = "HTTP"
         port                    = 3000
+        path                    = "/validujeme"
         interval_seconds        = 10
         failure_count_threshold = 3
         timeout                 = 5
       }
 
       readiness_probe {
-        transport               = "TCP"
+        transport               = "HTTP"
         port                    = 3000
+        path                    = "/validujeme"
         interval_seconds        = 8
         failure_count_threshold = 30
         success_count_threshold = 1
@@ -49,6 +62,14 @@ resource "azurerm_container_app" "frontend" {
         failure_count_threshold = 30
         timeout                 = 3
       }
+    }
+  }
+
+  dynamic "secret" {
+    for_each = var.site_preview_secret != "" ? [1] : []
+    content {
+      name  = "site-preview-secret"
+      value = var.site_preview_secret
     }
   }
 

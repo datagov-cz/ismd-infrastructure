@@ -63,7 +63,7 @@ resource "azurerm_container_app" "backend" {
         value = "8080"
       }
       env {
-        name  = "SPRING_PROFILES_ACTIVE"
+        name = "SPRING_PROFILES_ACTIVE"
         # TODO: switch test back to "stage" once stage profile reads env vars (FUSEKI_URL, CORS_ALLOWED_ORIGINS)
         value = var.environment == "prod" ? "production" : "dev"
       }
@@ -81,7 +81,7 @@ resource "azurerm_container_app" "backend" {
       }
       env {
         name  = "FUSEKI_URL"
-        value = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ds" : var.fuseki_url
+        value = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ismd-tool-dataset" : var.fuseki_url
       }
       env {
         name  = "KEYCLOAK_ISSUER_URI"
