@@ -88,6 +88,21 @@ Each repo's `docker-compose.yml` works on its own:
 
 Add `-f docker-compose.build.yml` in any repo to build instead of pull.
 
+## Environment Variables
+
+Copy `compose.env.example` to `.env`. Compose auto-loads it.
+
+| Var | Default | Purpose |
+|---|---|---|
+| `VALIDATOR_BACKEND_IMAGE` / `TOOL_BACKEND_IMAGE` | `ghcr.io/datagov-cz/ismd-<svc>-backend-dev:latest` | Backend image override (pin a tag, swap to a fork, etc.) |
+| `VALIDATOR_FRONTEND_IMAGE` / `TOOL_FRONTEND_IMAGE` | `ghcr.io/datagov-cz/ismd-<svc>-frontend-dev:latest` | Frontend image override (only used with `docker-compose.frontends.yml`) |
+| `*_PULL_POLICY` | `missing` | `missing` = pull only if absent, `always` = re-pull every `up`, `never` = require local image |
+| `GITHUB_TOKEN` / `GITHUB_ACTOR` | — | Required for build overrides (Maven → GitHub Packages). PAT needs `read:packages` scope. |
+| `KEYCLOAK_CLIENT_SECRET` | `secret123` | Must match the secret configured for the tool BE client in your Keycloak realm |
+| `CAAIS_CLIENT_ID` | — | Optional — set when federating Keycloak to the CAAIS IdP |
+
+Mix per service: e.g. pin tool BE to `:1.0.3` while keeping validator BE on `:latest`, by setting only `TOOL_BACKEND_IMAGE` in `.env`.
+
 ## Port Map
 
 | Service | Host Port | Notes |
