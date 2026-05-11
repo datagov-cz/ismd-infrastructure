@@ -472,19 +472,103 @@ Infrastructure Changes:
 
 ## Docker Compose Configuration
 
-Local development files for testing the application stack:
+This repo aggregates compose definitions from sibling repos via the `include:`
+directive, plus a wrapper script that hides the `-f`/profile machinery for
+day-to-day use. Default sibling layout (matches CI repo names):
 
-- `docker-compose.yml` - Base configuration with production settings
-- `docker-compose.dev.yml` - Development environment overrides
-- `docker-compose.local.yml` - Local image overrides for development
+```
+<parent>/
+├── ismd-validator-backend/
+├── ismd-validator-frontend/
+├── ismd-tool-backend/        (also defines postgres, keycloak, fuseki)
+├── ismd-tool-frontend/
+└── ismd-infrastructure/      (this repo)
+```
+
+### Quick start
 
 ```bash
-# Local testing with production images
-docker compose up
+# Linux/Mac/WSL
+./compose.sh up
 
-# Development with local overrides
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Windows PowerShell
+.\compose.ps1 up
 ```
+
+This pulls pre-built images from GHCR for the full backend stack (tool BE,
+validator BE, postgres, keycloak, fuseki) and starts them. Frontends are
+*not* started by default — most developers run `npm run dev` locally against
+the containerized backends.
+
+### Common flags
+
+All flags below work with both `compose.sh` and `compose.ps1`. Examples use
+the bash form.
+
+| Goal | Command |
+|---|---|
+| Full backend stack, all pulled (default) | `./compose.sh up` |
+| Also start containerized frontends | `./compose.sh up --frontends` |
+| Skip the tool backend (BE dev runs Spring Boot natively) | `./compose.sh up --no-tool-be` |
+| Build the tool backend from local source | `./compose.sh up --build tool-be` |
+| Build multiple targets | `./compose.sh up --build tool-be fuseki` |
+| Build everything from local source | `./compose.sh up --build all` |
+| Combine: build tool FE + run other FEs from GHCR | `./compose.sh up --build tool-fe --frontends` |
+| Tear down | `./compose.sh down` |
+| Pass-through (logs/ps/etc.) | `./compose.sh logs -f backend` |
+
+**Build targets:** `tool-be`, `validator-be`, `fuseki`, `tool-fe`,
+`validator-fe`, `all`.
+
+Whatever flags you pass, the script prints the resolved `docker compose ...`
+command before running it, so you can see what's happening underneath.
+
+### Configuration via `infrastructure/.env`
+
+Compose auto-loads `.env` from this directory. Useful entries:
+
+```bash
+# Required when building images locally (GHCR Maven Packages access).
+# Not needed for the default pull-from-GHCR flow.
+GITHUB_TOKEN=<PAT with read:packages scope>
+GITHUB_ACTOR=<your github username>
+
+# Required for tool backend to obtain Keycloak tokens at startup.
+KEYCLOAK_CLIENT_SECRET=<from Keycloak admin UI>
+
+# Sibling-repo path overrides — only set if your local folder names
+# differ from the defaults shown above.
+VALIDATOR_BACKEND_PATH=../backend
+TOOL_BACKEND_PATH=../tool-backend
+VALIDATOR_FRONTEND_PATH=../frontend
+TOOL_FRONTEND_PATH=../tool-frontend
+```
+
+The `GITHUB_TOKEN` is passed to backend builds via a BuildKit secret mount —
+it does not appear in image history or build logs. Maven dependencies are
+cached in a BuildKit cache mount, so subsequent builds skip the dependency
+download.
+
+### Power-user / raw docker compose
+
+The wrapper just composes `-f` chains and the `--profile full-backend` flag.
+If you need full control, invoke `docker compose` directly:
+
+```bash
+# Equivalent to ./compose.sh up --build tool-be
+docker compose -f docker-compose.yml \
+               -f ../ismd-tool-backend/docker-compose.build.yml \
+               --profile full-backend up --build
+```
+
+### Files in this repo
+
+- `docker-compose.yml` — aggregator using `include:` for sibling repos.
+- `docker-compose.frontends.yml` — optional include for containerized frontends.
+- `compose.sh` / `compose.ps1` — wrapper scripts (recommended entrypoint).
+- `docker-compose.dev.yml` / `docker-compose.local.yml` — legacy overrides
+  retained for the validator-only quick start (`docker compose -f
+  docker-compose.yml -f docker-compose.dev.yml up`).
 
 ## Configuration Management
 

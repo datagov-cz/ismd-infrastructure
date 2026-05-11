@@ -1,29 +1,23 @@
 # ==============================================
 # ISMD - Aggregator Compose (Backends + Shared Infra)
 # ==============================================
-# Pulls compose definitions from each repo. Assumes sibling-repo layout:
+# Pulls compose definitions from each sibling repo. Daily use should go
+# through the wrapper script, which composes the right `-f` chain + profile:
 #
-#   <parent>/
-#   ├── ismd-validator-backend/   (validator BE)
-#   ├── ismd-tool-backend/        (tool BE + postgres + keycloak + fuseki)
-#   ├── ismd-validator-frontend/  (validator FE — only via docker-compose.frontends.yml)
-#   ├── ismd-tool-frontend/     (tool FE     — only via docker-compose.frontends.yml)
-#   └── ismd-infrastructure/    (this file)
+#   ./compose.sh up                     # full backend stack, all pulled
+#   ./compose.sh up --build tool-be     # build tool backend locally
+#   ./compose.sh up --frontends         # also run containerized frontends
+#   ./compose.sh up --no-tool-be        # BE dev mode
+#   .\compose.ps1 ...                   # PowerShell equivalent
 #
-# Quick start (FE developer running both backends + deps in containers):
-#   cd ismd-infrastructure
-#   docker compose --profile full-backend up
+# See README.md "Docker Compose Configuration" for the full flag reference.
 #
-# Add containerized frontends (optional):
-#   docker compose -f docker-compose.yml \
-#                  -f docker-compose.frontends.yml \
-#                  --profile full-backend up
-#
-# Build all images from local source instead of pulling:
-#   docker compose -f docker-compose.yml \
-#                  -f ../ismd-validator-backend/docker-compose.build.yml \
-#                  -f ../ismd-tool-backend/docker-compose.build.yml \
-#                  --profile full-backend up --build
+# Sibling-repo path overrides (set in .env if your folder names differ from
+# the defaults below):
+#   VALIDATOR_BACKEND_PATH   (default: ../ismd-validator-backend)
+#   TOOL_BACKEND_PATH        (default: ../ismd-tool-backend)
+#   VALIDATOR_FRONTEND_PATH  (default: ../ismd-validator-frontend)
+#   TOOL_FRONTEND_PATH       (default: ../ismd-tool-frontend)
 #
 # Requires Docker Compose v2.20+ (for `include:` directive).
 # ==============================================
