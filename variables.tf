@@ -230,3 +230,36 @@ variable "deploy_tool_apps" {
   type        = bool
   default     = true
 }
+
+# Frontend gating (per-app, per-env). Values: live | coming_soon | maintenance.
+variable "validator_site_status" {
+  description = "Frontend gating mode for the Validator app."
+  type        = string
+  default     = "coming_soon"
+}
+
+variable "tool_site_status" {
+  description = "Frontend gating mode for the Tool app."
+  type        = string
+  default     = "coming_soon"
+}
+
+variable "validator_site_preview_secret" {
+  description = "Bypass secret for the Validator app's gate. Empty disables the bypass."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "tool_site_preview_secret" {
+  description = "Bypass secret for the Tool app's gate. Empty disables the bypass."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "validator_use_bff" {
+  description = "True if the deployed validator frontend image supports the BFF pattern (server-side BE_URL via Next.js rewrites). False = legacy NEXT_PUBLIC_BE_URL + externally exposed backend."
+  type        = bool
+  default     = false
+}

@@ -22,3 +22,10 @@ app_gateway_hostname   = "oha03.dia.gov.cz"
 tool_keycloak_hostname = "oha03.dia.gov.cz"
 
 deploy_tool_apps = true
+
+# Frontend gating — DEV is open for the engineering team
+validator_site_status = "live"
+tool_site_status      = "live"
+
+# DEV uses -dev images built from the dev branch which has the BFF refactor.
+validator_use_bff = true

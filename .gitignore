@@ -20,3 +20,4 @@ plan.*.txt
 # Local environment files
 .env*
 .env.local
+.terraw-env
