@@ -94,6 +94,15 @@ module "dev" {
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
 
+  # Frontend gating
+  validator_site_status         = var.validator_site_status
+  tool_site_status              = var.tool_site_status
+  validator_site_preview_secret = var.validator_site_preview_secret
+  tool_site_preview_secret      = var.tool_site_preview_secret
+
+  # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
+  validator_use_bff = var.validator_use_bff
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
@@ -159,6 +168,15 @@ module "test" {
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
 
+  # Frontend gating
+  validator_site_status         = var.validator_site_status
+  tool_site_status              = var.tool_site_status
+  validator_site_preview_secret = var.validator_site_preview_secret
+  tool_site_preview_secret      = var.tool_site_preview_secret
+
+  # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
+  validator_use_bff = var.validator_use_bff
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
@@ -223,6 +241,15 @@ module "prod" {
 
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
+
+  # Frontend gating
+  validator_site_status         = var.validator_site_status
+  tool_site_status              = var.tool_site_status
+  validator_site_preview_secret = var.validator_site_preview_secret
+  tool_site_preview_secret      = var.tool_site_preview_secret
+
+  # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
+  validator_use_bff = var.validator_use_bff
 
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")

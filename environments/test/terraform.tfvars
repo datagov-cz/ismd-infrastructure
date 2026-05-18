@@ -26,3 +26,14 @@ frontend_app_name = "ismd-validator-frontend"
 backend_app_name  = "ismd-validator-backend"
 
 deploy_tool_apps = true
+
+# Frontend gating
+# - validator: live
+# - tool: coming_soon (still WIP)
+validator_site_status = "live"
+tool_site_status      = "coming_soon"
+
+# Validator runs v1.0.3 (cherry-pick: gate only, no BFF refactor) — keep legacy
+# wiring (NEXT_PUBLIC_BE_URL + externally exposed backend with AppGW IP allowlist)
+# until a BFF-capable image is released.
+validator_use_bff = false

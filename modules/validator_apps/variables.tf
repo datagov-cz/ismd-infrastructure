@@ -103,3 +103,15 @@ variable "site_preview_secret" {
     error_message = "site_preview_secret must not equal the literal 'ne' (reserved for cookie clearing via ?nahled=ne)."
   }
 }
+
+variable "use_bff" {
+  description = "Whether the running frontend image supports the BFF pattern (server-side BE_URL via Next.js rewrites). When true: backend ingress is internal-only and frontend uses BE_URL. When false: legacy mode — backend is externally exposed (restricted to AppGW IP) and frontend uses NEXT_PUBLIC_BE_URL pointing at the public hostname. Set to true ONLY when the deployed frontend image actually supports BFF (v1.0.x with BFF refactor merged)."
+  type        = bool
+  default     = false
+}
+
+variable "public_be_url" {
+  description = "Legacy public backend URL used when use_bff = false. Typically https://<app_gateway_hostname>/validujeme."
+  type        = string
+  default     = ""
+}

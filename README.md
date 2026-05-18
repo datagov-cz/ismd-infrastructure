@@ -6,15 +6,32 @@ This repository contains Terraform configurations for managing Azure Container A
 
 > Read this before your first `terraform plan` — these are the things that have actually caught us out.
 
-- **`load_env_vars.sh` must be sourced, not executed.** Running `./load_env_vars.sh dev` does nothing useful — env vars get set in a subshell and disappear immediately. Use one of these:
+- **Use `terraw.sh` / `terraw.ps1` instead of raw `terraform`.** It's a thin wrapper that picks up `.env.<env>` secrets and the right `-var-file` automatically. No sourcing needed — just execute:
   ```bash
-  source load_env_vars.sh dev    # bash
-  . ./load_env_vars.sh dev       # bash (shorthand)
-  . .\load_env_vars.ps1 dev      # PowerShell
+  ./terraw.sh switch dev         # persist current env, load .env.dev, select workspace
+  ./terraw.sh plan -out=tfplan   # auto-injects -var-file=environments/dev/terraform.tfvars
+  ./terraw.sh apply tfplan
+  ./terraw.sh env                # show current env + tfvars resolution
+  ./terraw.sh <anything>         # pass-through to terraform (e.g. ./terraw.sh output)
   ```
-  Symptom if you forget: `terraform plan` fails with `expected "administrator_password" to not be an empty string` (or similar empty-var errors).
+  ```powershell
+  .\terraw.ps1 switch dev
+  .\terraw.ps1 plan -out=tfplan
+  ```
+  Optional one-time alias for less typing:
+  ```bash
+  alias terraw="$(pwd)/terraw.sh"          # bash/zsh — add to ~/.bashrc to persist
+  Set-Alias terraw "$PWD\terraw.ps1"       # PowerShell — add to $PROFILE to persist
+  ```
+  Then just `terraw switch dev`, `terraw plan`, etc.
 
-- **PowerShell and WSL bash have separate environments.** Sourcing the loader in PowerShell does not propagate vars to your WSL bash session. You must source the appropriate script in whichever shell you actually run `terraform` from.
+  State lives in `.terraw-env` (gitignored). `.env.<env>` is re-read on every `plan`/`apply`, so editing secrets does NOT require a re-`switch`. Re-`switch` only when changing target environment.
+
+  In `shared-global/` (no environments/workspaces) just use `./terraw.sh plan` — no `environments/<env>/terraform.tfvars` exists, so it passes through to plain terraform.
+
+  Symptom if you forget `terraw switch <env>` before `plan`: `terraform plan` fails with `expected "administrator_password" to not be an empty string` (or similar empty-var errors).
+
+- **PowerShell and WSL bash have separate environments.** `.terraw-env` state file is shared (same path), but env var exports happen per-process — so just keep using whichever shell variant of `terraw` you started in for a given session.
 
 - **Verify env vars before planning:**
   ```bash
@@ -23,6 +40,19 @@ This repository contains Terraform configurations for managing Azure Container A
   If this is empty, you forgot to source the loader.
 
 - **Workspace must match the environment.** The loader handles this automatically, but if you run `terraform workspace select` manually, make sure you're on the right one (`dev` / `test` / `prod`) before planning or applying.
+
+- **`validator_use_bff` must match the deployed frontend image.** The validator app supports two wiring modes:
+
+  | `validator_use_bff` | Frontend env | Backend ingress | Required image |
+  |---|---|---|---|
+  | `true` (BFF) | `BE_URL` → internal `http://ismd-validator-backend-<env>/validujeme` | internal-only | image with BFF refactor (post-PR #91 / v1.0.4+) |
+  | `false` (legacy) | `NEXT_PUBLIC_BE_URL` → public `https://<hostname>/validujeme` | external + AppGW IP allowlist | any image |
+
+  Flipping `use_bff = true` while the running image still reads `NEXT_PUBLIC_BE_URL` at build time → frontend can't reach backend → outage as soon as the gate is `live`.
+
+  **Launch sequence when ready to enable BFF on TEST/PROD:** (1) cut a release that includes the BFF refactor, (2) deploy the new image via the relevant `trigger-deployment` workflow, (3) verify the frontend talks to backend while still gated, (4) flip `validator_use_bff = true` and `terraw apply`, (5) flip `validator_site_status = "live"` and `terraw apply`.
+
+  Current state (2026-05-07): DEV = `true` (uses `-dev` images that have BFF), TEST/PROD = `false` (running v1.0.3 cherry-pick which intentionally excluded the BFF refactor).
 
 ## Architecture Overview
 
@@ -43,7 +73,7 @@ State is stored in Azure Storage. Each environment has its own blob, isolated vi
 - **Storage Account**: `ismdtfstate`
 - **Container**: `tfstate`
 
-Use `load_env_vars.sh` / `load_env_vars.ps1` to switch workspaces — it calls `terraform workspace select` automatically.
+Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform workspace select`, persists the env in `.terraw-env`, and subsequent `./terraw.sh plan` / `apply` auto-inject the right `-var-file` and re-load `.env.<env>` secrets.
 
 ## Directory Structure
 
@@ -287,20 +317,20 @@ All environments use dedicated D4 workload profiles with VNet integration for co
    ```
    Fill in values in `.env.dev`.
 
-4. **Load secrets and select workspace**:
+4. **Switch env via the wrapper**:
 
    ```bash
    # bash
-   source load_env_vars.sh dev
+   ./terraw.sh switch dev
    ```
    ```powershell
    # PowerShell
-   . .\load_env_vars.ps1 dev
+   .\terraw.ps1 switch dev
    ```
 
-   Run once per shell session before any `terraform` commands. Use `dev`, `test`, or `prod` as the argument. This exports all `TF_VAR_*` secrets and switches the Terraform workspace.
+   `switch` exports all `TF_VAR_*` secrets from `.env.<env>`, runs `terraform workspace select <env>`, and persists the env name in `.terraw-env` so subsequent `plan`/`apply` auto-inject `-var-file=environments/<env>/terraform.tfvars` and re-load secrets.
 
-   In CI, secrets are injected automatically from GitHub Actions secrets — the load scripts are not used.
+   In CI, secrets are injected automatically from GitHub Actions secrets — `terraw` is not used.
 
 ### Deployment
 
@@ -333,13 +363,12 @@ cd ..
 # Initialize Terraform (only needed once)
 terraform init
 
-# Load secrets and switch workspace (if not already done)
-source load_env_vars.sh dev        # bash
-# . .\load_env_vars.ps1 dev        # PowerShell
+# Switch env (if not already done)
+./terraw.sh switch dev    # bash — or: .\terraw.ps1 switch dev (PowerShell)
 
-# Plan and apply changes
-terraform plan
-terraform apply
+# Plan and apply changes (var-file + .env.dev auto-loaded by the wrapper)
+./terraw.sh plan -out=tfplan
+./terraw.sh apply tfplan
 ```
 
 This creates:
@@ -374,9 +403,9 @@ After initial setup, deployments are simplified:
 
 - **Infrastructure changes** (environment variables, ingress, etc.):
   ```bash
-  source load_env_vars.sh <env>   # bash — or: . .\load_env_vars.ps1 <env>
-  terraform plan
-  terraform apply
+  ./terraw.sh switch <env>     # bash — or: .\terraw.ps1 switch <env> (PowerShell)
+  ./terraw.sh plan -out=tfplan
+  ./terraw.sh apply tfplan
   ```
   
 - **Container image updates**: Handled automatically by application repositories via `az containerapp update`

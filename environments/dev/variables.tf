@@ -297,3 +297,9 @@ variable "deploy_tool_apps" {
   type        = bool
   default     = true
 }
+
+variable "validator_use_bff" {
+  description = "True if the deployed validator frontend image supports the BFF pattern (server-side BE_URL)."
+  type        = bool
+  default     = false
+}

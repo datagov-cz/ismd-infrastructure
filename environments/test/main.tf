@@ -49,6 +49,10 @@ module "validator_apps" {
   site_status         = var.validator_site_status
   site_preview_secret = var.validator_site_preview_secret
 
+  # BFF mode toggle — keep false until the deployed frontend image supports BFF.
+  use_bff       = var.validator_use_bff
+  public_be_url = "https://${var.app_gateway_hostname}/validujeme"
+
   depends_on = [
     module.shared,
     azurerm_resource_group.validator
