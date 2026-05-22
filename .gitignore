@@ -19,5 +19,7 @@ plan.*.txt
 
 # Local environment files
 .env*
+
+!.env.example
 .env.local
 .terraw-env
