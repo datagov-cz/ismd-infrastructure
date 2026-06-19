@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 4.37.0"
+      version = "~> 4.0"
     }
   }
 }
@@ -94,6 +94,11 @@ module "dev" {
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
 
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+
   # Frontend gating
   validator_site_status         = var.validator_site_status
   tool_site_status              = var.tool_site_status
@@ -108,6 +113,7 @@ module "dev" {
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }
 
 # Test environment
@@ -168,6 +174,11 @@ module "test" {
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
 
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+
   # Frontend gating
   validator_site_status         = var.validator_site_status
   tool_site_status              = var.tool_site_status
@@ -182,6 +193,7 @@ module "test" {
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }
 
 # Production environment
@@ -242,6 +254,11 @@ module "prod" {
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
 
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+
   # Frontend gating
   validator_site_status         = var.validator_site_status
   tool_site_status              = var.tool_site_status
@@ -256,4 +273,5 @@ module "prod" {
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }

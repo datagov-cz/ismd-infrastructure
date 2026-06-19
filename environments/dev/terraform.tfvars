@@ -29,3 +29,6 @@ tool_site_status      = "live"
 
 # DEV uses -dev images built from the dev branch which has the BFF refactor.
 validator_use_bff = true
+
+# paging_email_recipients is fed from .env.dev (TF_VAR_paging_email_recipients).
+deploy_monitoring = true

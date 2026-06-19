@@ -5,9 +5,19 @@ output "frontend_name" {
   value       = azurerm_container_app.frontend.name
 }
 
+output "frontend_id" {
+  description = "The resource ID of the frontend container app. Used by the monitoring module to scope alert rules."
+  value       = azurerm_container_app.frontend.id
+}
+
 output "backend_name" {
   description = "The name of the backend container app"
   value       = azurerm_container_app.backend.name
+}
+
+output "backend_id" {
+  description = "The resource ID of the backend container app. Used by the monitoring module to scope alert rules."
+  value       = azurerm_container_app.backend.id
 }
 
 output "frontend_fqdn" {
@@ -47,14 +57,29 @@ output "postgres_server_name" {
   value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].name : null
 }
 
+output "postgres_server_id" {
+  description = "The resource ID of the PostgreSQL Flexible Server. Used by the monitoring module to scope alert rules."
+  value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].id : null
+}
+
 output "fuseki_name" {
   description = "The name of the Fuseki container app"
   value       = var.deploy_fuseki ? azurerm_container_app.fuseki[0].name : null
 }
 
+output "fuseki_id" {
+  description = "The resource ID of the Fuseki container app. Used by the monitoring module to scope alert rules."
+  value       = var.deploy_fuseki ? azurerm_container_app.fuseki[0].id : null
+}
+
 output "keycloak_name" {
   description = "The name of the Keycloak container app"
   value       = var.deploy_keycloak ? azurerm_container_app.keycloak[0].name : null
+}
+
+output "keycloak_id" {
+  description = "The resource ID of the Keycloak container app. Used by the monitoring module to scope alert rules."
+  value       = var.deploy_keycloak ? azurerm_container_app.keycloak[0].id : null
 }
 
 output "keycloak_fqdn" {
@@ -69,10 +94,10 @@ output "keycloak_issuer_uri" {
 
 output "keycloak_public_base_url" {
   description = "The public Keycloak base URL exposed through the gateway"
-  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}/auth" : null
+  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}${local.tool_base_path}/auth" : null
 }
 
 output "keycloak_caais_broker_callback_template" {
   description = "Template callback URL to register in CAAIS (replace <idp-alias> with the Keycloak broker alias)"
-  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}/auth/realms/${var.keycloak_realm}/broker/<idp-alias>/endpoint" : null
+  value       = local.keycloak_issuer_host != "" ? "https://${local.keycloak_issuer_host}${local.tool_base_path}/auth/realms/${var.keycloak_realm}/broker/<idp-alias>/endpoint" : null
 }

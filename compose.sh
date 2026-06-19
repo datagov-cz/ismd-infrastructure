@@ -5,12 +5,12 @@
 # Ergonomic frontend over the modular docker-compose stack.
 #
 # Usage:
-#   ./compose.sh up                          # full stack, all pulled from GHCR
+#   ./compose.sh up                          # BE stack, all pulled from GHCR
+#   ./compose.sh up --frontends              # also run containerized frontends
 #   ./compose.sh up --build tool-be          # build tool backend locally
 #   ./compose.sh up --build tool-be fuseki   # build multiple targets
 #   ./compose.sh up --build all              # build everything locally
 #   ./compose.sh up --no-tool-be             # BE dev mode (skip tool BE)
-#   ./compose.sh up --frontends              # also run containerized frontends
 #   ./compose.sh down                        # tear down
 #   ./compose.sh logs -f backend             # pass-through to docker compose
 #   ./compose.sh ps

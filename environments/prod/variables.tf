@@ -109,6 +109,42 @@ variable "app_gateway_public_ip_address" {
   type        = string
 }
 
+variable "shared_global_app_gateway_id" {
+  description = "Resource ID of the shared Application Gateway (from shared-global state). Empty disables AppGW alerts in this env."
+  type        = string
+  default     = ""
+}
+
+variable "deploy_monitoring" {
+  description = "Whether to provision the monitoring module (Action Groups + Logic App + Teams notifier). Default false until Phase A is verified end-to-end."
+  type        = bool
+  default     = false
+}
+
+variable "paging_email_recipients" {
+  description = "Email addresses (or one mail-enabled group address) that receive paging-tier alerts. Empty list → no paging action group is created."
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_card_language" {
+  description = "Language for Teams card labels and severity/status mapping (cs|en). Passed through to the monitoring module."
+  type        = string
+  default     = "cs"
+}
+
+variable "teams_group_id" {
+  description = "Teams group (team) ID the Logic App posts alerts to. Set via TF_VAR_teams_group_id in the gitignored .env.<env> (Phase A: maintainer test channel; Phase B: DIA channel)."
+  type        = string
+  default     = ""
+}
+
+variable "teams_channel_id" {
+  description = "Teams channel ID within teams_group_id. Set via TF_VAR_teams_channel_id in the gitignored .env.<env>."
+  type        = string
+  default     = ""
+}
+
 variable "app_gateway_hostname" {
   description = "Hostname for the production environment (e.g., xn--slovnk-7va.gov.cz)"
   type        = string

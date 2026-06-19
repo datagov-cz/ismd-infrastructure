@@ -5,9 +5,19 @@ output "frontend_name" {
   value       = azurerm_container_app.frontend.name
 }
 
+output "frontend_id" {
+  description = "The resource ID of the frontend container app. Used by the monitoring module to scope alert rules."
+  value       = azurerm_container_app.frontend.id
+}
+
 output "backend_name" {
   description = "The name of the backend container app"
   value       = azurerm_container_app.backend.name
+}
+
+output "backend_id" {
+  description = "The resource ID of the backend container app. Used by the monitoring module to scope alert rules."
+  value       = azurerm_container_app.backend.id
 }
 
 output "frontend_fqdn" {

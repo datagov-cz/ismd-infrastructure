@@ -33,6 +33,10 @@ resource "azurerm_postgresql_flexible_server" "tool" {
     Component   = "Database"
     ManagedBy   = "Terraform"
   }
+
+  lifecycle {
+    ignore_changes = [zone]
+  }
 }
 
 # Allow the unaccent extension at the server level so the application can
@@ -133,14 +137,36 @@ resource "azurerm_container_app" "fuseki" {
     max_replicas = 1
 
     container {
-      name   = "fuseki"
-      image  = var.fuseki_image
-      cpu    = 0.5
-      memory = "1Gi"
+      name  = "fuseki"
+      image = var.fuseki_image
+      cpu   = 1.0
+      # Bumped 2 → 4 GiB (2026-05-26) after observing OOM-kill restart loop in DEV.
+      # Bumped 4 → 6 GiB (2026-05-27) after memory_high alert fired the next day —
+      # Fuseki crossed 3.4 GiB (85% of 4 GiB) sustained 15m. Underlying cause still
+      # unexplored (Fuseki JVM heap config or dataset growth); bump again to buy
+      # headroom. If we see the alert at 5.1 GiB (85% of 6) revisit by either:
+      #   - investigating Fuseki -Xmx / dataset size,
+      #   - splitting dev/test data smaller,
+      #   - or accepting 8+ GiB.
+      memory = "6Gi"
 
       volume_mounts {
         name = "fuseki-data"
         path = "/opt/fuseki/run/databases"
+      }
+
+      # Generous startup grace so cold-start AzureFile mount + JVM warmup don't
+      # cascade into liveness restarts. See TODO §15 for full context.
+      # Note: Container Apps caps failure_count_threshold at 30. Using 60s
+      # interval × 30 threshold = 30 min grace, covering the observed ~22 min
+      # cold-start gap with margin.
+      startup_probe {
+        transport               = "HTTP"
+        port                    = 3030
+        path                    = "/$/ping"
+        interval_seconds        = 60
+        failure_count_threshold = 30
+        timeout                 = 5
       }
 
       liveness_probe {
@@ -203,14 +229,6 @@ output "postgres_jdbc_url" {
 output "postgres_fqdn" {
   description = "FQDN of the PostgreSQL Flexible Server"
   value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].fqdn : null
-}
-
-# Enable unaccent extension at the server level
-resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
-  count     = var.deploy_postgres ? 1 : 0
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
-  name      = "azure.extensions"
-  value     = "UNACCENT"
 }
 
 output "fuseki_internal_url" {

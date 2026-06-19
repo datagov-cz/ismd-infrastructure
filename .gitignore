@@ -8,11 +8,23 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
+
+# Lock files: commit only the real root locks (., shared-global, keycloak-config).
+# environments/* are child modules (sourced via ./environments/<env>) — their lock
+# files are vestigial and unused, so keep them out of the repo.
+environments/*/.terraform.lock.hcl
 terraform.tfvars
 !environments/*/terraform.tfvars
 
 # Terraform plan output (human-readable, for local review only)
 plan.*.txt
+
+# Planning / handover docs — kept locally for reference, not committed.
+# Operational runbooks (docs/runbooks/) and module READMEs ARE committed.
+docs/HANDOVER-monitoring.md
+docs/keycloak-smtp-plan.md
+docs/monitoring-plan.md
+docs/monitoring-overview.md
 
 # Temporary and debug files
 *.log

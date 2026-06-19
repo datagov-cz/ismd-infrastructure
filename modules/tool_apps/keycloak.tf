@@ -9,7 +9,7 @@ locals {
   keycloak_hostname_effective = trimspace(var.keycloak_hostname)
 
   keycloak_issuer_host = local.keycloak_hostname_effective != "" ? local.keycloak_hostname_effective : local.keycloak_fqdn
-  keycloak_issuer_uri  = var.keycloak_issuer_uri != "" ? var.keycloak_issuer_uri : (var.deploy_keycloak ? "https://${local.keycloak_issuer_host}/popisujeme/auth/realms/${var.keycloak_realm}" : "")
+  keycloak_issuer_uri  = var.keycloak_issuer_uri != "" ? var.keycloak_issuer_uri : (var.deploy_keycloak ? "https://${local.keycloak_issuer_host}${local.tool_base_path}/auth/realms/${var.keycloak_realm}" : "")
 }
 
 resource "azurerm_container_app" "keycloak" {
@@ -114,6 +114,10 @@ resource "azurerm_container_app" "keycloak" {
         name  = "CAAIS_CLIENT_ID"
         value = var.enable_caais ? var.caais_client_id : ""
       }
+      env {
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "app-insights-connection-string"
+      }
 
       liveness_probe {
         transport        = "HTTP"
@@ -149,6 +153,11 @@ resource "azurerm_container_app" "keycloak" {
   secret {
     name  = "keycloak-db-password"
     value = var.deploy_postgres ? var.postgres_admin_password : var.keycloak_postgres_password
+  }
+
+  secret {
+    name  = "app-insights-connection-string"
+    value = var.app_insights_connection_string
   }
 
   ingress {

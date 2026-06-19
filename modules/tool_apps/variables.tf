@@ -1,10 +1,28 @@
 # Tool Apps Module — core variable declarations
 # Database vars: variables_database.tf | Keycloak/CAAIS vars: variables_keycloak.tf
 
+# Application Insights — connection string injected into every HTTP-speaking app
+# as APPLICATIONINSIGHTS_CONNECTION_STRING. Java apps auto-attach via the AI agent;
+# Next.js apps need the `applicationinsights` npm package wired explicitly.
+variable "app_insights_connection_string" {
+  description = "Application Insights connection string for app telemetry. Passed through from modules/shared.app_insights_connection_string."
+  type        = string
+  sensitive   = true
+}
+
 # Core Environment Variables
 variable "environment" {
   description = "Environment name (dev, test, prod)"
   type        = string
+}
+
+# DEV-only: expose tool-backend via external ingress so the App Gateway's
+# /popisujeme/be/* route (and thus a local frontend) can reach it directly.
+# Keep false on TEST/PROD — they stay pure BFF (internal ingress).
+variable "backend_external_enabled" {
+  description = "Enable external ingress on tool-backend (DEV dev-loop only). False = internal-only BFF."
+  type        = bool
+  default     = false
 }
 
 variable "location" {

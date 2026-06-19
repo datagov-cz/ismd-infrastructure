@@ -10,8 +10,13 @@
 #   then: terraw switch dev
 #
 # State (current env) persists in .terraw-env (gitignored).
-# In a directory without environments/<env>/terraform.tfvars (e.g. shared-global),
-# plan/apply pass through with no var-file — works as plain terraform.
+#
+# Auto-injected var-file resolves per directory:
+#   - infra root:      environments/<env>/terraform.tfvars   (main state)
+#   - keycloak-config: <env>.tfvars                          (run ../terraw.sh from inside)
+#   - shared-global:   neither → pass-through (plain terraform)
+# .env.<env> (TF_VAR_* incl. secrets) is loaded from the infra root regardless of cwd,
+# so keycloak-config picks up TF_VAR_keycloak_admin_password etc. from .env.<env> too.
 
 set -u
 
@@ -41,6 +46,19 @@ load_env_file() {
     echo "[terraw] loaded $count vars from .env.$env" >&2
 }
 
+# Resolve the per-env tfvars file relative to the current dir. Supports both
+# layouts: the main state (environments/<env>/terraform.tfvars, run from root)
+# and per-dir states like keycloak-config (<env>.tfvars, run from inside the dir).
+# Prints the path if found, empty otherwise. shared-global has neither → pass-through.
+resolve_tfvars() {
+    local env="$1"
+    if [ -f "environments/$env/terraform.tfvars" ]; then
+        echo "environments/$env/terraform.tfvars"
+    elif [ -f "$env.tfvars" ]; then
+        echo "$env.tfvars"
+    fi
+}
+
 cmd="${1:-}"
 [ $# -gt 0 ] && shift
 
@@ -64,11 +82,11 @@ case "$cmd" in
         echo "STATE_FILE=$STATE_FILE"
         echo "CWD=$(pwd)"
         if [ -n "$env" ]; then
-            tfv="environments/$env/terraform.tfvars"
-            if [ -f "$tfv" ]; then
+            tfv="$(resolve_tfvars "$env")"
+            if [ -n "$tfv" ]; then
                 echo "tfvars   = $tfv (would auto-inject)"
             else
-                echo "tfvars   = $tfv (NOT FOUND — pass-through)"
+                echo "tfvars   = none in $(pwd) (pass-through, e.g. shared-global)"
             fi
         fi
         ;;
@@ -79,12 +97,12 @@ case "$cmd" in
             echo "[terraw] WARN: no env set — running plain 'terraform $cmd'. Run 'terraw switch <env>' first if you wanted env-scoped vars." >&2
         else
             load_env_file "$env" || exit 1
-            tfv="environments/$env/terraform.tfvars"
-            if [ -f "$tfv" ]; then
+            tfv="$(resolve_tfvars "$env")"
+            if [ -n "$tfv" ]; then
                 args+=(-var-file="$tfv")
                 echo "[terraw] $cmd → injecting -var-file=$tfv"
             else
-                echo "[terraw] $cmd → no $tfv in $(pwd) (pass-through, e.g. shared-global)"
+                echo "[terraw] $cmd → no env tfvars in $(pwd) (pass-through, e.g. shared-global)"
             fi
         fi
         exec terraform "$cmd" "${args[@]}" "$@"

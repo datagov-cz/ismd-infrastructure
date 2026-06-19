@@ -1,3 +1,12 @@
+# Application Insights — connection string injected into every HTTP-speaking app
+# as APPLICATIONINSIGHTS_CONNECTION_STRING. Java apps auto-attach via the AI agent;
+# Next.js apps need the `applicationinsights` npm package wired explicitly.
+variable "app_insights_connection_string" {
+  description = "Application Insights connection string for app telemetry. Passed through from modules/shared.app_insights_connection_string."
+  type        = string
+  sensitive   = true
+}
+
 # Core Environment Variables
 variable "environment" {
   description = "Environment name (dev, test, prod)"

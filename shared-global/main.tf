@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 4.37.0"
+      version = "~> 4.0"
     }
   }
 }
@@ -70,4 +70,35 @@ output "vnet_name" {
 
 output "app_gateway_public_ip_address" {
   value = module.shared_global.app_gateway_public_ip_address
+}
+
+output "app_gateway_id" {
+  value = module.shared_global.app_gateway_id
+}
+
+# --- ACS Email (Keycloak SMTP sender) ---
+
+output "acs_name" {
+  value = module.shared_global.acs_name
+}
+
+output "acs_id" {
+  value = module.shared_global.acs_id
+}
+
+output "acs_managed_sender_domain" {
+  value = module.shared_global.acs_managed_sender_domain
+}
+
+output "acs_managed_from_address" {
+  value = module.shared_global.acs_managed_from_address
+}
+
+output "acs_smtp_host" {
+  value = module.shared_global.acs_smtp_host
+}
+
+# DNS records the client must publish for auth.dia.gov.cz (custom sender domain).
+output "acs_custom_domain_verification_records" {
+  value = module.shared_global.acs_custom_domain_verification_records
 }

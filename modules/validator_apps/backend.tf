@@ -72,6 +72,10 @@ resource "azurerm_container_app" "backend" {
         name  = "SPRING_PROFILES_ACTIVE"
         value = "localhost"
       }
+      env {
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "app-insights-connection-string"
+      }
       liveness_probe {
         transport = "HTTP"
         port      = 8080
@@ -94,6 +98,11 @@ resource "azurerm_container_app" "backend" {
         timeout                 = 5
       }
     }
+  }
+
+  secret {
+    name  = "app-insights-connection-string"
+    value = var.app_insights_connection_string
   }
 
   tags = {

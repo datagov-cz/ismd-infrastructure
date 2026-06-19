@@ -37,3 +37,6 @@ tool_site_status      = "coming_soon"
 # wiring (NEXT_PUBLIC_BE_URL + externally exposed backend with AppGW IP allowlist)
 # until a BFF-capable image is released.
 validator_use_bff = false
+
+# Monitoring — paging_email_recipients is fed from .env.test (TF_VAR_paging_email_recipients).
+deploy_monitoring = true

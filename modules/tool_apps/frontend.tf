@@ -68,6 +68,10 @@ resource "azurerm_container_app" "frontend" {
           secret_name = "site-preview-secret"
         }
       }
+      env {
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "app-insights-connection-string"
+      }
 
       liveness_probe {
         transport               = "HTTP"
@@ -114,6 +118,11 @@ resource "azurerm_container_app" "frontend" {
       name  = "site-preview-secret"
       value = var.site_preview_secret
     }
+  }
+
+  secret {
+    name  = "app-insights-connection-string"
+    value = var.app_insights_connection_string
   }
 
   ingress {

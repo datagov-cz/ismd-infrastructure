@@ -24,9 +24,10 @@ resource "azurerm_container_app" "backend" {
   }
 
   ingress {
-    # Internal only — all browser traffic goes through tool-frontend (BFF pattern).
-    # FE reaches BE over the shared Container App Environment's private network.
-    external_enabled = false
+    # BFF pattern: backend is internal-only by default. DEV flips this on
+    # (backend_external_enabled) for the direct local-frontend → DEV-backend
+    # dev loop via the App Gateway /popisujeme/be/* route. TEST/PROD stay false.
+    external_enabled = var.backend_external_enabled
     target_port      = 8080
     transport        = "auto"
 
@@ -56,8 +57,10 @@ resource "azurerm_container_app" "backend" {
       }
       env {
         name = "SPRING_PROFILES_ACTIVE"
-        # TODO: switch test back to "stage" once stage profile reads env vars (FUSEKI_URL, CORS_ALLOWED_ORIGINS)
-        value = var.environment == "prod" ? "production" : "dev"
+        # Map env → Spring profile. application-<profile>.properties files exist
+        # for dev, test, and production — all env-var-driven for env-specific
+        # values (POSTGRES_URL, FUSEKI_URL, KEYCLOAK_ISSUER_URI, CORS_ALLOWED_ORIGINS).
+        value = var.environment == "prod" ? "production" : var.environment
       }
       env {
         name  = "POSTGRES_URL"
@@ -86,6 +89,10 @@ resource "azurerm_container_app" "backend" {
       env {
         name        = "KEYCLOAK_CLIENT_SECRET"
         secret_name = "keycloak-client-secret"
+      }
+      env {
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "app-insights-connection-string"
       }
       liveness_probe {
         transport        = "HTTP"
@@ -118,6 +125,11 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "keycloak-client-secret"
     value = var.keycloak_client_secret
+  }
+
+  secret {
+    name  = "app-insights-connection-string"
+    value = var.app_insights_connection_string
   }
 
   tags = {

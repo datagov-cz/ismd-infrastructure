@@ -4,12 +4,12 @@
 # Ergonomic frontend over the modular docker-compose stack.
 #
 # Usage:
-#   .\compose.ps1 up                            # full stack, all pulled from GHCR
+#   .\compose.ps1 up                            # BE stack, all pulled from GHCR
+#   .\compose.ps1 up --frontends                # also run containerized frontends
 #   .\compose.ps1 up --build tool-be            # build tool backend locally
 #   .\compose.ps1 up --build tool-be fuseki     # build multiple targets
 #   .\compose.ps1 up --build all                # build everything locally
 #   .\compose.ps1 up --no-tool-be               # BE dev mode (skip tool BE)
-#   .\compose.ps1 up --frontends                # also run containerized frontends
 #   .\compose.ps1 down                          # tear down
 #   .\compose.ps1 logs -f backend               # pass-through to docker compose
 #   .\compose.ps1 ps

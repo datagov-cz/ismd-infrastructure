@@ -231,6 +231,24 @@ variable "deploy_tool_apps" {
   default     = true
 }
 
+variable "deploy_monitoring" {
+  description = "Whether to provision the monitoring module (Action Groups + Logic App + Teams notifier). Default false during Phase A rollout; flip true per env once Logic App connector is OAuth-authorized."
+  type        = bool
+  default     = false
+}
+
+variable "paging_email_recipients" {
+  description = "Email addresses (or one mail-enabled group address) that receive paging-tier alerts. Empty list → no paging action group is created. Use Plan A (hardcoded individuals) until the Entra mail-enabled group exists; then swap to a single group address."
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_card_language" {
+  description = "Language for Teams card labels and severity/status mapping (cs|en). Passed through to the monitoring module."
+  type        = string
+  default     = "cs"
+}
+
 # Frontend gating (per-app, per-env). Values: live | coming_soon | maintenance.
 variable "validator_site_status" {
   description = "Frontend gating mode for the Validator app."
