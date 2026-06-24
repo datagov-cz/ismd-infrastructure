@@ -22,3 +22,17 @@ updates:
       terraform-providers:
         patterns:
           - "*"
+
+  # Watches action versions pinned in .github/workflows/ (actions/checkout, etc.).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
