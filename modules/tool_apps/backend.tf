@@ -40,7 +40,7 @@ resource "azurerm_container_app" "backend" {
 
   template {
     min_replicas = 1
-    max_replicas = 1 # Pinned to singleton — see TODO §12 for reasoning (avoids DB connection pool exhaustion, no concurrency hardening needed)
+    max_replicas = 1 # Pinned to singleton: avoids DB connection pool exhaustion, no concurrency hardening needed
     container {
       name   = "ismd-tool-backend-${var.environment}"
       image  = "${var.backend_image}:${var.backend_image_tag}"
@@ -107,11 +107,16 @@ resource "azurerm_container_app" "backend" {
         interval_seconds = 10
       }
       startup_probe {
-        transport               = "HTTP"
-        port                    = 8080
-        path                    = "/popisujeme/actuator/health"
+        transport = "HTTP"
+        port      = 8080
+        path      = "/popisujeme/actuator/health"
+        # 30 × 10s = 300s budget. Backend runs as a singleton (min=max=1),
+        # so after a platform node-maintenance eviction the cold JVM boot (image pull +
+        # Spring start + Postgres/Fuseki/Keycloak deps) is the whole outage window. A
+        # tight budget kills the still-booting replica into a restart loop, extending the
+        # gap and tripping the restart-count alert. 300s lets the cold start finish in one go.
         interval_seconds        = 10
-        failure_count_threshold = 12
+        failure_count_threshold = 30
         timeout                 = 5
       }
     }

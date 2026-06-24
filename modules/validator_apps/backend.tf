@@ -90,11 +90,15 @@ resource "azurerm_container_app" "backend" {
         interval_seconds = 10
       }
       startup_probe {
-        transport               = "HTTP"
-        port                    = 8080
-        path                    = "/validujeme/actuator/health"
+        transport = "HTTP"
+        port      = 8080
+        path      = "/validujeme/actuator/health"
+        # 30 × 10s = 300s budget. Matches the tool backend: a tight budget kills a
+        # still-booting replica into a restart loop after a platform node-maintenance
+        # eviction, extending the outage and tripping the restart-count alert. 300s lets
+        # the cold JVM/Spring start finish in one pass.
         interval_seconds        = 10
-        failure_count_threshold = 12
+        failure_count_threshold = 30
         timeout                 = 5
       }
     }

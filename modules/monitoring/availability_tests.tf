@@ -2,9 +2,7 @@
 #
 # IMPORTANT: We do NOT use App Insights Standard Web Tests. They depend on a
 # Microsoft-managed WinHTTP client that fails with "The function requested is
-# not supported" against our AppGW (HTTP/2 ALPN incompatibility). Documented
-# fully in docs/HANDOVER-monitoring.md § "Availability monitoring — design
-# decision (2026-05-26)".
+# not supported" against our AppGW (HTTP/2 ALPN incompatibility).
 #
 # Instead, a custom uptime probe Logic App (see uptime_probe.tf) posts
 # `Microsoft.ApplicationInsights.Availability` events to AI's /v2/track

@@ -1,7 +1,6 @@
 # Custom external uptime probe — replacement for App Insights Standard Web Tests.
 #
-# See docs/HANDOVER-monitoring.md § "Availability monitoring — design decision".
-# tl;dr: Standard Web Tests fail against our AppGW because of HTTP/2 ALPN.
+# Standard Web Tests fail against our AppGW because of HTTP/2 ALPN.
 # This Logic App probes URLs every 5 min and posts custom Availability events
 # to AI's /v2/track endpoint, so AI's native portal blade still renders the
 # data and existing alert rules still fire.

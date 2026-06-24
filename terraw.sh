@@ -35,7 +35,9 @@ load_env_file() {
         return 1
     fi
     local count=0
-    while IFS='=' read -r name value; do
+    # `|| [ -n "$name" ]` processes a final line that lacks a trailing newline,
+    # which `read` otherwise returns non-zero on and the loop would skip.
+    while IFS='=' read -r name value || [ -n "$name" ]; do
         name="${name//$'\r'/}"
         value="${value//$'\r'/}"
         if [ -n "$name" ] && [ -n "$value" ]; then

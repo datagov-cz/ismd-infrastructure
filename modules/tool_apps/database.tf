@@ -156,7 +156,7 @@ resource "azurerm_container_app" "fuseki" {
       }
 
       # Generous startup grace so cold-start AzureFile mount + JVM warmup don't
-      # cascade into liveness restarts. See TODO §15 for full context.
+      # cascade into liveness restarts.
       # Note: Container Apps caps failure_count_threshold at 30. Using 60s
       # interval × 30 threshold = 30 min grace, covering the observed ~22 min
       # cold-start gap with margin.

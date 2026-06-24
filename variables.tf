@@ -249,6 +249,18 @@ variable "alert_card_language" {
   default     = "cs"
 }
 
+variable "teams_group_id" {
+  description = "Teams group (team) ID the Logic App posts alerts to. Set via TF_VAR_teams_group_id in the gitignored .env.<env> (Phase A: maintainer test channel; Phase B: DIA channel)."
+  type        = string
+  default     = ""
+}
+
+variable "teams_channel_id" {
+  description = "Teams channel ID within teams_group_id. Set via TF_VAR_teams_channel_id in the gitignored .env.<env>."
+  type        = string
+  default     = ""
+}
+
 # Frontend gating (per-app, per-env). Values: live | coming_soon | maintenance.
 variable "validator_site_status" {
   description = "Frontend gating mode for the Validator app."

@@ -98,6 +98,8 @@ module "dev" {
   deploy_monitoring       = var.deploy_monitoring
   paging_email_recipients = var.paging_email_recipients
   alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
@@ -178,6 +180,8 @@ module "test" {
   deploy_monitoring       = var.deploy_monitoring
   paging_email_recipients = var.paging_email_recipients
   alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
@@ -258,6 +262,8 @@ module "prod" {
   deploy_monitoring       = var.deploy_monitoring
   paging_email_recipients = var.paging_email_recipients
   alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
