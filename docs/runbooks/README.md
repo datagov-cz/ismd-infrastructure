@@ -16,9 +16,13 @@ Known correction already applied:
 
 ## Convention
 
-- File name matches the alert rule pattern: `al-dia-<slug>.md` (env suffix stripped).
-- Alert `description` field in terraform references the runbook by relative path:
-  `… See: docs/runbooks/al-dia-<slug>.md`
+- File name is the alert slug with no prefix or env suffix: `<slug>.md`
+  (e.g. `replicas-zero.md`, `appgw-5xx.md`).
+- Alert rules link their runbook via the `local.runbook_link["<slug>"]` helper
+  in `modules/monitoring/main.tf`, which appends a `📖 Runbook` HTML anchor to
+  the alert `description`. The anchor points at the committed file on GitHub
+  (`blob/main/docs/runbooks/<slug>.md`), so the link only resolves once the
+  runbook has reached `main`.
 - The runbook stays short (~10 lines). Long writeups belong in `docs/` proper.
 
 ## Index

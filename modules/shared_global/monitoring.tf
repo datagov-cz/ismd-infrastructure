@@ -4,9 +4,11 @@
 # high-volume per-request data that's rarely queried, so we ship them to blob
 # storage (not Log Analytics) for cheap retention with a 90-day lifecycle.
 #
-# Per the monitoring plan §"Diagnostic settings matrix":
+# WAF is enabled (Prevention mode), so the firewall log is collected too. Both
+# AccessLog and FirewallLog ship to this blob storage account with a 90-day
+# lifecycle:
 #   Application Gateway → Storage Account (AccessLog, 90d retention)
-#   Application Gateway → Log Analytics (FirewallLog only when WAF is enabled — not today)
+#   Application Gateway → Storage Account (FirewallLog, 90d retention)
 
 resource "azurerm_storage_account" "monitoring" {
   name                     = "ismdmonglobal"
@@ -60,11 +62,27 @@ resource "azurerm_storage_management_policy" "monitoring" {
       }
     }
   }
+
+  rule {
+    name    = "appgw-firewall-logs-90d"
+    enabled = true
+    filters {
+      prefix_match = ["insights-logs-applicationgatewayfirewalllog/"]
+      blob_types   = ["blockBlob"]
+    }
+    actions {
+      base_blob {
+        delete_after_days_since_modification_greater_than = 90
+      }
+    }
+  }
 }
 
-# Diagnostic setting on the AppGW: ship AccessLog (per-request access logs) to
-# the storage account. PerformanceLog + FirewallLog skipped — Performance is
-# already covered by metrics, Firewall is WAF-only and WAF isn't enabled.
+# Diagnostic setting on the AppGW: ship AccessLog (per-request access logs) and
+# FirewallLog (WAF matched/blocked requests) to the storage account.
+# PerformanceLog skipped — already covered by metrics. FirewallLog is collected
+# because the WAF runs in Prevention (blocking) mode; without it there'd be no
+# way to see or tune what the WAF blocks.
 resource "azurerm_monitor_diagnostic_setting" "appgw_access" {
   name               = "diag-appgw-access-to-storage"
   target_resource_id = azurerm_application_gateway.appgw.id
@@ -72,6 +90,10 @@ resource "azurerm_monitor_diagnostic_setting" "appgw_access" {
 
   enabled_log {
     category = "ApplicationGatewayAccessLog"
+  }
+
+  enabled_log {
+    category = "ApplicationGatewayFirewallLog"
   }
 
   # Metrics are already collected platform-side; no need to duplicate to storage.

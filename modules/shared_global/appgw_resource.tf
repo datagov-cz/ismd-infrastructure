@@ -48,7 +48,10 @@ resource "azurerm_application_gateway" "appgw" {
   zones = ["1", "2", "3"]
 
   autoscale_configuration {
-    min_capacity = 0
+    # Warm floor of 1 capacity unit so the gateway never serves from a cold
+    # zero — scale-out to higher capacity takes minutes, so a 0 floor risks
+    # latency/5xx on the first burst after idle. Scales up to max under load.
+    min_capacity = 1
     max_capacity = 10
   }
 

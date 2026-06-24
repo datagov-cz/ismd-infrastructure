@@ -1,5 +1,5 @@
 # Application Gateway WAF Policy
-# Provides rate limiting + OWASP CRS 3.2 protection for ismd-app-gateway.
+# Provides rate limiting + Microsoft DRS 2.2 protection for ismd-app-gateway.
 # Associated gateway-wide via firewall_policy_id in appgw_resource.tf (applies
 # to every listener / hostname: validator + tool apps).
 #
@@ -54,10 +54,12 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     }
   }
 
-  # Blocked requests (rate-limit and OWASP) return HTTP 403 — the App Gateway
-  # WAF default. The gateway's existing 403 custom error page applies.
+  # Blocked requests return different status codes by rule type: the custom
+  # RateLimitRule Block returns HTTP 429 (Too Many Requests), while the managed
+  # DRS rules return HTTP 403 (Forbidden) — the App Gateway WAF default. The
+  # gateway's existing 403 custom error page applies to the managed-rule blocks.
 
-  # Managed rule set. Microsoft_DefaultRuleSet (DRS) 2.1 is preferred over OWASP
+  # Managed rule set. Microsoft_DefaultRuleSet (DRS) 2.2 is preferred over OWASP
   # CRS 3.2 here: it runs the modern WAF engine that rate limiting requires, is
   # tuned by Microsoft to produce fewer false positives on real traffic, and —
   # unlike CRS 3.2 — supports per-rule `action` and `sensitivity` for tightening

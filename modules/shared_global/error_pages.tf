@@ -29,7 +29,9 @@ resource "azurerm_storage_account_static_website" "error_pages" {
 
 resource "azurerm_storage_blob" "error_502" {
   name                 = "502.html"
-  storage_container_id = "${azurerm_storage_account.error_pages.primary_blob_endpoint}$web"
+  # Resource-manager ID of the auto-created $web container — NOT the blob-endpoint
+  # URL. azurerm 4.x requires the RM ID form here and rejects the dataplane URL.
+  storage_container_id = "${azurerm_storage_account.error_pages.id}/blobServices/default/containers/$web"
   type                 = "Block"
   content_type         = "text/html"
   source               = "${path.module}/../../static-pages/502.html"
@@ -38,7 +40,9 @@ resource "azurerm_storage_blob" "error_502" {
 
 resource "azurerm_storage_blob" "error_403" {
   name                 = "403.html"
-  storage_container_id = "${azurerm_storage_account.error_pages.primary_blob_endpoint}$web"
+  # Resource-manager ID of the auto-created $web container — NOT the blob-endpoint
+  # URL. azurerm 4.x requires the RM ID form here and rejects the dataplane URL.
+  storage_container_id = "${azurerm_storage_account.error_pages.id}/blobServices/default/containers/$web"
   type                 = "Block"
   content_type         = "text/html"
   source               = "${path.module}/../../static-pages/403.html"

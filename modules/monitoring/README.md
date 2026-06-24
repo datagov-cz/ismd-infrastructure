@@ -27,12 +27,16 @@ Optional:
 **All monitoring config lives in terraform. No portal clickops.**
 The only manual step is the one-time OAuth authorization of the Teams connector in `azurerm_api_connection.teams` after first apply — Microsoft API requires a user identity to grant the connector consent, terraform cannot do this. Document the date + identity + connection ID in the runbook.
 
-## Phase rollout
+## Build history
 
-This module is built up in phases:
-- Phase 1a (this commit): Action Groups + module skeleton, webhook URLs as variables
-- Phase 1b: Logic App + Teams connector + 1 canary alert end-to-end
-- Phase 2: Container App alert set (5xx, replicas, restart count, latency)
-- Phase 3: AppGW + Keycloak + Fuseki alerts
-- Phase 4: Diagnostic settings matrix (incl. CAE-level → populates CAE Logs blade)
-- Phase 5: Application Insights availability tests
+This module was rolled out in phases, all of which have now landed:
+- Action Groups + module skeleton
+- Logic App + Teams connector + canary alert end-to-end
+- Container App alert set (5xx, replicas, restart count, CPU, memory)
+- AppGW, PostgreSQL, and GHCR-pull alerts
+- Diagnostic settings matrix (incl. CAE-level → populates CAE Logs blade)
+- Custom availability probes (Logic App → Application Insights)
+
+Extending the module: add the alert rule in the relevant `alerts_*.tf`, give it
+a `local.runbook_link["<slug>"]`, and add the matching runbook under
+`docs/runbooks/`.
