@@ -15,7 +15,7 @@ Find the pool with `health: Unhealthy` and read `healthProbeLog`.
 **Common causes**:
 - Backend Container App scaled to 0 or down (check companion `replicas-zero` alert).
 - Probe path returns non-200 (recent path change in the app?).
-- Anticipatory pool pointing at a non-existent app — should be in the `appgw_excluded_backend_settings` list; if not, add it.
+- Anticipatory pool pointing at a non-existent app — it should simply be absent from this env's `appgw_backend_settings` Include list; if mistakenly added, remove it.
 - AppGW SSL/listener issue (recent shared-global change?).
 
-**Resolution**: restart the app, fix the probe path, or add the pool to the exclusion list if intentional.
+**Resolution**: restart the app, fix the probe path, or remove the pool from this env's `appgw_backend_settings` if it's intentionally not deployed.

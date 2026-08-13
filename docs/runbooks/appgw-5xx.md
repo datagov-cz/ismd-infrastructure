@@ -3,7 +3,8 @@
 **Trigger**: `ResponseStatus` with `HttpStatusGroup = 5xx` total > 5 in 5 min. Sev2 quiet.
 
 **First look**:
-1. AppGW access logs in `ismdmonglobal/insights-logs-applicationgatewayaccesslog/` (90-day retention). Look at `requestUri_s`, `httpStatus_d`, `backendPoolName_s`, `serverStatus_s` for the failing requests.
+1. Run `scripts/investigate-appgw-5xx.sh "<alert time as shown, Europe/Prague>"` — it converts to UTC, pulls the right hour's access-log blob (account-key auth, no RBAC role needed), and prints the failing requests: URL, backend status, response time, error_info, user-agent. Add `--firewall` to also dump WAF blocks. This replaces the manual blob-download + jq below.
+2. Manual fallback: AppGW access logs in `ismdmonglobal/insights-logs-applicationgatewayaccesslog/` (90-day retention). Fields are under `.properties` (`requestUri`, `httpStatus`, `serverStatus`, `timeTaken`) EXCEPT `backendSettingName`/`backendPoolName` which are top-level. `serverStatus` = the code the backend returned.
 2. Cross-check with companion per-app `http-5xx` alerts — if a Container App is also firing, the issue is app-side, not gateway-side.
 
 **Common causes**:

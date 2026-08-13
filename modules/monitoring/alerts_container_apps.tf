@@ -36,8 +36,16 @@ resource "azurerm_monitor_metric_alert" "replicas_zero" {
 }
 
 # --- HTTP 5xx errors --------------------------------------------------------
-# Fires when 5xx requests > 0 in a 5-min window. Quiet tier — backends can blip,
-# real signal is sustained. Threshold of 0 catches any 5xx; tune if too noisy.
+# Fires when 5xx requests exceed the per-env threshold in a 5-min window. Quiet
+# tier — backends can blip, real signal is a burst.
+#
+# Threshold is env-aware. Non-prod (dev/test) scale toward zero, so cold-start /
+# idle-scaledown transients routinely emit 1-2 stray 5xx that are not incidents.
+# At >0 those paged the Teams channel constantly (observed 2026-07-10/11: a
+# 2-count tool-dev-fe blip fired the same rules as a real 8-in-a-minute Fuseki
+# cascade). >3 suppresses the blips while still catching a real burst — mirrors
+# the gateway appgw-5xx rule (>5) which correctly stayed silent on the blip and
+# loud on the burst. Prod keeps >0 until it has real traffic to baseline against.
 resource "azurerm_monitor_metric_alert" "http_5xx" {
   for_each = var.container_apps
 
@@ -55,7 +63,7 @@ resource "azurerm_monitor_metric_alert" "http_5xx" {
     metric_name      = "Requests"
     aggregation      = "Total"
     operator         = "GreaterThan"
-    threshold        = 0
+    threshold        = var.environment == "prod" ? 0 : 3
 
     dimension {
       name     = "statusCodeCategory"

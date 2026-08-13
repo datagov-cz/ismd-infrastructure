@@ -1,6 +1,6 @@
 # LA workspace self-monitoring — daily ingestion approaching cap
 #
-# Why this matters (gotcha #6 in monitoring-plan.md):
+# Why this matters:
 # When daily ingestion hits `daily_quota_gb` on the workspace, Azure SILENTLY
 # stops ingestion until UTC midnight. Log-based alerts cannot fire on data that
 # is not there. This alert fires at 80% of cap so we can raise the cap before

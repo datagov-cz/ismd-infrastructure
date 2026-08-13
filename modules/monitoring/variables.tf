@@ -32,7 +32,7 @@ variable "app_insights_instrumentation_key" {
 }
 
 variable "container_app_environment_id" {
-  description = "ID of the shared Container App Environment. Used as the scope for management-plane diagnostic settings (fixes the empty CAE Logs blade — gotcha #4/#7 in monitoring-plan.md)."
+  description = "ID of the shared Container App Environment. Used as the scope for management-plane diagnostic settings (fixes the empty CAE Logs blade)."
   type        = string
 }
 
@@ -96,15 +96,18 @@ variable "application_gateway_id" {
   default     = ""
 }
 
-variable "appgw_excluded_backend_settings" {
-  description = "Backend HTTP settings names to exclude from the AppGW unhealthy-host alert. Use for anticipatory pools that point at resources not yet deployed (e.g. tool-prod-* before tool ships to PROD)."
-  type        = list(string)
-  default     = []
+variable "appgw_backend_settings" {
+  description = "THIS environment's own AppGW backend pools. The Application Gateway is a single shared-global resource serving dev/test/prod via hostname listeners, so its metrics are gateway-wide. These entries scope the per-env AppGW alerts (5xx, unhealthy-host) to only this env's backends — without them, a 5xx or unhealthy host in dev/test would fire prod's alert. Each entry = { pool, http_settings } matching the backend pool + backend HTTP settings names in modules/shared_global/appgw_*_config.tf. Empty list = no dimension filter (alert spans the whole gateway). Omit anticipatory pools that point at undeployed resources (e.g. tool-prod-* before tool ships to PROD) — they would 404/5xx and create noise."
+  type = list(object({
+    pool          = string
+    http_settings = string
+  }))
+  default = []
 }
 
 # Log Analytics workspace daily ingestion cap — must match the cap configured on the
 # workspace itself (in modules/shared). Used to compute the 80%-of-cap alert threshold
-# so we get warned BEFORE ingestion silently stops (gotcha #6 in monitoring-plan.md).
+# so we get warned BEFORE ingestion silently stops.
 variable "log_analytics_daily_cap_gb" {
   description = "Daily ingestion cap (GB) configured on the LA workspace. Used to derive the 80%-of-cap warning threshold. Must match the value passed to modules/shared."
   type        = number

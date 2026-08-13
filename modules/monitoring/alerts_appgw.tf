@@ -14,6 +14,14 @@
 
 locals {
   appgw_alerts_enabled = var.application_gateway_id != ""
+
+  # The shared gateway emits metrics gateway-wide (all envs combined). To scope
+  # alerts to THIS env we filter by backend, but the two metrics name the
+  # dimension differently:
+  #   - BackendResponseStatus  → dimension "BackendHttpSetting" (settings name alone)
+  #   - UnhealthyHostCount     → dimension "BackendSettingsPool" (pool~settings, tilde-joined)
+  appgw_backend_http_settings  = [for b in var.appgw_backend_settings : b.http_settings]
+  appgw_backend_settings_pools = [for b in var.appgw_backend_settings : "${b.pool}~${b.http_settings}"]
 }
 
 # --- Backend pool unhealthy host -------------------------------------------
@@ -39,16 +47,17 @@ resource "azurerm_monitor_metric_alert" "appgw_unhealthy_backend" {
     operator         = "GreaterThan"
     threshold        = 0
 
-    # Exclude backend HTTP settings for resources that are anticipatory and not
-    # yet deployed (tool isn't in PROD yet — its pools always 404). When tool
-    # ships to PROD, remove the corresponding exclusions.
-    # When new envs/apps are added, audit this list against the AppGW config.
+    # Scope to THIS env's backend pools only. Without this Include filter the
+    # rule spans the whole shared gateway, so a dev/test backend going unhealthy
+    # would fire prod's alert. var.appgw_backend_settings deliberately omits
+    # anticipatory pools (tool-prod-* before tool ships) so they don't count.
+    # When new envs/apps are added, audit the list against the AppGW config.
     dynamic "dimension" {
-      for_each = length(var.appgw_excluded_backend_settings) > 0 ? [1] : []
+      for_each = length(local.appgw_backend_settings_pools) > 0 ? [1] : []
       content {
         name     = "BackendSettingsPool"
-        operator = "Exclude"
-        values   = var.appgw_excluded_backend_settings
+        operator = "Include"
+        values   = local.appgw_backend_settings_pools
       }
     }
   }
@@ -60,19 +69,29 @@ resource "azurerm_monitor_metric_alert" "appgw_unhealthy_backend" {
   tags = local.common_tags
 }
 
-# --- Total 5xx --------------------------------------------------------------
-# AppGW response status sliced by status code. Threshold is absolute count
-# rather than rate (1% per the plan) — rate-based criteria requires a
-# scheduled query with two metrics, while a count threshold is a simple metric
-# alert. Tune the count after observing real traffic. Sev2 quiet — duplicate
-# with Container App 5xx alerts but at a different layer (gateway-vs-app).
+# --- Backend 5xx (per-env) --------------------------------------------------
+# The gateway is shared across dev/test/prod, so the gateway-wide ResponseStatus
+# metric can't tell whose traffic threw a 5xx — a dev error would page prod.
+# Instead we use BackendResponseStatus, which carries a BackendHttpSetting
+# dimension, and Include-filter THIS env's backends. Trade-off: per Azure docs
+# BackendResponseStatus counts only codes the BACKEND returned, NOT codes the
+# gateway generated itself (502 backend-unreachable, WAF 403/503, listener/cert
+# misconfig). Those are inherently gateway-wide and unattributable to one env;
+# the backend-down case is covered per-env by appgw_unhealthy_backend + the
+# Container App 5xx / availability alerts.
+#
+# Threshold is an absolute count (not the 1% rate in the plan) — rate criteria
+# needs a two-metric scheduled query; a count threshold is a simple metric
+# alert. Tune after observing real traffic. Sev2 quiet — overlaps Container App
+# 5xx but at the gateway layer. With the dimension split the threshold applies
+# per backend setting (any single env backend > 5 in 5m fires).
 resource "azurerm_monitor_metric_alert" "appgw_5xx" {
   count = local.appgw_alerts_enabled ? 1 : 0
 
   name                = "al-dia-appgw-5xx-${var.environment}"
   resource_group_name = var.resource_group_name
   scopes              = [var.application_gateway_id]
-  description         = "Application Gateway 5xx responses > 5 in 5m. Could be backend issues or AppGW misconfig (listener/rule problems).${local.runbook_link["appgw-5xx"]}"
+  description         = "Application Gateway: a ${var.environment} backend returned > 5 5xx responses in 5m. Backend app is erroring (gateway-generated 5xx like 502/WAF are not counted here).${local.runbook_link["appgw-5xx"]}"
   severity            = 2
   frequency           = "PT1M"
   window_size         = "PT5M"
@@ -80,7 +99,7 @@ resource "azurerm_monitor_metric_alert" "appgw_5xx" {
 
   criteria {
     metric_namespace = "Microsoft.Network/applicationGateways"
-    metric_name      = "ResponseStatus"
+    metric_name      = "BackendResponseStatus"
     aggregation      = "Total"
     operator         = "GreaterThan"
     threshold        = 5
@@ -89,6 +108,17 @@ resource "azurerm_monitor_metric_alert" "appgw_5xx" {
       name     = "HttpStatusGroup"
       operator = "Include"
       values   = ["5xx"]
+    }
+
+    # Scope to THIS env's backends. Without it the rule would still span the
+    # whole gateway (every env's backends), recreating the cross-env noise.
+    dynamic "dimension" {
+      for_each = length(local.appgw_backend_http_settings) > 0 ? [1] : []
+      content {
+        name     = "BackendHttpSetting"
+        operator = "Include"
+        values   = local.appgw_backend_http_settings
+      }
     }
   }
 

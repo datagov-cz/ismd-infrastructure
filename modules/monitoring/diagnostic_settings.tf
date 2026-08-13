@@ -3,11 +3,11 @@
 # Note on Container App logs: stdout/stderr from each container is already shipped
 # to LA via the CAE's appLogsConfiguration (set in modules/shared). Those rows land
 # in ContainerAppConsoleLogs_CL + ContainerAppSystemLogs_CL tagged with each
-# CHILD app's resource ID, NOT the CAE's. This is gotcha #4 in monitoring-plan.md.
+# CHILD app's resource ID, NOT the CAE's.
 #
 # This file adds the CAE-level diagnostic setting — management-plane events
 # (autoscaling, control-plane activity) tagged with the CAE's resource ID. Without
-# it the CAE Logs blade in the portal is empty by default (gotcha #7).
+# it the CAE Logs blade in the portal is empty by default.
 
 resource "azurerm_monitor_diagnostic_setting" "cae" {
   name                       = "diag-cae-${var.environment}"

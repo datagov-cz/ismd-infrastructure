@@ -16,6 +16,6 @@
 - **Network policy / NSG**: rare in DEV; possible after subnet changes.
 
 **Resolution**:
-- Scale-up blip: tune threshold (currently >0; consider >3) or accept noise. Documented as Phase 2 tuning.
+- Scale-up blip: expected below the threshold. Non-prod fires at >3 5xx / 5m (dev/test scale-to-zero produces routine 1-2 cold-start 5xx that are not incidents); prod fires at >0. A single blip should no longer page.
 - App error: fix and redeploy.
 - Upstream: resolve at the upstream first.
