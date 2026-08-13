@@ -21,6 +21,15 @@ tool_backend_image_tag  = "0.0.1-a9a5d5b"
 app_gateway_hostname   = "oha03.dia.gov.cz"
 tool_keycloak_hostname = "oha03.dia.gov.cz"
 
+# Send the frontend's authorization request straight to the CAAIS IdP, skipping the
+# Keycloak login page. Injected as KEYCLOAK_IDP_HINT; auth.ts turns it into
+# kc_idp_hint. Empty (the default) shows the Keycloak page with local accounts.
+#
+# OFF for now (2026-08-12): it works — verified end to end on dev — but skipping the
+# Keycloak page leaves no way in without a CAAIS account, and dev has none. Re-enable
+# once CAAIS logins are available here, or when a local-account escape hatch exists.
+# tool_keycloak_idp_hint = "caais"
+
 deploy_tool_apps = true
 
 # AI apps (ismd-ai) — internal-only Spring Boot service; DB lives on the tool's

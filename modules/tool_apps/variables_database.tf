@@ -65,41 +65,20 @@ variable "postgres_admin_password" {
   sensitive   = true
 }
 
-variable "postgres_sku_name" {
-  description = "SKU name for PostgreSQL Flexible Server (e.g., B_Standard_B1ms for burstable)"
+# The server itself lives in modules/postgres; these are injected from the env
+# root so this module can create its databases and build connection URLs.
+variable "postgres_server_id" {
+  description = "Resource id of the shared Flexible Server (modules/postgres output server_id). The tool and keycloak databases are created against it."
   type        = string
-  default     = "B_Standard_B1ms"
+  default     = ""
 }
 
-variable "postgres_storage_mb" {
-  description = "Storage size in MB for PostgreSQL"
-  type        = number
-  default     = 32768 # 32GB
+variable "postgres_fqdn" {
+  description = "FQDN of the shared Flexible Server (modules/postgres output fqdn), used to build the JDBC URLs."
+  type        = string
+  default     = ""
 }
 
-# Network access control for the public Postgres endpoint.
-# These two lists are the ONLY sources of allowed inbound IPs — there is no
-# longer a blanket "AllowAzureServices" (any Azure tenant) or "AllowAllForDev"
-# (entire internet) rule. Empty lists = no inbound access.
-variable "allow_azure_services" {
-  description = "Allow Azure-resident services (the 0.0.0.0 special rule) to reach Postgres. Required for app connectivity while the Container Apps subnet has no NAT gateway, because outbound egress is Azure's dynamic SNAT rather than a fixed IP. Set false only once a stable NAT egress IP is added to app_outbound_ips."
-  type        = bool
-  default     = true
-}
-
-variable "app_outbound_ips" {
-  description = "Stable outbound IP(s) of the apps (e.g. a NAT gateway public IP) allowlisted to reach the public Postgres endpoint. Empty while relying on allow_azure_services. NOTE: the Container Apps env *inbound* static IP is NOT the egress IP — do not use it here."
-  type        = list(string)
-  default     = []
-}
-
-variable "admin_allowed_ips" {
-  description = "Operator/admin public IP(s) allowed direct access to Postgres for troubleshooting (each becomes a single-IP firewall rule). Replaces the AllowAllForDev internet-wide rule. Empty = no direct human access."
-  type        = list(string)
-  default     = []
-}
-
-# Fuseki connection (fallback when deploy_fuseki = false)
 variable "fuseki_url" {
   description = "URL for Apache Jena Fuseki (external, if not deploying Fuseki container)"
   type        = string

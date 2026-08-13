@@ -364,6 +364,18 @@ variable "tool_app_insights_kv_secret_id" {
   default     = ""
 }
 
+variable "tool_backend_db_user" {
+  description = "Dedicated Postgres LOGIN role for the tool backend (e.g. ismd_tool_app). Empty = admin login. Set via terraform.tfvars after db/user-separation Phase 1."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_db_user" {
+  description = "Dedicated Postgres LOGIN role for Keycloak (e.g. ismd_keycloak_app). Empty = admin login. Cut over last. Set via terraform.tfvars after db/user-separation Phase 1."
+  type        = string
+  default     = ""
+}
+
 variable "tool_postgres_password_kv_secret_id" {
   description = "Class A: versionless KV secret id for the tool backend's postgres password (e.g. https://ismd-kv-test.vault.azure.net/secrets/postgres-password). Empty = inline value. Set via .env.<env>."
   type        = string
