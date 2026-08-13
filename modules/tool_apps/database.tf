@@ -1,6 +1,21 @@
 # Azure Database for PostgreSQL Flexible Server
 # Managed service with automatic backups, HA options, and persistent storage
-
+#
+# SHARED / MULTI-TENANT — this one server backs more than the tool. Databases on it:
+#   - var.postgres_db_name  (ismd_tool_db)  — tool backend, below
+#   - var.keycloak_db_name                  — keycloak container, below
+#   - ismd_ai                               — the AI app, created OUT OF MODULE in
+#     modules/ai_apps/database.tf, which receives this server's id from the env root
+#
+# Consequences, before changing anything here:
+#   - deploy_ai_apps requires deploy_tool_apps; destroying/renaming this server or
+#     flipping deploy_postgres takes the AI app's database with it.
+#   - the SKU is small (B_Standard_B1ms in dev) and max_connections is limited, so
+#     every tenant's pool is sized defensively (see the Hikari caps on the tool
+#     backend and KC_DB_POOL_MAX_CONNECTIONS on keycloak). A new tenant must budget
+#     its pool against the same ceiling.
+#   - all tenants connect as this admin login, so the same password secret is shared;
+#     there is no per-tenant DB user isolation today.
 resource "azurerm_postgresql_flexible_server" "tool" {
   count               = var.deploy_postgres ? 1 : 0
   name                = "ismd-tool-postgres-${var.environment}"
@@ -35,7 +50,11 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   }
 
   lifecycle {
-    ignore_changes = [zone]
+    # administrator_password: seeded once at create, then owned out-of-band (KV is
+    # the source of truth; rotate via `az postgres flexible-server update` + KV +
+    # app restart). Ignored so a stray `.env`/config drift can't rotate the live DB
+    # admin password on apply.
+    ignore_changes = [zone, administrator_password]
   }
 }
 
@@ -49,6 +68,26 @@ resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.tool[0].id
   value     = "UNACCENT"
+}
+
+# Auto-reap abandoned sessions so dead/orphaned connections (e.g. left behind
+# when a client's network path drops) free their slot instead of lingering until
+# slow TCP keepalive timeouts — which is what tipped the 50-connection server
+# into exhaustion during a reconnect storm. Values in milliseconds; both are
+# dynamic (no restart). Set comfortably longer than pool keepalive so healthy
+# pooled connections aren't churned.
+resource "azurerm_postgresql_flexible_server_configuration" "idle_session_timeout" {
+  count     = var.deploy_postgres ? 1 : 0
+  name      = "idle_session_timeout"
+  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  value     = "600000" # 10 min — closes sessions idle with no activity
+}
+
+resource "azurerm_postgresql_flexible_server_configuration" "idle_in_transaction_session_timeout" {
+  count     = var.deploy_postgres ? 1 : 0
+  name      = "idle_in_transaction_session_timeout"
+  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  value     = "300000" # 5 min — guards against leaked open transactions
 }
 
 # Create the application database
@@ -68,22 +107,43 @@ resource "azurerm_postgresql_flexible_server_database" "keycloak" {
   collation = "en_US.utf8"
 }
 
-# Firewall rule to allow Azure services
+# App access — Azure services.
+# The Container Apps subnet has NO NAT gateway, so the apps' outbound traffic to
+# the public Postgres endpoint egresses via Azure's *dynamic* SNAT — NOT the
+# environment's static (inbound) IP. There is therefore no single stable egress
+# IP to allowlist, which is why this blanket "AllowAzureServices" (0.0.0.0) rule
+# is required for the apps (backend, keycloak, fuseki) to reach the database.
+#
+# To tighten this to a real allowlist: add a NAT gateway + static public IP to
+# the Container Apps subnet, put that IP in app_outbound_ips, and set
+# allow_azure_services = false. See app_outbound rule below.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure" {
-  count            = var.deploy_postgres ? 1 : 0
+  count            = var.deploy_postgres && var.allow_azure_services ? 1 : 0
   name             = "AllowAzureServices"
   server_id        = azurerm_postgresql_flexible_server.tool[0].id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
 }
 
-# Firewall rule to allow all IPs for dev (restrict in prod)
-resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_all_dev" {
-  count            = var.deploy_postgres && var.environment == "dev" ? 1 : 0
-  name             = "AllowAllForDev"
+# App access — stable egress allowlist (used once a NAT gateway exists).
+# Empty until then. When populated, set allow_azure_services = false above.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "app_outbound" {
+  for_each         = var.deploy_postgres ? toset(var.app_outbound_ips) : toset([])
+  name             = "app-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.tool[0].id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "255.255.255.255"
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# Admin access: specific operator IPs for troubleshooting.
+# Replaces the previous "AllowAllForDev" (0.0.0.0-255.255.255.255) rule, which
+# exposed the dev database to the entire internet.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "admin" {
+  for_each         = var.deploy_postgres ? toset(var.admin_allowed_ips) : toset([])
+  name             = "admin-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.tool[0].id
+  start_ip_address = each.value
+  end_ip_address   = each.value
 }
 
 # Storage Account for Fuseki data persistence
@@ -134,6 +194,13 @@ resource "azurerm_container_app" "fuseki" {
 
   template {
     min_replicas = 1
+    # LOAD-BEARING — do not scale above 1. This is a data-integrity constraint, not
+    # a cost choice. Fuseki stores TDB2 on the Azure Files share mounted below, and
+    # TDB2 is strictly single-writer: it guards the dataset with an on-disk lock.
+    # A second replica mounting the same share either fails to acquire the lock or,
+    # worse, corrupts the dataset — and this holds the tool's actual content, which
+    # is NOT in Postgres. Recovering means the clear/reset procedure.
+    # Scaling out would require a different store or a real Fuseki HA setup.
     max_replicas = 1
 
     container {

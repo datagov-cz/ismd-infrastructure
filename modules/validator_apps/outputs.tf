@@ -1,5 +1,15 @@
 # Outputs for Validator Apps Module
 
+output "backend_kv_identity_principal_id" {
+  description = "Principal (object) id of the validator backend's dedicated KV identity. Grant it 'get' on the per-env vault's secrets (environments/<env>/keyvault.tf)."
+  value       = azurerm_user_assigned_identity.backend_kv.principal_id
+}
+
+output "frontend_kv_identity_principal_id" {
+  description = "Principal (object) id of the validator frontend's dedicated KV identity. Grant it 'get' on the per-env vault's secrets (environments/<env>/keyvault.tf)."
+  value       = azurerm_user_assigned_identity.frontend_kv.principal_id
+}
+
 output "frontend_name" {
   description = "The name of the frontend container app"
   value       = azurerm_container_app.frontend.name

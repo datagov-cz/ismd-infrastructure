@@ -48,6 +48,17 @@ variable "postgres_admin_user" {
   default     = "ismdadmin"
 }
 
+# Per-app user separation (see infrastructure/db/user-separation/). The tool
+# backend logs in as this dedicated LOGIN role instead of the server admin.
+# Empty = fall back to postgres_admin_user (current behaviour) so this stays a
+# no-op until an env flips it. Set to "ismd_tool_app" AFTER running 01-tool.sql
+# and pointing the tool's postgres password secret at that role's password.
+variable "backend_db_user" {
+  description = "Dedicated Postgres LOGIN role for the tool backend. Empty = use the admin login. Set to 'ismd_tool_app' once db/user-separation Phase 1 is applied and the tool password secret holds that role's password."
+  type        = string
+  default     = ""
+}
+
 variable "postgres_admin_password" {
   description = "PostgreSQL admin password"
   type        = string
@@ -64,6 +75,28 @@ variable "postgres_storage_mb" {
   description = "Storage size in MB for PostgreSQL"
   type        = number
   default     = 32768 # 32GB
+}
+
+# Network access control for the public Postgres endpoint.
+# These two lists are the ONLY sources of allowed inbound IPs — there is no
+# longer a blanket "AllowAzureServices" (any Azure tenant) or "AllowAllForDev"
+# (entire internet) rule. Empty lists = no inbound access.
+variable "allow_azure_services" {
+  description = "Allow Azure-resident services (the 0.0.0.0 special rule) to reach Postgres. Required for app connectivity while the Container Apps subnet has no NAT gateway, because outbound egress is Azure's dynamic SNAT rather than a fixed IP. Set false only once a stable NAT egress IP is added to app_outbound_ips."
+  type        = bool
+  default     = true
+}
+
+variable "app_outbound_ips" {
+  description = "Stable outbound IP(s) of the apps (e.g. a NAT gateway public IP) allowlisted to reach the public Postgres endpoint. Empty while relying on allow_azure_services. NOTE: the Container Apps env *inbound* static IP is NOT the egress IP — do not use it here."
+  type        = list(string)
+  default     = []
+}
+
+variable "admin_allowed_ips" {
+  description = "Operator/admin public IP(s) allowed direct access to Postgres for troubleshooting (each becomes a single-IP firewall rule). Replaces the AllowAllForDev internet-wide rule. Empty = no direct human access."
+  type        = list(string)
+  default     = []
 }
 
 # Fuseki connection (fallback when deploy_fuseki = false)

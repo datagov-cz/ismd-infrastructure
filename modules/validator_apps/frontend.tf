@@ -1,5 +1,20 @@
 # Frontend Container App for Validator
 
+# Dedicated identity for pulling this app's secrets from the per-env Key Vault.
+# The validator frontend had no identity before Class A.
+resource "azurerm_user_assigned_identity" "frontend_kv" {
+  name                = "${var.frontend_app_name}-kv-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = "Validator"
+    Component   = "Frontend-KV"
+    ManagedBy   = "Terraform"
+  }
+}
+
 resource "azurerm_container_app" "frontend" {
   name                         = "${var.frontend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
@@ -10,6 +25,11 @@ resource "azurerm_container_app" "frontend" {
   # For Consumption profile, set to null
   # For Dedicated profile, use the provided workload profile name
   workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.frontend_kv.id]
+  }
 
   template {
     min_replicas = 1
@@ -39,7 +59,7 @@ resource "azurerm_container_app" "frontend" {
         value = var.site_status
       }
       dynamic "env" {
-        for_each = var.site_preview_secret != "" ? [1] : []
+        for_each = var.site_preview_secret != "" || var.frontend_site_preview_secret_kv_secret_id != "" ? [1] : []
         content {
           name        = "SITE_PREVIEW_SECRET"
           secret_name = "site-preview-secret"
@@ -48,6 +68,17 @@ resource "azurerm_container_app" "frontend" {
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "app-insights-connection-string"
+      }
+      # Server-side App Insights activation for the Next.js server. OTEL_SERVICE_NAME
+      # is both the per-env activation signal (instrumentation.node.ts is inert until
+      # it's set) and the cloud role name. Gated so it's a config toggle with no
+      # rebuild — see enable_frontend_app_insights for the dep-must-ship-first guard.
+      dynamic "env" {
+        for_each = var.enable_frontend_app_insights ? [1] : []
+        content {
+          name  = "OTEL_SERVICE_NAME"
+          value = "${var.frontend_app_name}-${var.environment}"
+        }
       }
 
       liveness_probe {
@@ -79,17 +110,39 @@ resource "azurerm_container_app" "frontend" {
     }
   }
 
+  # site-preview: inline only when a preview secret is set AND not yet in KV;
+  # KV reference when its secret id is supplied; absent otherwise.
   dynamic "secret" {
-    for_each = var.site_preview_secret != "" ? [1] : []
+    for_each = var.site_preview_secret != "" && var.frontend_site_preview_secret_kv_secret_id == "" ? [1] : []
     content {
       name  = "site-preview-secret"
       value = var.site_preview_secret
     }
   }
+  dynamic "secret" {
+    for_each = var.frontend_site_preview_secret_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "site-preview-secret"
+      key_vault_secret_id = var.frontend_site_preview_secret_kv_secret_id
+      identity            = azurerm_user_assigned_identity.frontend_kv.id
+    }
+  }
 
-  secret {
-    name  = "app-insights-connection-string"
-    value = var.app_insights_connection_string
+  # app-insights: two-phase KV migration (Class A).
+  dynamic "secret" {
+    for_each = var.frontend_app_insights_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "app-insights-connection-string"
+      value = var.app_insights_connection_string
+    }
+  }
+  dynamic "secret" {
+    for_each = var.frontend_app_insights_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "app-insights-connection-string"
+      key_vault_secret_id = var.frontend_app_insights_kv_secret_id
+      identity            = azurerm_user_assigned_identity.frontend_kv.id
+    }
   }
 
   ingress {

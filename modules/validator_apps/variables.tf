@@ -7,6 +7,41 @@ variable "app_insights_connection_string" {
   sensitive   = true
 }
 
+# Class A: KV secret ids — each empty = inline value, set = key_vault_secret_id
+# reference pulled by the respective app's UserAssigned identity.
+variable "backend_app_insights_kv_secret_id" {
+  description = "Versionless KV secret id for the validator backend's app-insights connection string. Empty = inline value."
+  type        = string
+  default     = ""
+}
+
+variable "enable_app_insights_agent" {
+  description = <<-EOT
+    Activate the Application Insights Java agent on the validator backend via
+    JAVA_TOOL_OPTIONS (-javaagent). Default false, and it MUST stay false until the
+    jar-bearing image is deployed to the env: enabling this injects -javaagent
+    pointing at /app/applicationinsights-agent.jar, so if the image doesn't yet
+    carry that jar (Dockerfile ADD), the JVM fails to start and the container
+    crashloops. Cut over per env (set true) only AFTER the new image ships. The
+    agent auto-reads the already-injected APPLICATIONINSIGHTS_CONNECTION_STRING for
+    its destination; an empty connection string makes it self-disable regardless.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "frontend_app_insights_kv_secret_id" {
+  description = "Versionless KV secret id for the validator frontend's app-insights connection string. Empty = inline value."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_site_preview_secret_kv_secret_id" {
+  description = "Versionless KV secret id for the validator frontend's site-preview secret. Empty = inline value (only present when site_preview_secret is set)."
+  type        = string
+  default     = ""
+}
+
 # Core Environment Variables
 variable "environment" {
   description = "Environment name (dev, test, prod)"
@@ -66,11 +101,31 @@ variable "backend_image_tag" {
   type        = string
 }
 
+variable "backend_port" {
+  description = "Port the backend Tomcat binds to; must match the running image's Spring server.port"
+  type        = number
+}
+
 # App Names
 variable "frontend_app_name" {
   description = "Name of the frontend container app"
   type        = string
   default     = "ismd-validator-frontend"
+}
+
+variable "enable_frontend_app_insights" {
+  description = <<-EOT
+    Activate server-side Application Insights on the Next.js frontend by injecting
+    OTEL_SERVICE_NAME (the cloud role name). Separate from enable_app_insights_agent
+    because the frontend gates on the @azure/monitor-opentelemetry npm dep being in
+    the frontend image, whereas the backend agent gates on the jar — different image
+    prerequisites, so they flip independently. Default false; MUST stay false until
+    the dep-bearing frontend image ships to the env. The frontend reads the
+    already-injected APPLICATIONINSIGHTS_CONNECTION_STRING for its destination.
+    Inert (register() no-ops) while OTEL_SERVICE_NAME is unset.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "backend_app_name" {
