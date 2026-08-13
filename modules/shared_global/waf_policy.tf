@@ -31,10 +31,24 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     # for the app's JSON/form POSTs and the tighter, safer default.
   }
 
-  # Rate limiting: at most `waf_rate_limit_threshold` requests per client IP per
+  # Rate limiting: at most `waf_rate_limit_threshold` requests per client per
   # `waf_rate_limit_duration` window; requests over the limit are blocked.
   # The match condition matches all traffic (every request URI contains "/"),
-  # so the limit applies gateway-wide, grouped per client IP address.
+  # so the limit applies gateway-wide.
+  #
+  # Grouped by ClientAddrXFFHeader, NOT ClientAddr: all end-user traffic reaches
+  # this gateway via the client's nginx reverse proxy (single TCP source IP), so
+  # ClientAddr would collapse the entire userbase into one bucket and throttle
+  # everyone together (observed: mass 429s on legit calls like
+  # /popisujeme/api/backend/api/user/me → "unauthorized after login"). Grouping
+  # by the X-Forwarded-For IP keys the limit on the real per-user client address.
+  #
+  # PREREQUISITE / trust boundary: XFF is client-supplied, so this is only sound
+  # if the client's nginx sets X-Forwarded-For to the true client IP in a
+  # non-spoofable way (overwrite with $remote_addr, or sanitize any inbound XFF).
+  # If nginx blindly appends to a client-sent XFF, a caller could poison/evade
+  # the per-IP grouping. Confirm nginx XFF handling before trusting this for
+  # abuse mitigation.
   custom_rules {
     name                 = "RateLimitPerClientIp"
     priority             = 10
@@ -42,7 +56,7 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     action               = "Block"
     rate_limit_duration  = var.waf_rate_limit_duration
     rate_limit_threshold = var.waf_rate_limit_threshold
-    group_rate_limit_by  = "ClientAddr"
+    group_rate_limit_by  = "ClientAddrXFFHeader"
 
     match_conditions {
       match_variables {
@@ -51,6 +65,31 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
       operator           = "Contains"
       negation_condition = false
       match_values       = ["/"]
+    }
+  }
+
+  # Scoped WAF bypass for the Keycloak admin console. The new admin console saves
+  # realm settings via JSON PUTs to /admin/realms/<realm>/ui-ext whose bodies trip
+  # DRS false positives (930120 LFI "OS File Access Attempt" + 932130 RCE "Unix
+  # Shell Expression" → anomaly score 10 → 949110 blocks with 403). This path is
+  # already gated by Keycloak admin auth, so an Allow rule scoped to it lets those
+  # requests skip managed-rule evaluation while DRS stays fully active on the
+  # public validator + tool app surfaces. Priority 20 runs AFTER the rate-limit
+  # rule (priority 10), so rate limiting still applies; the Allow match then stops
+  # further managed-rule processing for the matched request.
+  custom_rules {
+    name      = "AllowKeycloakAdmin"
+    priority  = 20
+    rule_type = "MatchRule"
+    action    = "Allow"
+
+    match_conditions {
+      match_variables {
+        variable_name = "RequestUri"
+      }
+      operator           = "BeginsWith"
+      negation_condition = false
+      match_values       = ["/popisujeme/auth/admin/"]
     }
   }
 

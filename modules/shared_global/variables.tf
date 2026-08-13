@@ -9,6 +9,12 @@ variable "domain_name_label" {
   default     = "ismd-appgw-ipv6"
 }
 
+variable "keyvault_operator_object_ids" {
+  description = "Entra object ids granted data-plane secret management (Get/List/Set/Delete/Recover) on the global Key Vault, so operators can seed/rotate secret values via CLI. Set via TF_VAR_keyvault_operator_object_ids in the gitignored shared-global env file; never commit personal principal ids. Empty = vault created with no operator policy."
+  type        = list(string)
+  default     = []
+}
+
 # --- Azure Communication Services (ACS) Email — Keycloak SMTP sender ---
 
 variable "deploy_acs" {
@@ -140,9 +146,9 @@ variable "backend_fqdn_prod" {
 }
 
 variable "ssl_certificate_keyvault_secret_id" {
-  description = "Key Vault secret ID for SSL certificate (supports versioned or versionless URLs)"
+  description = "Key Vault secret ID for the AppGW HTTPS-listener cert (versionless). Sourced from our own ismd-kv-global; the AppGW's ismd-identity is granted read on that vault in keyvault.tf. This cert only backs the internal nginx→AppGW hop (public TLS terminates on the nginx reverse proxy)."
   type        = string
-  default     = "https://ismd-keyvault.vault.azure.net/secrets/datagov-cz"
+  default     = "https://ismd-kv-global.vault.azure.net/secrets/ismd-prod-https-cert"
 }
 
 variable "frontend_app_name" {

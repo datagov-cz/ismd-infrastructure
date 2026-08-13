@@ -3,6 +3,16 @@ output "resource_group_name" {
   value       = azurerm_resource_group.shared_global.name
 }
 
+output "global_keyvault_name" {
+  description = "Global Key Vault name. Seed secret values with: az keyvault secret set --vault-name <this> --name <secret> ..."
+  value       = azurerm_key_vault.global.name
+}
+
+output "global_keyvault_uri" {
+  description = "Global Key Vault URI. Base for versionless secret ids (e.g. the AppGW cert) used in key_vault_secret_id references."
+  value       = azurerm_key_vault.global.vault_uri
+}
+
 output "vnet_id" {
   description = "The ID of the shared global virtual network."
   value       = azurerm_virtual_network.shared_global.id

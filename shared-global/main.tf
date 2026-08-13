@@ -17,6 +17,9 @@ module "shared_global" {
   source   = "../modules/shared_global"
   location = var.location
 
+  # Global Key Vault operator grant (seed/rotate secret values via CLI)
+  keyvault_operator_object_ids = var.keyvault_operator_object_ids
+
   # Construct FQDNs from environment-specific domains (backward compatible with old variable)
   frontend_fqdn = var.frontend_fqdn != "" ? var.frontend_fqdn : (
     var.container_app_environment_domain_dev != "" ? "${var.frontend_app_name}-dev.${var.container_app_environment_domain_dev}" :
@@ -54,10 +57,26 @@ module "shared_global" {
   container_app_environment_domain_dev  = var.container_app_environment_domain_dev
   container_app_environment_domain_test = var.container_app_environment_domain_test
   container_app_environment_domain_prod = var.container_app_environment_domain_prod
+
+  # Per-user rate limit. The rule groups by ClientAddrXFFHeader (real client IP
+  # from X-Forwarded-For), so this threshold is per end user, not per proxy —
+  # see the RateLimitPerClientIp rule + trust-boundary note in waf_policy.tf.
+  # 600/min gives headroom for the SPA's first-load burst (many icon/asset + RSC
+  # requests per navigation, visible in the firewall log); lower it once we see
+  # real per-user rates now that grouping is meaningful.
+  waf_rate_limit_threshold = 600
 }
 
 output "resource_group_name" {
   value = module.shared_global.resource_group_name
+}
+
+output "global_keyvault_name" {
+  value = module.shared_global.global_keyvault_name
+}
+
+output "global_keyvault_uri" {
+  value = module.shared_global.global_keyvault_uri
 }
 
 output "vnet_id" {

@@ -4,6 +4,12 @@ variable "location" {
   default     = "germanywestcentral"
 }
 
+variable "keyvault_operator_object_ids" {
+  description = "Entra object ids granted data-plane secret management on the global Key Vault, so operators can seed/rotate secret values via CLI. Set via TF_VAR_keyvault_operator_object_ids in the gitignored shared-global env file; never commit personal principal ids. Empty = vault created with no operator policy."
+  type        = list(string)
+  default     = []
+}
+
 variable "frontend_app_name" {
   description = "Base name of the frontend container app (without environment suffix)"
   type        = string

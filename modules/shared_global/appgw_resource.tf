@@ -15,6 +15,14 @@ resource "azurerm_application_gateway" "appgw" {
     prevent_destroy = true
   }
 
+  # The HTTPS-listener cert is pulled from ismd-kv-global via the AppGW's
+  # ismd-identity. That identity's read access is granted by the access policy
+  # below, which references only a plain-string secret id — so without this
+  # explicit edge Terraform could update the cert before the policy lands and
+  # Azure would reject the pull. Ordering the policy first makes the migration
+  # single-pass.
+  depends_on = [azurerm_key_vault_access_policy.appgw]
+
   identity {
     type = "UserAssigned"
     identity_ids = [

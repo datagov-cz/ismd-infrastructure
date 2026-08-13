@@ -2,14 +2,14 @@
 #
 # Provides the sender side of Keycloak's email (password reset, verification) for the
 # `ismd` realm across all envs. Lives in shared-global because one ACS instance serves
-# DEV/TEST/PROD Keycloak (see docs/keycloak-smtp-plan.md).
+# DEV/TEST/PROD Keycloak.
 #
 # IMPORTANT — what this file does NOT create:
 #   The SMTP *authentication principal* (Entra app registration + client secret +
 #   "Communication and Email Service Owner" role assignment on the ACS resource +
 #   the ACS "SMTP Username" mapping) is NOT defined here. The terraform SP is
 #   Contributor-only and cannot create role assignments or Entra app registrations.
-#   That piece is provisioned out-of-band — see docs/runbooks/acs-smtp-setup.md.
+#   That piece is provisioned out-of-band — see docs/acs-smtp-setup.md.
 #
 # Domains:
 #   - Azure-managed domain: auto-verified, sendable immediately, sender is
