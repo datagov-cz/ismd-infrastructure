@@ -8,8 +8,14 @@ terraform {
 
   required_providers {
     keycloak = {
-      source  = "keycloak/keycloak"
-      version = "~> 5.0"
+      source = "keycloak/keycloak"
+      # Pinned exactly, NOT "~> 5.0": this provider must stay in step with the
+      # Keycloak server it talks to (tool_keycloak_image_tag, currently 24.0.2).
+      # 5.8.0 sends the newer `bruteForceStrategy` realm field, which 24.0.2 rejects
+      # outright — any realm update fails with a 400 "Unrecognized field". 5.7.0 does
+      # not send it. A floating constraint silently upgraded us into that break.
+      # Bump this only together with the Keycloak image, and re-check compatibility.
+      version = "5.7.0"
     }
     azurerm = {
       source  = "hashicorp/azurerm"

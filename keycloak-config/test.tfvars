@@ -13,3 +13,14 @@ reset_password_allowed = false
 verify_email           = false
 
 smtp_enabled = false
+
+# --- CAAIS (TEST gateway) ---
+enable_caais = true
+# CAAIS calls our TEST environment "stage" — hence ISMD_stage, not ISMD_test.
+caais_client_id         = "ISMD_stage" # the AIS shortcut ("zkratka") in CAAIS; not a secret
+caais_authorization_url = "https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/authorize"
+caais_token_url         = "https://cert-openidconnectapi.caais-test-ext.gov.cz/oauth2/token"
+caais_jwks_url          = "https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/jwks"
+caais_logout_url        = "https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/end_session"
+caais_user_info_url     = "https://rest-openidconnectapi.caais-test-ext.gov.cz/userinfo"
+caais_issuer            = "https://rest-openidconnectapi.caais-test-ext.gov.cz/" # trailing slash is significant — must match the `iss` claim

@@ -46,7 +46,7 @@ gitignored `.env.<env>`. Repeat with `test` / `prod` and the matching
 
 `smtp_enabled` stays `false` until the ACS SMTP username/password are delivered
 and the sending domain verifies. The credentials are supplied via `TF_VAR_*`,
-not committed. See `docs/runbooks/acs-smtp-setup.md`.
+not committed. See `docs/acs-smtp-setup.md`.
 
 ## Provider auth
 

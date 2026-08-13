@@ -19,10 +19,25 @@ module "ismd_realm" {
   additional_web_origins               = var.local_dev_origins
   additional_post_logout_redirect_uris = [for o in var.local_dev_origins : "${o}/*"]
 
+  sso_session_idle_timeout = var.sso_session_idle_timeout
+  sso_session_max_lifespan = var.sso_session_max_lifespan
+
   smtp_enabled  = var.smtp_enabled
   smtp_from     = var.smtp_from
   smtp_username = var.smtp_username
   smtp_password = var.smtp_password
+
+  # CAAIS brokered login. URLs are pre-filled per env in tfvars; enable_caais
+  # stays false until the client_id is issued and the container-side mTLS
+  # keystore is live.
+  enable_caais            = var.enable_caais
+  caais_client_id         = var.caais_client_id
+  caais_authorization_url = var.caais_authorization_url
+  caais_token_url         = var.caais_token_url
+  caais_jwks_url          = var.caais_jwks_url
+  caais_user_info_url     = var.caais_user_info_url
+  caais_issuer            = var.caais_issuer
+  caais_logout_url        = var.caais_logout_url
 }
 
 output "ismd_realm_id" {

@@ -20,6 +20,13 @@ resource "keycloak_realm" "ismd" {
   # Pin to the realm's current value so import is a no-op (also the KC default).
   default_signature_algorithm = "RS256"
 
+  # Session lifetimes. Sized so a dev logs in once and stays logged in for the
+  # workday: idle ≥ longest inactivity gap, max = hard ceiling before re-auth.
+  # Access tokens stay short (KC default ~5m) and are refreshed under the hood —
+  # do NOT lengthen those for "stay logged in".
+  sso_session_idle_timeout = var.sso_session_idle_timeout
+  sso_session_max_lifespan = var.sso_session_max_lifespan
+
   # Only rendered once real ACS SMTP credentials are supplied (smtp_enabled).
   dynamic "smtp_server" {
     for_each = var.smtp_enabled ? [1] : []

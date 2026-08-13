@@ -27,6 +27,20 @@ variable "ssl_required" {
   default     = "external"
 }
 
+# --- Session lifetimes ---
+
+variable "sso_session_idle_timeout" {
+  description = "SSO session idle timeout (Go duration, e.g. '10h'). How long with no activity before the session dies. Set ≥ longest expected inactivity gap so a dev isn't logged out over lunch/meetings."
+  type        = string
+  default     = "10h"
+}
+
+variable "sso_session_max_lifespan" {
+  description = "SSO session max lifespan (Go duration, e.g. '10h'). Hard ceiling regardless of activity; after this the user must re-authenticate."
+  type        = string
+  default     = "10h"
+}
+
 # --- Login / registration flags ---
 
 variable "login_with_email_allowed" {
@@ -106,6 +120,68 @@ variable "additional_post_logout_redirect_uris" {
   description = "Extra post-logout redirect URIs (e.g. http://localhost:3000/*). DEV-only; keep empty on TEST/PROD."
   type        = list(string)
   default     = []
+}
+
+# --- CAAIS identity provider (brokered OIDC, mTLS) ---
+
+variable "enable_caais" {
+  description = "Render the CAAIS identity provider + claim mappers. Keep false until the client_id and endpoint URLs are set per env AND the container-side mTLS keystore is live."
+  type        = bool
+  default     = false
+}
+
+variable "caais_client_id" {
+  description = "CAAIS-issued Relying Party (AIS) identifier. Not a secret. Required when enable_caais = true."
+  type        = string
+  default     = ""
+}
+
+variable "caais_authorization_url" {
+  description = "CAAIS authorization endpoint (rest- host), e.g. https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/authorize"
+  type        = string
+  default     = ""
+}
+
+variable "caais_token_url" {
+  description = "CAAIS token endpoint — SEPARATE mTLS host (cert-), e.g. https://cert-openidconnectapi.caais-test-ext.gov.cz/oauth2/token"
+  type        = string
+  default     = ""
+}
+
+variable "caais_jwks_url" {
+  description = "CAAIS JWKS endpoint (rest- host), e.g. https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/jwks"
+  type        = string
+  default     = ""
+}
+
+variable "caais_user_info_url" {
+  description = "CAAIS userinfo endpoint if used; leave empty to rely on id_token claims."
+  type        = string
+  default     = ""
+}
+
+variable "caais_issuer" {
+  description = "CAAIS issuer (iss) for token validation; take from the .well-known/openid-configuration. Empty = skip issuer validation."
+  type        = string
+  default     = ""
+}
+
+variable "caais_logout_url" {
+  description = "CAAIS end_session endpoint (rest- host), e.g. https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/end_session. Set so Keycloak propagates logout to CAAIS (single-logout). Empty = no IdP logout URL."
+  type        = string
+  default     = ""
+}
+
+variable "caais_default_scopes" {
+  description = "Scopes requested from CAAIS. Start minimal; widen later with a plain apply (users re-login to pick up new claims)."
+  type        = string
+  default     = "openid profile"
+}
+
+variable "caais_validate_signature" {
+  description = "Validate CAAIS id_token signatures against jwks_url. Requires caais_jwks_url set."
+  type        = bool
+  default     = true
 }
 
 # --- SMTP (ACS) ---

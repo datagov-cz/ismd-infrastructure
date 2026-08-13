@@ -60,6 +60,73 @@ variable "verify_email" {
   default = false
 }
 
+# --- Session lifetimes ---
+# Both default to the module's 10h; DEV overrides to 24h so a dev stays logged in
+# across a full day of testing. Access tokens stay short and refresh underneath —
+# these are the SSO session bounds, not token lifetimes.
+
+variable "sso_session_idle_timeout" {
+  description = "SSO session idle timeout (Go duration). How long with no activity before the session dies."
+  type        = string
+  default     = "10h"
+}
+
+variable "sso_session_max_lifespan" {
+  description = "SSO session max lifespan (Go duration). Hard ceiling regardless of activity."
+  type        = string
+  default     = "10h"
+}
+
+# --- CAAIS brokered login ---
+
+variable "enable_caais" {
+  description = "Render the CAAIS identity provider in the realm. Keep false until client_id is issued and the container mTLS keystore is live."
+  type        = bool
+  default     = false
+}
+
+variable "caais_client_id" {
+  description = "CAAIS-issued AIS/client identifier (not a secret)."
+  type        = string
+  default     = ""
+}
+
+variable "caais_authorization_url" {
+  description = "CAAIS authorize endpoint (rest- host)."
+  type        = string
+  default     = ""
+}
+
+variable "caais_token_url" {
+  description = "CAAIS token endpoint (cert- mTLS host)."
+  type        = string
+  default     = ""
+}
+
+variable "caais_jwks_url" {
+  description = "CAAIS JWKS endpoint (rest- host)."
+  type        = string
+  default     = ""
+}
+
+variable "caais_user_info_url" {
+  description = "CAAIS userinfo endpoint; empty to rely on id_token claims."
+  type        = string
+  default     = ""
+}
+
+variable "caais_issuer" {
+  description = "CAAIS issuer (iss) from .well-known; empty to skip issuer validation."
+  type        = string
+  default     = ""
+}
+
+variable "caais_logout_url" {
+  description = "CAAIS end_session endpoint (rest- host) for Keycloak->CAAIS logout propagation."
+  type        = string
+  default     = ""
+}
+
 # --- SMTP (ACS) — supply once Layer A creds exist ---
 
 variable "smtp_enabled" {
