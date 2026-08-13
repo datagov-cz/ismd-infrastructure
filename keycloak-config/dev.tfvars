@@ -38,3 +38,23 @@ caais_jwks_url          = "https://rest-openidconnectapi.caais-test-ext.gov.cz/o
 caais_logout_url        = "https://rest-openidconnectapi.caais-test-ext.gov.cz/oauth2/end_session"
 caais_user_info_url     = "https://rest-openidconnectapi.caais-test-ext.gov.cz/userinfo"
 caais_issuer            = "https://rest-openidconnectapi.caais-test-ext.gov.cz/" # trailing slash is significant — must match the `iss` claim
+
+# --- NIA (direct Národní bod registration; uses the TEST národní bod) ---
+# Values taken from NIA's discovery document, which lives at a NON-STANDARD path:
+#   https://tnia.identita.gov.cz/fpsts/oidc/openid-configuration
+# (no .well-known). It supersedes the SeP handbook, which lists only 4 of the 6
+# endpoints. Flip enable_nia to true once the "Unikátní URL" below is registered
+# and TF_VAR_nia_client_secret is set. See NIA-INTEGRATION-REQUEST.md.
+enable_nia            = false
+nia_client_id         = "" # = "https://oha03.dia.gov.cz/popisujeme" once registered
+nia_authorization_url = "https://tnia.identita.gov.cz/FPSTS/oidc/authorize"
+nia_token_url         = "https://tnia.identita.gov.cz/FPSTS/oidc/token"
+nia_logout_url        = "https://tnia.identita.gov.cz/FPSTS/oidc/endsession"
+nia_user_info_url     = "https://tnia.identita.gov.cz/FPSTS/oidc/userinfo"
+nia_jwks_url          = "https://tnia.identita.gov.cz/FPSTS/oidc/openid-configuration-jwks"
+# A URN, not a URL — and the SAME on test and prod, so it cannot tell the two apart.
+nia_issuer             = "urn:microsoft:cgg2010:fpsts"
+nia_validate_signature = true
+# "profile" is not a supported NIA scope. Append the LoA scope (loalow /
+# loasubstantial / loahigh) once DIA settles the required level.
+nia_default_scopes = "openid"

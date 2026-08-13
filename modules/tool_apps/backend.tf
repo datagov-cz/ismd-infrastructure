@@ -10,6 +10,23 @@ locals {
   all_origins = concat(local.base_origins, var.additional_cors_origins)
 }
 
+# Dedicated identity for pulling this app's secrets from the per-env Key Vault.
+# Pre-grantable, unlike SystemAssigned — the access policy can be created before the
+# app exists. Declaration was lost in the nb/recovery restore while the resource stayed
+# in state (and in Azure); restored 2026-08-06 so code matches reality.
+resource "azurerm_user_assigned_identity" "backend_kv" {
+  name                = "${var.backend_app_name}-kv-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "Backend-KV"
+    ManagedBy   = "Terraform"
+  }
+}
+
 resource "azurerm_container_app" "backend" {
   name                         = "${var.backend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
@@ -20,7 +37,8 @@ resource "azurerm_container_app" "backend" {
   workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
 
   identity {
-    type = "SystemAssigned"
+    type         = "SystemAssigned, UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.backend_kv.id]
   }
 
   ingress {
@@ -67,16 +85,43 @@ resource "azurerm_container_app" "backend" {
         value = var.deploy_postgres ? "jdbc:postgresql://ismd-tool-postgres-${var.environment}.postgres.database.azure.com:5432/${var.postgres_db_name}?sslmode=require" : var.postgres_url
       }
       env {
-        name  = "POSTGRES_USER"
-        value = var.deploy_postgres ? var.postgres_admin_user : var.postgres_user
+        name = "POSTGRES_USER"
+        # Per-app user separation: dedicated role when set, else admin login. See backend_db_user.
+        value = var.backend_db_user != "" ? var.backend_db_user : (var.deploy_postgres ? var.postgres_admin_user : var.postgres_user)
       }
       env {
         name        = "POSTGRES_PASSWORD"
         secret_name = "postgres-password"
       }
+      # Hikari pool caps. LOAD-BEARING — the Postgres server is small and its
+      # max_connections is limited, and every tenant on it (tool, keycloak, ai)
+      # sizes its pool against the same ceiling. A reconnect storm has already
+      # exhausted the 50-connection server once; see the idle-session timeouts in
+      # database.tf. Do not raise without re-budgeting the other tenants.
+      # Declaration was lost in the nb/recovery restore while the deployed apps
+      # kept the values — restored 2026-08-12 so code matches reality.
+      env {
+        name  = "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE"
+        value = "10"
+      }
+      env {
+        name  = "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE"
+        value = "2"
+      }
+      env {
+        name  = "OUTBOX_DONE_RETENTION"
+        value = var.outbox_done_retention
+      }
       env {
         name  = "FUSEKI_URL"
         value = var.deploy_fuseki ? "https://ismd-tool-fuseki-${var.environment}.internal.${var.container_app_environment_default_domain}/ismd-tool-dataset" : var.fuseki_url
+      }
+      # Internal call to the validator backend over the shared Container App
+      # Environment — app name only, ingress listens on 80, so no port. Also lost
+      # in the nb/recovery restore; the variable survived, the env block didn't.
+      env {
+        name  = "VALIDATION_SERVICE_URL"
+        value = "http://${var.validator_backend_app_name}/validujeme"
       }
       env {
         name  = "KEYCLOAK_ISSUER_URI"
@@ -93,6 +138,28 @@ resource "azurerm_container_app" "backend" {
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "app-insights-connection-string"
+      }
+      # App Insights Java agent activation. The agent jar is baked into the image;
+      # these envs (a) tell the JVM to load it and (b) pin cloud_RoleName so KQL /
+      # the Failures blade filter cleanly. Gated so instrumentation is a per-env
+      # config toggle with no image rebuild — see enable_app_insights_agent for the
+      # image-must-ship-first ordering constraint. DEV only today; TEST/PROD leave
+      # it false until their jar-bearing images ship.
+      # Lost in the nb/recovery restore (the variable survived, these blocks did
+      # not) — restored 2026-08-12 so code matches the deployed DEV backend.
+      dynamic "env" {
+        for_each = var.enable_app_insights_agent ? [1] : []
+        content {
+          name  = "JAVA_TOOL_OPTIONS"
+          value = "-javaagent:/app/applicationinsights-agent.jar"
+        }
+      }
+      dynamic "env" {
+        for_each = var.enable_app_insights_agent ? [1] : []
+        content {
+          name  = "APPLICATIONINSIGHTS_ROLE_NAME"
+          value = "${var.backend_app_name}-${var.environment}"
+        }
       }
       liveness_probe {
         transport        = "HTTP"
@@ -122,19 +189,57 @@ resource "azurerm_container_app" "backend" {
     }
   }
 
-  secret {
-    name  = "postgres-password"
-    value = var.deploy_postgres ? var.postgres_admin_password : var.postgres_password
+  # Class A secrets: empty KV id = inline value, set = key_vault_secret_id reference
+  # pulled by the backend's UserAssigned identity. The KV form was lost in the
+  # nb/recovery restore while the deployed apps kept the references — restored
+  # 2026-08-12 so code matches reality. Applying the inline form against an env
+  # whose TF_VAR_* secrets are unset would overwrite live secrets with "".
+  dynamic "secret" {
+    for_each = var.postgres_password_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "postgres-password"
+      value = var.deploy_postgres ? var.postgres_admin_password : var.postgres_password
+    }
+  }
+  dynamic "secret" {
+    for_each = var.postgres_password_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "postgres-password"
+      key_vault_secret_id = var.postgres_password_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backend_kv.id
+    }
   }
 
-  secret {
-    name  = "keycloak-client-secret"
-    value = var.keycloak_client_secret
+  dynamic "secret" {
+    for_each = var.keycloak_client_secret_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "keycloak-client-secret"
+      value = var.keycloak_client_secret
+    }
+  }
+  dynamic "secret" {
+    for_each = var.keycloak_client_secret_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "keycloak-client-secret"
+      key_vault_secret_id = var.keycloak_client_secret_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backend_kv.id
+    }
   }
 
-  secret {
-    name  = "app-insights-connection-string"
-    value = var.app_insights_connection_string
+  dynamic "secret" {
+    for_each = var.app_insights_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "app-insights-connection-string"
+      value = var.app_insights_connection_string
+    }
+  }
+  dynamic "secret" {
+    for_each = var.app_insights_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "app-insights-connection-string"
+      key_vault_secret_id = var.app_insights_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backend_kv.id
+    }
   }
 
   tags = {

@@ -184,6 +184,81 @@ variable "caais_validate_signature" {
   default     = true
 }
 
+# --- NIA identity provider (direct Národní bod registration, brokered OIDC) ---
+
+variable "enable_nia" {
+  description = "Render the NIA identity provider + claim mappers. Keep false until nia_client_id (the registered Unikátní URL) is issued by the národní bod."
+  type        = bool
+  default     = false
+}
+
+variable "nia_client_id" {
+  description = "The 'Unikátní URL' registered with NIA — NIA uses it as the OIDC client_id (SeP handbook ch. 8.3). Must match the registration exactly. Not a secret. Required when enable_nia = true."
+  type        = string
+  default     = ""
+}
+
+variable "nia_client_secret" {
+  description = "Shared secret for the NIA token endpoint. REQUIRED when enable_nia = true — NIA advertises client_secret_post as its only supported auth method, so unlike CAAIS there is no certificate fallback. Supply via TF_VAR_nia_client_secret, never in tfvars."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "nia_client_auth_method" {
+  description = "Keycloak clientAuthMethod for the NIA token request body. client_secret_post is the only value NIA's discovery document advertises; do not change without checking it."
+  type        = string
+  default     = "client_secret_post"
+}
+
+variable "nia_authorization_url" {
+  description = "NIA authorize endpoint, e.g. https://tnia.identita.gov.cz/fpsts/oidc/authorize (test) or https://nia.identita.gov.cz/fpsts/oidc/authorize (prod)."
+  type        = string
+  default     = ""
+}
+
+variable "nia_token_url" {
+  description = "NIA token endpoint, e.g. https://tnia.identita.gov.cz/fpsts/oidc/token. Unlike CAAIS this is the SAME host as authorize — there is no separate mTLS host."
+  type        = string
+  default     = ""
+}
+
+variable "nia_jwks_url" {
+  description = "NIA JWKS endpoint, e.g. https://tnia.identita.gov.cz/FPSTS/oidc/openid-configuration-jwks. Absent from the SeP handbook but present in the discovery document at /fpsts/oidc/openid-configuration. Keys are RS256."
+  type        = string
+  default     = ""
+}
+
+variable "nia_user_info_url" {
+  description = "NIA userinfo endpoint, e.g. https://tnia.identita.gov.cz/FPSTS/oidc/userinfo. Absent from the handbook, present in discovery. Empty to rely on id_token claims."
+  type        = string
+  default     = ""
+}
+
+variable "nia_issuer" {
+  description = "NIA issuer (iss). It is the URN 'urn:microsoft:cgg2010:fpsts' — NOT a URL, and IDENTICAL on test and prod, so it cannot distinguish environments. Empty = skip issuer validation."
+  type        = string
+  default     = ""
+}
+
+variable "nia_logout_url" {
+  description = "NIA endsession endpoint, e.g. https://tnia.identita.gov.cz/fpsts/oidc/endsession. Set so Keycloak propagates logout to NIA — the národní bod uses SSO across all service providers, so without it the session survives our logout."
+  type        = string
+  default     = ""
+}
+
+variable "nia_default_scopes" {
+  description = "Scopes requested from NIA. NOTE: 'profile' is NOT in NIA's scopes_supported — do not copy the CAAIS value. Supported: openid, forceauthn, publicsector, privatesector, ispassive, and the LoA scopes loalow/loasubstantial/loahigh/loamin/loamax/loabetter/loaexact. Append the LoA scope once DIA settles the required level (alternatively pass it via acr_values)."
+  type        = string
+  default     = "openid"
+}
+
+variable "nia_validate_signature" {
+  description = "Validate NIA id_token signatures against nia_jwks_url. Defaults TRUE: NIA publishes a JWKS endpoint in its discovery document and signs with RS256."
+  type        = bool
+  default     = true
+}
+
 # --- SMTP (ACS) ---
 
 variable "smtp_enabled" {

@@ -38,6 +38,23 @@ module "ismd_realm" {
   caais_user_info_url     = var.caais_user_info_url
   caais_issuer            = var.caais_issuer
   caais_logout_url        = var.caais_logout_url
+
+  # NIA brokered login — direct registration with the národní bod, parallel to
+  # CAAIS. Endpoints are pre-filled per env in tfvars; enable_nia stays false
+  # until the "Unikátní URL" is registered on identita.gov.cz and returned as
+  # the client_id.
+  enable_nia             = var.enable_nia
+  nia_client_id          = var.nia_client_id
+  nia_client_secret      = var.nia_client_secret
+  nia_client_auth_method = var.nia_client_auth_method
+  nia_authorization_url  = var.nia_authorization_url
+  nia_token_url          = var.nia_token_url
+  nia_jwks_url           = var.nia_jwks_url
+  nia_user_info_url      = var.nia_user_info_url
+  nia_issuer             = var.nia_issuer
+  nia_logout_url         = var.nia_logout_url
+  nia_default_scopes     = var.nia_default_scopes
+  nia_validate_signature = var.nia_validate_signature
 }
 
 output "ismd_realm_id" {

@@ -127,6 +127,81 @@ variable "caais_logout_url" {
   default     = ""
 }
 
+# --- NIA (direct Národní bod registration) ---
+
+variable "enable_nia" {
+  description = "Render the NIA identity provider in the realm. Keep false until the 'Unikátní URL' is registered on identita.gov.cz and usable as client_id."
+  type        = bool
+  default     = false
+}
+
+variable "nia_client_id" {
+  description = "The registered 'Unikátní URL' — NIA uses it as the OIDC client_id. Must match the registration exactly."
+  type        = string
+  default     = ""
+}
+
+variable "nia_client_secret" {
+  description = "Shared secret for the NIA token endpoint, if one is issued. Supply via TF_VAR_nia_client_secret — never commit."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "nia_client_auth_method" {
+  description = "Keycloak clientAuthMethod for the NIA token request body."
+  type        = string
+  default     = "client_secret_post"
+}
+
+variable "nia_authorization_url" {
+  description = "NIA authorize endpoint."
+  type        = string
+  default     = ""
+}
+
+variable "nia_token_url" {
+  description = "NIA token endpoint (same host as authorize)."
+  type        = string
+  default     = ""
+}
+
+variable "nia_jwks_url" {
+  description = "NIA JWKS endpoint (from the discovery document, not the handbook)."
+  type        = string
+  default     = ""
+}
+
+variable "nia_user_info_url" {
+  description = "NIA userinfo endpoint; empty to rely on id_token claims."
+  type        = string
+  default     = ""
+}
+
+variable "nia_issuer" {
+  description = "NIA issuer (iss) — the URN urn:microsoft:cgg2010:fpsts, identical on test and prod. Empty to skip issuer validation."
+  type        = string
+  default     = ""
+}
+
+variable "nia_logout_url" {
+  description = "NIA endsession endpoint for Keycloak->NIA logout propagation."
+  type        = string
+  default     = ""
+}
+
+variable "nia_default_scopes" {
+  description = "Scopes requested from NIA. 'profile' is NOT supported; append a LoA scope once DIA settles the level."
+  type        = string
+  default     = "openid"
+}
+
+variable "nia_validate_signature" {
+  description = "Validate NIA id_token signatures against nia_jwks_url."
+  type        = bool
+  default     = true
+}
+
 # --- SMTP (ACS) — supply once Layer A creds exist ---
 
 variable "smtp_enabled" {
