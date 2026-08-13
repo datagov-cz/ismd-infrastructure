@@ -28,6 +28,21 @@ output "tool_backend_fqdn" {
   value = var.deploy_tool_apps ? module.tool_apps[0].backend_fqdn : null
 }
 
+output "tool_caais_redirect_uri" {
+  description = "redirect_uri to register with CAAIS for this environment."
+  value       = var.deploy_tool_apps ? module.tool_apps[0].keycloak_caais_redirect_uri : null
+}
+
+output "env_keyvault_name" {
+  description = "Per-env Key Vault name. Seed secret values with: az keyvault secret set --vault-name <this> --name <secret> ..."
+  value       = azurerm_key_vault.env.name
+}
+
+output "env_keyvault_uri" {
+  description = "Per-env Key Vault URI. Base for versionless secret ids used in key_vault_secret_id references."
+  value       = azurerm_key_vault.env.vault_uri
+}
+
 output "shared_container_app_environment_id" {
   description = "ID of the shared Container App Environment"
   value       = module.shared.shared_container_app_environment_id

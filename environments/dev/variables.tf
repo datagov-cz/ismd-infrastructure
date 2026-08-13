@@ -13,7 +13,7 @@ variable "deploy_monitoring" {
 }
 
 variable "paging_email_recipients" {
-  description = "Email addresses (or one mail-enabled group address) that receive paging-tier alerts. Empty list → no paging action group is created. Use Plan A (5 hardcoded individuals) until the Entra mail-enabled group exists; then swap to a single group address."
+  description = "Email addresses (or one mail-enabled group address) that receive paging-tier alerts. Empty list → no paging action group is created. Use hardcoded individuals until the Entra mail-enabled group exists; then swap to a single group address."
   type        = list(string)
   default     = []
 }
@@ -83,6 +83,17 @@ variable "backend_image" {
 }
 
 
+
+variable "backend_port" {
+  description = "Port the backend Tomcat binds to; must match the running image's Spring server.port"
+  type        = number
+  default     = 8082
+
+  validation {
+    condition     = var.backend_port > 0 && var.backend_port < 65536
+    error_message = "The backend_port must be a valid TCP port (1-65535)."
+  }
+}
 
 variable "backend_image_tag" {
   description = "Tag for the backend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
@@ -176,6 +187,12 @@ variable "tool_backend_app_name" {
 }
 
 # Tool Database & Fuseki Configuration
+variable "admin_allowed_ips" {
+  description = "Operator/admin public IP(s) allowed direct access to the Tool Postgres server. Set via TF_VAR_admin_allowed_ips in .env.<env>."
+  type        = list(string)
+  default     = []
+}
+
 variable "tool_postgres_url" {
   description = "JDBC URL for Tool PostgreSQL"
   type        = string
@@ -255,15 +272,15 @@ variable "tool_enable_caais" {
 }
 
 variable "tool_keycloak_image" {
-  description = "Base image for Keycloak container app"
+  description = "Base image for Keycloak container app (custom ISMD image: stock Keycloak + baked login theme)"
   type        = string
-  default     = "quay.io/keycloak/keycloak"
+  default     = "ghcr.io/datagov-cz/ismd-tool-keycloak-dev"
 }
 
 variable "tool_keycloak_image_tag" {
-  description = "Tag for Keycloak container app image"
+  description = "Tag for Keycloak container app image (CI publishes latest + 0.0.1-<sha>)"
   type        = string
-  default     = "24.0.2"
+  default     = "latest"
 }
 
 variable "tool_keycloak_app_name" {
@@ -309,6 +326,12 @@ variable "tool_keycloak_client_id" {
   default     = "ismd-app"
 }
 
+variable "tool_keycloak_idp_hint" {
+  description = "Keycloak IdP alias to redirect straight to (e.g. \"caais\"), skipping the Keycloak login page. Empty shows the Keycloak page."
+  type        = string
+  default     = ""
+}
+
 variable "tool_keycloak_client_secret" {
   description = "OIDC client secret used by tool apps"
   type        = string
@@ -322,8 +345,123 @@ variable "tool_caais_client_id" {
   default     = ""
 }
 
+variable "tool_caais_p12_kv_secret_id" {
+  description = "KV secret id in ismd-kv-<env> yielding the base64 CAAIS client PKCS12 — normally the auto-exposed secret of the CAAIS KV Certificate object. Empty = CAAIS mTLS keystore not yet wired."
+  type        = string
+  default     = ""
+}
+
+variable "tool_caais_keystore_password_kv_secret_id" {
+  description = "KV secret id for the CAAIS PKCS12 keystore password."
+  type        = string
+  default     = ""
+}
+
+
+variable "tool_app_insights_kv_secret_id" {
+  description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-dev.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_backend_db_user" {
+  description = "Dedicated Postgres LOGIN role for the tool backend (e.g. ismd_tool_app). Empty = admin login. Set via .env.dev after db/user-separation Phase 1."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_db_user" {
+  description = "Dedicated Postgres LOGIN role for Keycloak (e.g. ismd_keycloak_app). Empty = admin login. Cut over last. Set via .env.dev after db/user-separation Phase 1."
+  type        = string
+  default     = ""
+}
+
+variable "ai_db_user" {
+  description = "Postgres LOGIN role for the AI app. Defaults to the admin login; set to 'ismd_ai_app' after db/user-separation Phase 1. Set via .env.dev."
+  type        = string
+  default     = "ismdadmin"
+}
+
+variable "tool_postgres_password_kv_secret_id" {
+  description = "Class A: versionless KV secret id for the tool backend's postgres password (e.g. https://ismd-kv-dev.vault.azure.net/secrets/postgres-password). Empty = inline value. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_client_secret_kv_secret_id" {
+  description = "Class A: versionless KV secret id for the tool backend's keycloak client secret (e.g. https://ismd-kv-dev.vault.azure.net/secrets/keycloak-client-secret). Empty = inline value. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_nextauth_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's NextAuth secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_keycloak_client_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's keycloak client secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_site_preview_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's site-preview secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_backend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the validator backend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_frontend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the validator frontend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_frontend_site_preview_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the validator frontend's site-preview secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_admin_password_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak admin password. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_db_password_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak DB password (point at the same postgres-password secret when deploy_postgres). Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak container's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
+  type        = list(string)
+  default     = []
+}
+
+variable "keyvault_operator_object_ids" {
+  description = "Entra object ids granted data-plane secret management (Get/List/Set/Delete/Recover) on the per-env Key Vault, so operators can seed/rotate secret values via CLI. Set via TF_VAR_keyvault_operator_object_ids in the gitignored .env.<env>; never commit personal principal ids. Empty = vault created with no operator policy."
   type        = list(string)
   default     = []
 }
@@ -332,6 +470,126 @@ variable "deploy_tool_apps" {
   description = "Whether to deploy Tool apps (set to false to deploy only Validator)"
   type        = bool
   default     = true
+}
+
+# --- AI apps (ismd-ai semantic modeling assistant) -----------------------
+# Internal-only Spring Boot service. Its Postgres DB lives on the tool's server,
+# so deploy_ai_apps requires deploy_tool_apps.
+
+variable "deploy_ai_apps" {
+  description = "Whether to deploy the AI apps (ismd-ai). Requires deploy_tool_apps."
+  type        = bool
+  default     = false
+}
+
+variable "ai_resource_group_name" {
+  description = "Resource group for the AI container app"
+  type        = string
+  default     = "ismd-ai-dev"
+}
+
+variable "ai_backend_app_name" {
+  description = "Base name of the AI backend container app"
+  type        = string
+  default     = "ismd-ai"
+}
+
+variable "ai_backend_image" {
+  description = "Base container image URL for the AI backend (without tag)"
+  type        = string
+  default     = "ghcr.io/datagov-cz/ismd-ai-dev"
+}
+
+variable "ai_backend_image_tag" {
+  description = "Tag for the AI backend container image"
+  type        = string
+  default     = "latest"
+}
+
+variable "ai_app_environment" {
+  description = "AI app environment mode: 'development' disables OIDC; 'production' requires Keycloak JWTs."
+  type        = string
+  default     = "development"
+}
+
+variable "ai_llm_enabled" {
+  description = "Enable LLM calls in the AI service. Keep false until the API key secret is seeded."
+  type        = bool
+  default     = false
+}
+
+variable "ai_llm_provider" {
+  description = "LLM provider: OPENAI | AZURE_OPENAI | OPENAI_COMPATIBLE | ANTHROPIC | GOOGLE | MISTRAL | COHERE | OLLAMA"
+  type        = string
+  default     = "OPENAI"
+}
+
+variable "ai_llm_endpoint_url" {
+  description = <<-EOT
+    LLM endpoint URL; selects which AI host this env targets. Empty = provider default.
+    The app substitutes {model} with ai_llm_model, so for AZURE_OPENAI use e.g.
+    https://<host>.openai.azure.com/openai/deployments/{model}/chat/completions?api-version=2024-10-21
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "ai_llm_model" {
+  description = "LLM model name. For AZURE_OPENAI this is the *deployment* name (substituted into {model} in the endpoint URL), e.g. gpt-4o-mini-dev."
+  type        = string
+  default     = "gpt-4o-mini"
+}
+
+variable "ai_llm_api_key" {
+  description = "Inline LLM API key (used only while ai_llm_api_key_kv_secret_id is empty)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "ai_llm_api_key_kv_secret_id" {
+  description = "Key Vault secret id for the LLM API key (empty = inline value). Two-phase Class A cutover."
+  type        = string
+  default     = ""
+}
+
+variable "ai_app_insights_kv_secret_id" {
+  description = "Key Vault secret id for the AI App Insights connection string (empty = inline value)"
+  type        = string
+  default     = ""
+}
+
+variable "ai_postgres_password_kv_secret_id" {
+  description = <<-EOT
+    Key Vault secret id for the AI app's Postgres password (empty = inline value).
+    Class A two-phase: leave empty for the first apply so the ai_kv identity + its
+    vault grant get created, then set to tool_postgres_password_kv_secret_id and
+    re-apply to flip to the KV reference.
+  EOT
+  type        = string
+  default     = ""
+}
+
+# GHCR pull auth — ismd-ai is the only private app repo, so its package is private
+# and needs a read:packages PAT. All empty = anonymous pull (public package).
+
+variable "ai_ghcr_username" {
+  description = "GitHub username/bot account owning the read:packages PAT"
+  type        = string
+  default     = ""
+}
+
+variable "ai_ghcr_token" {
+  description = "Inline GHCR PAT with read:packages (used only while ai_ghcr_token_kv_secret_id is empty)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "ai_ghcr_token_kv_secret_id" {
+  description = "Key Vault secret id for the GHCR PAT (empty = inline value)"
+  type        = string
+  default     = ""
 }
 
 variable "validator_use_bff" {
