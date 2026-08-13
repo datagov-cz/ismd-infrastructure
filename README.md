@@ -136,7 +136,7 @@ Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform work
 │   ├── {dev,test,prod}.tfvars   # Non-secret per-env realm settings (committed)
 │   └── README.md                # Usage, state model, SMTP gating
 ├── docs/
-│   └── runbooks/                # One short runbook per alert rule (+ acs-smtp-setup)
+│   └── runbooks/                # One short runbook per alert rule
 ├── shared-global/               # Shared global infrastructure state
 │   ├── main.tf                  # Shared global module configuration
 │   ├── backend.tf               # Backend configuration
