@@ -173,6 +173,9 @@ module "tool_apps" {
   frontend_app_name = var.tool_frontend_app_name
   backend_app_name  = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Validator BE the tool BE calls internally (VALIDATION_SERVICE_URL).
   validator_backend_app_name = module.validator_apps.backend_name
 

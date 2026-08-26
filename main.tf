@@ -74,6 +74,9 @@ module "dev" {
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
@@ -209,6 +212,9 @@ module "test" {
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
@@ -317,6 +323,9 @@ module "prod" {
   tool_backend_image_tag  = var.tool_backend_image_tag
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
+
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
 
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips

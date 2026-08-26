@@ -120,6 +120,12 @@ resource "azurerm_container_app" "backend" {
       # Internal call to the validator backend over the shared Container App
       # Environment — app name only, ingress listens on 80, so no port. Also lost
       # in the nb/recovery restore; the variable survived, the env block didn't.
+      # NKD SPARQL endpoint, one target per environment. Empty leaves the image
+      # default (production NKD) in place — see application.properties.
+      env {
+        name  = "NKD_SPARQL_ENDPOINT"
+        value = var.nkd_sparql_endpoint
+      }
       env {
         name  = "VALIDATION_SERVICE_URL"
         value = "http://${var.validator_backend_app_name}/validujeme"
