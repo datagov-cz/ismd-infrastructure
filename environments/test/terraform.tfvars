@@ -20,6 +20,9 @@ tool_frontend_image_tag = "latest"
 tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
 tool_backend_image_tag  = "latest"
 
+# NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT).
+tool_nkd_sparql_endpoint = "https://pod-test.dia.gov.cz/slovn%C3%ADky/sparql"
+
 # App Gateway hostname for TEST
 # NOTE: slovnik-test.gov.cz is NOT this environment — it 302s to
 # https://datagov-cz.github.io/ssp/. The .dia form below is the real test entry point.

@@ -59,6 +59,17 @@ variable "outbox_done_retention" {
   default     = "P30D"
 }
 
+variable "nkd_sparql_endpoint" {
+  description = <<-EOT
+    NKD SPARQL endpoint the backend queries, injected as NKD_SPARQL_ENDPOINT.
+    Empty falls back to the image default in application.properties, which is the
+    production NKD (data.gov.cz). DEV and TEST point at the pod-develop / pod-test
+    mirrors. The path segment must stay percent-encoded (slovn%C3%ADky).
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "postgres_password_kv_secret_id" {
   description = "Versionless KV secret id for the backend's postgres password. Empty keeps the inline value; set to pull from Key Vault via the backend identity."
   type        = string

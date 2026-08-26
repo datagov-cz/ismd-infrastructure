@@ -247,6 +247,12 @@ variable "tool_caais_keystore_password_kv_secret_id" {
 }
 
 
+variable "tool_nkd_sparql_endpoint" {
+  description = "NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT). One target per environment: pod-develop (DEV), pod-test (TEST), data.gov.cz (PROD). Empty falls back to the image default. Keep the path segment percent-encoded (slovn%C3%ADky). Set via environments/<env>/terraform.tfvars."
+  type        = string
+  default     = ""
+}
+
 variable "tool_app_insights_kv_secret_id" {
   description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-<env>.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
   type        = string

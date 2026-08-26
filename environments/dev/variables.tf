@@ -358,6 +358,17 @@ variable "tool_caais_keystore_password_kv_secret_id" {
 }
 
 
+variable "tool_nkd_sparql_endpoint" {
+  description = <<-EOT
+    NKD SPARQL endpoint for the tool backend (NKD_SPARQL_ENDPOINT). One target per
+    environment: pod-develop for DEV, pod-test for TEST, data.gov.cz for PROD.
+    Empty falls back to the image default (production NKD). Keep the path segment
+    percent-encoded (slovn%C3%ADky).
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "tool_app_insights_kv_secret_id" {
   description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-dev.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
   type        = string
