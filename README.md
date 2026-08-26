@@ -31,6 +31,12 @@ This repository contains Terraform configurations for managing Azure Container A
 
   Symptom if you forget `terraw switch <env>` before `plan`: `terraform plan` fails with `expected "administrator_password" to not be an empty string` (or similar empty-var errors).
 
+- **Secrets are not kept on disk.** Any `TF_VAR_*` listed in `.terraw-vault-map` (names only, committed) is read from `ismd-kv-<env>` into the terraform process on every `switch`/`plan`/`apply` and dies with it — never written to a file, echoed, or passed as an argument. `.env.<env>` holds only non-secret ops config now.
+
+  A value already exported (or still present in `.env.<env>`) is left alone, so a one-off override works without touching the vault. If a mapped secret cannot be resolved — expired login, PIM activation lapsed, secret missing in that env's vault — `terraw` **refuses `apply`/`destroy`/`import`** and only warns on read-only commands. That guard exists because every sensitive root variable declares `default = ""`, so an unresolved secret would otherwise apply an empty value rather than fail.
+
+  Requires `az login` and Get on the vault's secrets. `./terraw.sh env` prints the mapping without contacting the vault.
+
 - **PowerShell and WSL bash have separate environments.** `.terraw-env` state file is shared (same path), but env var exports happen per-process — so just keep using whichever shell variant of `terraw` you started in for a given session.
 
 - **Verify env vars before planning:**
@@ -346,7 +352,7 @@ All environments use dedicated D4 workload profiles with VNet integration for co
 
    Non-sensitive config (resource group names, image tags, hostnames) lives in `environments/<env>/terraform.tfvars` and is committed to the repo. No setup needed here.
 
-   Sensitive variables (Postgres password, Keycloak secrets, NextAuth secret) are loaded from a `.env.<env>` file which is gitignored:
+   Non-secret ops config (operator IPs, alert recipients, Teams ids) lives in a gitignored `.env.<env>` file. Secrets are not put there — `terraw` pulls those from `ismd-kv-<env>` per `.terraw-vault-map`:
    ```bash
    # bash
    cp .env.example .env.dev
@@ -368,7 +374,7 @@ All environments use dedicated D4 workload profiles with VNet integration for co
    .\terraw.ps1 switch dev
    ```
 
-   `switch` exports all `TF_VAR_*` secrets from `.env.<env>`, runs `terraform workspace select <env>`, and persists the env name in `.terraw-env` so subsequent `plan`/`apply` auto-inject `-var-file=environments/<env>/terraform.tfvars` and re-load secrets.
+   `switch` exports all `TF_VAR_*` from `.env.<env>`, resolves the mapped secrets from Key Vault, runs `terraform workspace select <env>`, and persists the env name in `.terraw-env` so subsequent `plan`/`apply` auto-inject `-var-file=environments/<env>/terraform.tfvars` and re-load secrets.
 
    In CI, secrets are injected automatically from GitHub Actions secrets — `terraw` is not used.
 
