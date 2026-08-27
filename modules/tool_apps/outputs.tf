@@ -66,16 +66,9 @@ output "backend_revision_fqdn" {
   value       = azurerm_container_app.backend.latest_revision_fqdn
 }
 
-# Database outputs
-output "postgres_server_name" {
-  description = "The name of the PostgreSQL Flexible Server"
-  value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].name : null
-}
-
-output "postgres_server_id" {
-  description = "The resource ID of the PostgreSQL Flexible Server. Used by the monitoring module to scope alert rules."
-  value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].id : null
-}
+# Database outputs — the server now lives in modules/postgres, so consumers
+# (monitoring alert scopes, ai_apps) take its id/name/fqdn from that module's
+# outputs directly rather than through here.
 
 output "fuseki_name" {
   description = "The name of the Fuseki container app"

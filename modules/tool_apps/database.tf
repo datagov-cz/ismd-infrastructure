@@ -1,100 +1,18 @@
-# Azure Database for PostgreSQL Flexible Server
-# Managed service with automatic backups, HA options, and persistent storage
+# Postgres databases for the tool stack.
 #
-# SHARED / MULTI-TENANT — this one server backs more than the tool. Databases on it:
-#   - var.postgres_db_name  (ismd_tool_db)  — tool backend, below
-#   - var.keycloak_db_name                  — keycloak container, below
-#   - ismd_ai                               — the AI app, created OUT OF MODULE in
-#     modules/ai_apps/database.tf, which receives this server's id from the env root
+# The SERVER itself lives in modules/postgres (extracted 2026-08-12) — it is a
+# shared per-env resource backing tool, keycloak and the AI app, so "tool" no
+# longer owns it. This module only creates the databases it needs, against the
+# server id injected from the env root. Server-level config (extensions, idle
+# timeouts) and the firewall rules moved with the server.
 #
-# Consequences, before changing anything here:
-#   - deploy_ai_apps requires deploy_tool_apps; destroying/renaming this server or
-#     flipping deploy_postgres takes the AI app's database with it.
-#   - the SKU is small (B_Standard_B1ms in dev) and max_connections is limited, so
-#     every tenant's pool is sized defensively (see the Hikari caps on the tool
-#     backend and KC_DB_POOL_MAX_CONNECTIONS on keycloak). A new tenant must budget
-#     its pool against the same ceiling.
-#   - all tenants connect as this admin login, so the same password secret is shared;
-#     there is no per-tenant DB user isolation today.
-resource "azurerm_postgresql_flexible_server" "tool" {
-  count               = var.deploy_postgres ? 1 : 0
-  name                = "ismd-tool-postgres-${var.environment}"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  version             = "16"
-
-  administrator_login    = var.postgres_admin_user
-  administrator_password = var.postgres_admin_password
-
-  # Burstable tier - cost-effective for dev/test
-  sku_name   = var.postgres_sku_name
-  storage_mb = var.postgres_storage_mb
-
-  # Backup configuration
-  backup_retention_days        = var.environment == "prod" ? 35 : 7
-  geo_redundant_backup_enabled = var.environment == "prod"
-
-  # Zone redundancy for prod only
-  # NOTE: Hardcoded to "1" for dev to match existing server state.
-  # Change this only if recreating the server.
-  zone = "1"
-
-  # Public access for simplicity (can be restricted later with firewall rules)
-  public_network_access_enabled = true
-
-  tags = {
-    Environment = var.environment
-    Application = "Tool"
-    Component   = "Database"
-    ManagedBy   = "Terraform"
-  }
-
-  lifecycle {
-    # administrator_password: seeded once at create, then owned out-of-band (KV is
-    # the source of truth; rotate via `az postgres flexible-server update` + KV +
-    # app restart). Ignored so a stray `.env`/config drift can't rotate the live DB
-    # admin password on apply.
-    ignore_changes = [zone, administrator_password]
-  }
-}
-
-# Allow the unaccent extension at the server level so the application can
-# CREATE EXTENSION unaccent in the ismd_schema. The repositories in
-# ismd-tool-backend (ConceptMetadataRepository, OntologyMetadataRepository)
-# call ismd_schema.unaccent(...) for diacritic-insensitive search over
-# Czech text — without this, those queries fail at runtime.
-resource "azurerm_postgresql_flexible_server_configuration" "unaccent" {
-  count     = var.deploy_postgres ? 1 : 0
-  name      = "azure.extensions"
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
-  value     = "UNACCENT"
-}
-
-# Auto-reap abandoned sessions so dead/orphaned connections (e.g. left behind
-# when a client's network path drops) free their slot instead of lingering until
-# slow TCP keepalive timeouts — which is what tipped the 50-connection server
-# into exhaustion during a reconnect storm. Values in milliseconds; both are
-# dynamic (no restart). Set comfortably longer than pool keepalive so healthy
-# pooled connections aren't churned.
-resource "azurerm_postgresql_flexible_server_configuration" "idle_session_timeout" {
-  count     = var.deploy_postgres ? 1 : 0
-  name      = "idle_session_timeout"
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
-  value     = "600000" # 10 min — closes sessions idle with no activity
-}
-
-resource "azurerm_postgresql_flexible_server_configuration" "idle_in_transaction_session_timeout" {
-  count     = var.deploy_postgres ? 1 : 0
-  name      = "idle_in_transaction_session_timeout"
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
-  value     = "300000" # 5 min — guards against leaked open transactions
-}
+# Per-app LOGIN roles are created by SQL, not Terraform — see db/user-separation/.
 
 # Create the application database
 resource "azurerm_postgresql_flexible_server_database" "tool" {
   count     = var.deploy_postgres ? 1 : 0
   name      = var.postgres_db_name
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  server_id = var.postgres_server_id
   charset   = "UTF8"
   collation = "en_US.utf8"
 }
@@ -102,49 +20,11 @@ resource "azurerm_postgresql_flexible_server_database" "tool" {
 resource "azurerm_postgresql_flexible_server_database" "keycloak" {
   count     = var.deploy_postgres && var.deploy_keycloak ? 1 : 0
   name      = var.keycloak_db_name
-  server_id = azurerm_postgresql_flexible_server.tool[0].id
+  server_id = var.postgres_server_id
   charset   = "UTF8"
   collation = "en_US.utf8"
 }
 
-# App access — Azure services.
-# The Container Apps subnet has NO NAT gateway, so the apps' outbound traffic to
-# the public Postgres endpoint egresses via Azure's *dynamic* SNAT — NOT the
-# environment's static (inbound) IP. There is therefore no single stable egress
-# IP to allowlist, which is why this blanket "AllowAzureServices" (0.0.0.0) rule
-# is required for the apps (backend, keycloak, fuseki) to reach the database.
-#
-# To tighten this to a real allowlist: add a NAT gateway + static public IP to
-# the Container Apps subnet, put that IP in app_outbound_ips, and set
-# allow_azure_services = false. See app_outbound rule below.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure" {
-  count            = var.deploy_postgres && var.allow_azure_services ? 1 : 0
-  name             = "AllowAzureServices"
-  server_id        = azurerm_postgresql_flexible_server.tool[0].id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
-}
-
-# App access — stable egress allowlist (used once a NAT gateway exists).
-# Empty until then. When populated, set allow_azure_services = false above.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "app_outbound" {
-  for_each         = var.deploy_postgres ? toset(var.app_outbound_ips) : toset([])
-  name             = "app-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.tool[0].id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-# Admin access: specific operator IPs for troubleshooting.
-# Replaces the previous "AllowAllForDev" (0.0.0.0-255.255.255.255) rule, which
-# exposed the dev database to the entire internet.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "admin" {
-  for_each         = var.deploy_postgres ? toset(var.admin_allowed_ips) : toset([])
-  name             = "admin-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.tool[0].id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
 
 # Storage Account for Fuseki data persistence
 resource "azurerm_storage_account" "fuseki" {
@@ -290,12 +170,12 @@ resource "azurerm_container_app" "fuseki" {
 # Output the URLs for use by the backend
 output "postgres_jdbc_url" {
   description = "JDBC URL for PostgreSQL Flexible Server"
-  value       = var.deploy_postgres ? "jdbc:postgresql://${azurerm_postgresql_flexible_server.tool[0].fqdn}:5432/${var.postgres_db_name}?sslmode=require" : var.postgres_url
+  value       = var.deploy_postgres ? "jdbc:postgresql://${var.postgres_fqdn}:5432/${var.postgres_db_name}?sslmode=require" : var.postgres_url
 }
 
 output "postgres_fqdn" {
   description = "FQDN of the PostgreSQL Flexible Server"
-  value       = var.deploy_postgres ? azurerm_postgresql_flexible_server.tool[0].fqdn : null
+  value       = var.deploy_postgres ? var.postgres_fqdn : null
 }
 
 output "fuseki_internal_url" {

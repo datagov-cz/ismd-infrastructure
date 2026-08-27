@@ -68,6 +68,72 @@ module "validator_apps" {
   ]
 }
 
+# Shared per-env Postgres Flexible Server. Owned here rather than by tool_apps
+# because tool, keycloak and the AI app all have databases on it. Each app module
+# creates its own database against server_id.
+#
+# resource_group_name: still the TOOL rg. Relocating to ismd-shared-prod is a
+# separate step — changing it here forces replacement (total data loss). Move the
+# resource with `az resource move`, re-import the addresses, then change it.
+# See docs/postgres-shared-move-plan.md.
+module "postgres" {
+  count  = var.deploy_tool_apps ? 1 : 0
+  source = "../../modules/postgres"
+
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = var.tool_resource_group_name
+
+  postgres_admin_user     = "ismdadmin"
+  postgres_admin_password = var.tool_postgres_password
+  postgres_sku_name       = "GP_Standard_D2s_v3" # General Purpose for prod
+  postgres_storage_mb     = 65536                # 64GB for prod
+
+  # Firewall allowlist. No NAT gateway on the apps subnet yet, so apps egress via
+  # dynamic Azure SNAT and need allow_azure_services (default true).
+  # app_outbound_ips stays empty until a NAT gateway provides a stable egress IP.
+  app_outbound_ips  = []
+  admin_allowed_ips = var.admin_allowed_ips
+}
+
+# Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
+# State-address relocation only — the resources themselves are untouched, and the
+# plan MUST show 0 to destroy.
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server.tool[0]
+  to   = module.postgres[0].azurerm_postgresql_flexible_server.tool
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_configuration.unaccent[0]
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_configuration.unaccent
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_configuration.idle_session_timeout[0]
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_configuration.idle_session_timeout
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_configuration.idle_in_transaction_session_timeout[0]
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_configuration.idle_in_transaction_session_timeout
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_firewall_rule.allow_azure[0]
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_firewall_rule.allow_azure[0]
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_firewall_rule.app_outbound
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_firewall_rule.app_outbound
+}
+
+moved {
+  from = module.tool_apps[0].azurerm_postgresql_flexible_server_firewall_rule.admin
+  to   = module.postgres[0].azurerm_postgresql_flexible_server_firewall_rule.admin
+}
+
 # Create tool apps using shared Container App Environment
 module "tool_apps" {
   count  = var.deploy_tool_apps ? 1 : 0
@@ -111,15 +177,10 @@ module "tool_apps" {
   postgres_db_name        = "ismd_tool_db"
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password
-  postgres_sku_name       = "GP_Standard_D2s_v3" # General Purpose for prod
-  postgres_storage_mb     = 65536                # 64GB for prod
 
-  # Postgres firewall allowlist.
-  # No NAT gateway on the apps subnet yet, so apps egress via dynamic Azure SNAT
-  # and need allow_azure_services (default true). app_outbound_ips stays empty
-  # until a NAT gateway provides a stable egress IP.
-  app_outbound_ips  = []
-  admin_allowed_ips = var.admin_allowed_ips
+  # The server lives in module.postgres; this module only creates its databases.
+  postgres_server_id = module.postgres[0].server_id
+  postgres_fqdn      = module.postgres[0].fqdn
 
   # Fallback external URLs (used if deploy_postgres/fuseki = false)
   postgres_url      = var.tool_postgres_url
@@ -273,8 +334,8 @@ module "monitoring" {
 
   postgres_servers = var.deploy_tool_apps ? {
     "tool-postgres" = {
-      id   = module.tool_apps[0].postgres_server_id
-      name = module.tool_apps[0].postgres_server_name
+      id   = module.postgres[0].server_id
+      name = module.postgres[0].name
     }
   } : {}
 

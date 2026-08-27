@@ -175,6 +175,11 @@ module "test" {
   count  = terraform.workspace == "test" ? 1 : 0
   source = "./environments/test"
 
+  # Per-app DB user separation (Phase 2). Empty = admin login until test tfvars
+  # flips it. See infrastructure/db/user-separation/README.md.
+  tool_backend_db_user  = var.tool_backend_db_user
+  tool_keycloak_db_user = var.tool_keycloak_db_user
+
   # Common variables
   environment = "test"
   location    = var.location
