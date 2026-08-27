@@ -10,6 +10,24 @@ locals {
   all_origins = concat(local.base_origins, var.additional_cors_origins)
 }
 
+# Dedicated identity for pulling this app's secrets from the per-env Key Vault.
+# Pre-grantable, unlike SystemAssigned — the access policy can be created before the
+# app exists. Declaration was lost in the nb/recovery restore while the resource stayed
+# in state (and in Azure); restored so code matches reality and so the
+# backend_kv_identity_principal_id output resolves.
+resource "azurerm_user_assigned_identity" "backend_kv" {
+  name                = "${var.backend_app_name}-kv-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "Backend-KV"
+    ManagedBy   = "Terraform"
+  }
+}
+
 resource "azurerm_container_app" "backend" {
   name                         = "${var.backend_app_name}-${var.environment}"
   container_app_environment_id = var.container_app_environment_id
@@ -20,7 +38,8 @@ resource "azurerm_container_app" "backend" {
   workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
 
   identity {
-    type = "SystemAssigned"
+    type         = "SystemAssigned, UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.backend_kv.id]
   }
 
   ingress {
