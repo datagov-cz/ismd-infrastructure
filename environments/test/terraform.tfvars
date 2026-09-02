@@ -34,7 +34,10 @@ tool_keycloak_hostname = "xn--slovnk-test-scb.dia.gov.cz"
 # Send the frontend's authorization request straight to the CAAIS IdP, skipping the
 # Keycloak login page. Injected as KEYCLOAK_IDP_HINT; auth.ts turns it into
 # kc_idp_hint. Empty (the default) shows the Keycloak page with local accounts.
-tool_keycloak_idp_hint = "caais"
+# Disabled 2026-08-28: direct redirect off on TEST for now — empty means no
+# KEYCLOAK_IDP_HINT env var, so the Keycloak login page is shown (local accounts
+# + the CAAIS button). The IdP itself stays enabled. Restore with "caais".
+tool_keycloak_idp_hint = ""
 
 # App names
 frontend_app_name = "ismd-validator-frontend"

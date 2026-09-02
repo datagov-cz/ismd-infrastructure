@@ -82,10 +82,14 @@ resource "keycloak_openid_client" "ismd_app" {
   implicit_flow_enabled        = false
   service_accounts_enabled     = false
 
-  # Matches the current realm (refresh tokens off). The provider default is
-  # true; pinned here to avoid silently changing session behavior on import.
-  # Flip to true deliberately if we want next-auth refresh-token sessions.
-  use_refresh_tokens = false
+  # Refresh tokens MUST stay on. With this off Keycloak issues no refresh token in
+  # the authorization-code flow, so next-auth's refreshAccessToken has nothing to
+  # send and every session dies at the access-token lifespan (5 min) regardless of
+  # the 10h SSO session. That was the cause of the mid-work logouts on TEST,
+  # confirmed 2026-08-28 — see ../../TODO-SESSION-REFRESH.md. It was previously
+  # pinned false to match the imported realm; the import fidelity was preserving a
+  # bug. Do not flip this back.
+  use_refresh_tokens = true
 
   root_url                        = var.ismd_app_root_url
   base_url                        = var.ismd_app_root_url

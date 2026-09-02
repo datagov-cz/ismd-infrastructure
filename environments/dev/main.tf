@@ -257,6 +257,12 @@ module "tool_apps" {
   # their jar images ship.
   enable_app_insights_agent = true
 
+  # Activate server-side App Insights on the Next.js frontend (injects
+  # OTEL_SERVICE_NAME). Safe here because the dep-bearing image is deployed on
+  # DEV: ismd-tool-frontend-dev:1.0.2-640eed0 carries @azure/monitor-opentelemetry
+  # 1.18.1. TEST stays default false — its released 1.0.2 image predates the dep.
+  enable_frontend_app_insights = true
+
   depends_on = [
     module.shared,
     azurerm_resource_group.tool[0]
