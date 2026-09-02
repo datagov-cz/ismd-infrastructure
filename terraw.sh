@@ -90,8 +90,19 @@ resolve_vault_secrets() {
 
         # Command substitution, not a temp file or an argument: az writes the value
         # to this subshell's stdout and it goes straight into the variable.
+        #
+        # tr -d '\r\n' is load-bearing too: under WSL the Windows az emits CRLF, and
+        # command substitution strips trailing newlines but NOT carriage returns. The
+        # secret would be exported as "value" — an invisible extra byte that made the
+        # Keycloak provider fail with a bare 401 Unauthorized. Confirmed 2026-08-28.
+        #
+        # </dev/null is load-bearing: under WSL az reads stdin, which inside this
+        # loop is the vault map itself. Without it az swallows the remaining lines,
+        # so only the FIRST map entry is ever fetched — silently, since the rest are
+        # never reached and never recorded as unresolved. A variable with
+        # default = "" would then be applied empty with no prompt and no error.
         local value
-        value="$(az keyvault secret show --vault-name "$vault" --name "$secret"                      --query value -o tsv 2>/dev/null)"
+        value="$(az keyvault secret show --vault-name "$vault" --name "$secret"                      --query value -o tsv 2>/dev/null </dev/null | tr -d '\r\n')"
         if [ -z "$value" ]; then
             VAULT_MISSING+=("$name ($vault/$secret)")
             continue
