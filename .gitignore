@@ -15,6 +15,11 @@
 environments/*/.terraform.lock.hcl
 terraform.tfvars
 !environments/*/terraform.tfvars
+# shared-global/terraform.tfvars holds no secrets (public DNS names + Container
+# Apps environment domains) and IS load-bearing: without it the App Gateway
+# backend pools and listener host names plan to empty, for all three
+# environments, under a "0 to destroy" headline. Keep it committed.
+!shared-global/terraform.tfvars
 
 # Terraform plan output (human-readable, for local review only)
 plan.*.txt

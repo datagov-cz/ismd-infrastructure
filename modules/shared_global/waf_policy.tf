@@ -93,6 +93,47 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     }
   }
 
+  # Block unambiguous scanner/brute-force tooling by User-Agent. These are
+  # self-identifying attack tools, not browsers or crawlers — no legitimate
+  # caller of the validator or tool apps sends these, so a flat Block carries
+  # effectively no false-positive risk.
+  #
+  # Priority 15: after the rate limit (10), before AllowKeycloakAdmin (20) so
+  # the Allow cannot whitelist a scanner that happens to hit an admin path.
+  #
+  # SCOPE NOTE: this catches self-identifying tools only. The 2026-08-29 scan
+  # sent ~2/3 of its requests under ordinary browser User-Agents, so this rule
+  # would have blocked roughly a third of it. It is a cheap layer, not the
+  # whole answer — the managed DRS rules below do the payload-level work.
+  custom_rules {
+    name      = "BlockScannerUserAgents"
+    priority  = 15
+    rule_type = "MatchRule"
+    action    = "Block"
+
+    match_conditions {
+      match_variables {
+        variable_name = "RequestHeaders"
+        selector      = "User-Agent"
+      }
+      operator           = "Contains"
+      negation_condition = false
+      transforms         = ["Lowercase"]
+      match_values = [
+        "feroxbuster",
+        "libredtail",
+        "nuclei",
+        "sqlmap",
+        "nikto",
+        "dirbuster",
+        "gobuster",
+        "wpscan",
+        "masscan",
+        "zgrab",
+      ]
+    }
+  }
+
   # Blocked requests return different status codes by rule type: the custom
   # RateLimitRule Block returns HTTP 429 (Too Many Requests), while the managed
   # DRS rules return HTTP 403 (Forbidden) — the App Gateway WAF default. The
@@ -116,6 +157,35 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     managed_rule_set {
       type    = "Microsoft_DefaultRuleSet"
       version = "2.2"
+
+      # DRS 2.2 ships RFI 931100 and 931130 DISABLED by default (visible as
+      # computedDisabledRules on the live policy; this policy sets no other
+      # overrides). 931100 is the rule for a URL parameter pointing at a raw IP
+      # address — exactly the shape of the SSRF probes seen on 2026-08-29:
+      #   /validujeme?url=http://169.254.169.254/latest/meta-data/iam/...
+      # 411 such requests reached the backend that day and produced ZERO
+      # firewall-log entries — not blocked, not even matched.
+      #
+      # Enabled here as action "Log" rather than "Block" on purpose: the rule
+      # fires on any URL-ish parameter containing an IP literal, and while dev
+      # traffic shows no legitimate url= parameter at all (0 across all HTTP 200
+      # responses on 2026-08-29), prod traffic has NOT been checked. Run a week
+      # in Log, confirm the only matches are hostile, then flip to Block.
+      rule_group_override {
+        rule_group_name = "RFI"
+
+        rule {
+          id      = "931100"
+          enabled = true
+          action  = "Log"
+        }
+
+        rule {
+          id      = "931130"
+          enabled = true
+          action  = "Log"
+        }
+      }
     }
   }
 

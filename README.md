@@ -429,17 +429,28 @@ This creates:
 After deploying the apps, update the App Gateway backend pools with actual FQDNs:
 
 ```bash
-# Get FQDNs from the terraform outputs
-terraform output
+# Read the environment domains straight from Azure
+az containerapp env list --query "[].{name:name,domain:properties.defaultDomain}" -o table
 
-# Update shared-global/terraform.tfvars with the FQDNs:
-# container_app_environment_domain_dev = "livelydesert-xxx.germanywestcentral.azurecontainerapps.io"
-# container_app_environment_domain_test = "mangodune-xxx.germanywestcentral.azurecontainerapps.io"
+# These belong in shared-global/terraform.tfvars, which IS committed:
+#   container_app_environment_domain_dev/test/prod
+#   dev_hostname / test_hostname / prod_hostname
 
 cd shared-global
-terraform plan  # Review the routing changes
-terraform apply
+../terraw.sh plan -out=tfplan   # Review the routing changes
+../terraw.sh apply tfplan
 ```
+
+> **Do not plan here without `shared-global/terraform.tfvars` present.**
+> Every variable it sets defaults to `""`. If the file is missing — it was
+> gitignored until 2026-08-31, so older clones and any worktree created before
+> then will not have it — Terraform builds the App Gateway with empty backend
+> pools and empty listener host names, and proposes disconnecting **every app in
+> dev, test and prod** under a headline of `0 to add, 2 to change, 0 to destroy`.
+>
+> The destroy count does not catch this. Read the attribute lines: if you see
+> `fqdns = [...] -> null` or `host_name` going empty on
+> `azurerm_application_gateway.appgw`, stop and restore the tfvars file.
 
 This updates the Application Gateway backend pools to route traffic to the deployed container apps.
 

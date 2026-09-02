@@ -179,3 +179,14 @@ variable "public_be_url" {
   type        = string
   default     = ""
 }
+
+variable "frontend_min_replicas" {
+  description = "Minimum replicas for the validator frontend. Kept at 1 by default (cost); raised where burst traffic causes 503s during scale-out. Container Apps scales 1 -> N on demand, but a cold Next.js replica takes ~10-15s to become ready, and everything arriving in that window gets a 503 from the ingress (observed 2026-08-29 on dev: 966 x 503 while scaling 1 -> 10)."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.frontend_min_replicas >= 1
+    error_message = "frontend_min_replicas must be at least 1."
+  }
+}

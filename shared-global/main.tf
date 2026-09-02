@@ -62,8 +62,21 @@ module "shared_global" {
   # from X-Forwarded-For), so this threshold is per end user, not per proxy —
   # see the RateLimitPerClientIp rule + trust-boundary note in waf_policy.tf.
   # 600/min gives headroom for the SPA's first-load burst (many icon/asset + RSC
-  # requests per navigation, visible in the firewall log); lower it once we see
-  # real per-user rates now that grouping is meaningful.
+  # requests per navigation, visible in the firewall log).
+  #
+  # MEASURED 2026-08-31 from ContainerAppHTTPLogs (XForwardedFor first element =
+  # real client), peak requests/min per client over the preceding 7 days:
+  #   dev  377  (legitimate: 109.81.82.115, Czech consumer ISP)
+  #   test 215  (legitimate: 82.142.99.238)
+  #   prod  NOT MEASURED — the query was not run against ismd-shared-logs-prod
+  # versus the 2026-08-29 scan, which peaked at 555/min from 35.189.146.167.
+  #
+  # So the gap between a heavy legitimate user and the scan is 377 vs 555. The
+  # threshold is deliberately LEFT AT 600 rather than lowered: 300 (the module
+  # default) would have blocked real dev users outright, and even 450 sits only
+  # ~20% above an observed legitimate peak. Do not lower this without prod
+  # numbers — rate limiting is a coarse backstop here, not the control that
+  # separates this scan from real traffic.
   waf_rate_limit_threshold = 600
 }
 
