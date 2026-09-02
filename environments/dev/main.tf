@@ -84,9 +84,15 @@ module "postgres" {
   count  = var.deploy_tool_apps ? 1 : 0
   source = "../../modules/postgres"
 
-  environment         = var.environment
-  location            = var.location
-  resource_group_name = var.tool_resource_group_name
+  environment = var.environment
+  location    = var.location
+
+  # The server lives in the shared RG, not the tool RG: it backs three tenants
+  # (ismd_tool_db, keycloak_db, ismd_ai), so it is a per-env shared resource.
+  # Moved in Azure with `az resource move` on 2026-09-02 and re-imported; the
+  # config change had to follow the move, because changing resource_group_name
+  # on an existing server forces replacement and total data loss.
+  resource_group_name = var.shared_resource_group_name
 
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password

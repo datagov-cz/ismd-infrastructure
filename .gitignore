@@ -34,6 +34,7 @@ docs/HANDOVER-monitoring.md
 docs/keycloak-smtp-plan.md
 docs/monitoring-plan.md
 docs/monitoring-overview.md
+docs/postgres-shared-move-plan.md
 docs/secrets-config-plan.md
 
 # Temporary and debug files
