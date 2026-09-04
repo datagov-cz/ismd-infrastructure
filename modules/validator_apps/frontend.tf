@@ -32,7 +32,7 @@ resource "azurerm_container_app" "frontend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.frontend_min_replicas
     container {
       name   = "ismd-validator-frontend-${var.environment}"
       image  = "${var.frontend_image}:${var.frontend_image_tag}"

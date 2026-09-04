@@ -27,9 +27,16 @@ module "validator_apps" {
   # Container Images
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
-  backend_image      = var.backend_image
-  backend_image_tag  = var.backend_image_tag
-  backend_port       = var.backend_port
+
+  # DEV ONLY. Absorbs the scale-out gap during scanner bursts against the public
+  # dev hostname (2026-08-29: three bursts at ~450-575 req/min against a single
+  # replica produced 966 x 503 while Container Apps scaled 1 -> 10). Test and
+  # prod keep the module default of 1 — do not raise them without their own
+  # traffic evidence.
+  frontend_min_replicas = 2
+  backend_image         = var.backend_image
+  backend_image_tag     = var.backend_image_tag
+  backend_port          = var.backend_port
 
   # IP Restrictions
   app_gateway_public_ip = var.app_gateway_public_ip_address
