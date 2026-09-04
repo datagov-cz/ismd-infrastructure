@@ -48,25 +48,37 @@ variable "postgres_admin_user" {
   default     = "ismdadmin"
 }
 
+# Per-app user separation (see infrastructure/db/user-separation/). The tool
+# backend logs in as this dedicated LOGIN role instead of the server admin.
+# Empty = fall back to postgres_admin_user (current behaviour) so this stays a
+# no-op until an env flips it. Set to "ismd_tool_app" AFTER running 01-tool.sql
+# and pointing the tool's postgres password secret at that role's password.
+variable "backend_db_user" {
+  description = "Dedicated Postgres LOGIN role for the tool backend. Empty = use the admin login. Set to 'ismd_tool_app' once db/user-separation Phase 1 is applied and the tool password secret holds that role's password."
+  type        = string
+  default     = ""
+}
+
 variable "postgres_admin_password" {
   description = "PostgreSQL admin password"
   type        = string
   sensitive   = true
 }
 
-variable "postgres_sku_name" {
-  description = "SKU name for PostgreSQL Flexible Server (e.g., B_Standard_B1ms for burstable)"
+# The server itself lives in modules/postgres; these are injected from the env
+# root so this module can create its databases and build connection URLs.
+variable "postgres_server_id" {
+  description = "Resource id of the shared Flexible Server (modules/postgres output server_id). The tool and keycloak databases are created against it."
   type        = string
-  default     = "B_Standard_B1ms"
+  default     = ""
 }
 
-variable "postgres_storage_mb" {
-  description = "Storage size in MB for PostgreSQL"
-  type        = number
-  default     = 32768 # 32GB
+variable "postgres_fqdn" {
+  description = "FQDN of the shared Flexible Server (modules/postgres output fqdn), used to build the JDBC URLs."
+  type        = string
+  default     = ""
 }
 
-# Fuseki connection (fallback when deploy_fuseki = false)
 variable "fuseki_url" {
   description = "URL for Apache Jena Fuseki (external, if not deploying Fuseki container)"
   type        = string

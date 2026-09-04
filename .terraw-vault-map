@@ -1,0 +1,24 @@
+# terraw Key Vault map — NAMES ONLY, no values. Safe to commit.
+#
+# Format: TF_VAR_<name>=<secret name in ismd-kv-<env>>
+#
+# terraw resolves every entry that is not already set in the environment (or in
+# .env.<env>) by reading it from the per-env vault into its own process, right
+# before exec'ing terraform. The value is never written to disk, never echoed and
+# never passed as a command-line argument — it dies with the terraform process.
+#
+# This is the Class B set: secrets Terraform still consumes as literals. Class A
+# secrets are not here — those are non-secret *_kv_secret_id pointers committed in
+# environments/<env>/terraform.tfvars and resolved by each app's managed identity.
+#
+# Fetched as your 'az login' identity via the vault's access policy (the vaults have
+# enableRbacAuthorization = false). Not PIM-gated — PIM covers the subscription role.
+#
+# Adding an entry: the secret must already exist in ismd-kv-dev, -test and -prod,
+# or terraw will refuse to apply in the env that is missing it.
+
+# Postgres server admin password — seeds azurerm_postgresql_flexible_server.
+TF_VAR_tool_postgres_password=postgres-password
+
+# Keycloak admin password — used by the keycloak-config provider against the admin API.
+TF_VAR_tool_keycloak_admin_password=keycloak-admin-password

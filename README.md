@@ -31,6 +31,12 @@ This repository contains Terraform configurations for managing Azure Container A
 
   Symptom if you forget `terraw switch <env>` before `plan`: `terraform plan` fails with `expected "administrator_password" to not be an empty string` (or similar empty-var errors).
 
+- **Secrets are not kept on disk.** Any `TF_VAR_*` listed in `.terraw-vault-map` (names only, committed) is read from `ismd-kv-<env>` into the terraform process on every `switch`/`plan`/`apply` and dies with it — never written to a file, echoed, or passed as an argument. `.env.<env>` holds only non-secret ops config now.
+
+  A value already exported (or still present in `.env.<env>`) is left alone, so a one-off override works without touching the vault. If a mapped secret cannot be resolved — expired login, PIM activation lapsed, secret missing in that env's vault — `terraw` **refuses `apply`/`destroy`/`import`** and only warns on read-only commands. That guard exists because every sensitive root variable declares `default = ""`, so an unresolved secret would otherwise apply an empty value rather than fail.
+
+  Requires `az login` and Get on the vault's secrets. `./terraw.sh env` prints the mapping without contacting the vault.
+
 - **PowerShell and WSL bash have separate environments.** `.terraw-env` state file is shared (same path), but env var exports happen per-process — so just keep using whichever shell variant of `terraw` you started in for a given session.
 
 - **Verify env vars before planning:**
@@ -58,7 +64,7 @@ This repository contains Terraform configurations for managing Azure Container A
 
 - **Shared Container App Environment**: Consolidated environment for all applications (validator and tool) across dev, test, and prod
 - **Azure Container Apps**: Serverless container platform with auto-scaling and dedicated workload profiles
-- **Application Gateway**: Shared global load balancer with WAF capabilities and dual-stack (IPv4 + IPv6) support
+- **Application Gateway (WAF_v2)**: Shared global load balancer with a Microsoft Default Rule Set (DRS) 2.2 WAF policy, rate limiting, and dual-stack (IPv4 + IPv6) support
 - **Multi-Environment**: Dev, Test, and Prod environments with consistent configuration
 - **Networking**: Shared VNet with properly sized subnets for Container Apps, Tool Apps, and App Gateway
 - **Decoupled Deployments**: Infrastructure managed via Terraform, container images deployed directly from application repositories
@@ -97,6 +103,10 @@ Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform work
 │   │   ├── appgw_validator_config.tf  # Validator app routing configuration
 │   │   ├── appgw_tool_config.tf       # Tool app routing configuration
 │   │   ├── appgw_resource.tf          # App Gateway resource (dynamic blocks)
+│   │   ├── waf_policy.tf              # WAF policy (Microsoft DRS 2.2 + rate limit)
+│   │   ├── error_pages.tf            # Custom AppGW error pages (e.g. 403)
+│   │   ├── acs_email.tf              # Azure Communication Services email resource
+│   │   ├── monitoring.tf            # AppGW diagnostic settings + log storage
 │   │   ├── networking.tf              # VNet, subnets, public IPs
 │   │   ├── resource_group.tf          # Global resource group
 │   │   ├── outputs.tf                 # Module outputs
@@ -107,16 +117,32 @@ Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform work
 │   │   ├── outputs.tf           # Module outputs
 │   │   ├── variables.tf         # Module variables
 │   │   └── main.tf              # Documentation
-│   └── tool_apps/               # Tool Frontend, Backend, Database & Keycloak Container Apps
-│       ├── backend.tf           # Tool backend container app
-│       ├── frontend.tf          # Tool frontend container app
-│       ├── database.tf          # PostgreSQL flexible server
-│       ├── keycloak.tf          # Keycloak container app
-│       ├── outputs.tf           # Module outputs
-│       ├── variables.tf         # Core module variables
-│       ├── variables_database.tf  # Database-specific variables
-│       ├── variables_keycloak.tf  # Keycloak-specific variables
-│       └── main.tf              # Documentation
+│   ├── tool_apps/               # Tool Frontend, Backend, Database & Keycloak Container Apps
+│   │   ├── backend.tf           # Tool backend container app
+│   │   ├── frontend.tf          # Tool frontend container app
+│   │   ├── database.tf          # PostgreSQL flexible server
+│   │   ├── keycloak.tf          # Keycloak container app
+│   │   ├── outputs.tf           # Module outputs
+│   │   ├── variables.tf         # Core module variables
+│   │   ├── variables_database.tf  # Database-specific variables
+│   │   ├── variables_keycloak.tf  # Keycloak-specific variables
+│   │   └── main.tf              # Documentation
+│   ├── monitoring/              # Azure Monitor alerts + Logic App → Teams routing (per-env)
+│   │   ├── action_groups.tf     # Quiet (Teams) and paging (Teams + email) action groups
+│   │   ├── alerts_*.tf          # Alert rules: container apps, AppGW, Postgres, GHCR, self
+│   │   ├── availability_tests.tf  # Custom availability probe alerts
+│   │   ├── logic_app*.tf        # Logic App that posts Adaptive Cards to Teams
+│   │   ├── README.md            # Module docs + one-time Teams OAuth step
+│   │   └── variables.tf         # Module variables
+│   └── keycloak_realm/          # ismd realm definition (clients, flags, SMTP) via Keycloak API
+├── keycloak-config/             # Stage-2 Keycloak config root (separate state; see its README)
+│   ├── main.tf                  # Calls modules/keycloak_realm for the ismd realm
+│   ├── providers.tf             # keycloak + azurerm providers
+│   ├── backend.tf               # Separate tfstate, workspace-per-env
+│   ├── {dev,test,prod}.tfvars   # Non-secret per-env realm settings (committed)
+│   └── README.md                # Usage, state model, SMTP gating
+├── docs/
+│   └── runbooks/                # One short runbook per alert rule
 ├── shared-global/               # Shared global infrastructure state
 │   ├── main.tf                  # Shared global module configuration
 │   ├── backend.tf               # Backend configuration
@@ -124,15 +150,19 @@ Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform work
 │   └── terraform.tfvars         # Global configuration values (gitignored — not committed)
 ├── .github/workflows/           # CI/CD pipelines
 │   ├── terraform.yml                  # Manual infrastructure updates
-│   └── terraform-shared-global.yml    # App Gateway management
+│   ├── terraform-plan.yml             # Plan-only run (e.g. on PRs)
+│   ├── terraform-shared-global.yml    # App Gateway management
+│   └── trivy-reusable.yml             # Reusable Trivy IaC scan (see docs/security-scanning.md)
 ├── main.tf                      # Root configuration with environment module calls
 ├── backend.tf                   # Azure Storage backend configuration
 ├── variables.tf                 # Input variable definitions
 ├── outputs.tf                   # Root module outputs
 ├── terraform.tfvars.example     # Example variables (copy to terraform.tfvars)
-├── docker-compose.yml           # Base Docker Compose configuration
-├── docker-compose.dev.yml       # Development Docker Compose overrides
-└── docker-compose.local.yml     # Local development Docker Compose overrides
+├── docker-compose.yml           # Base services (backends, postgres, keycloak, fuseki)
+├── docker-compose.frontends.yml # Frontend services (chained by the compose wrapper)
+├── docker-compose.full-stack.yml # Standalone full-stack entrypoint (raw `docker compose`)
+├── compose.sh / compose.ps1     # Recommended wrapper around the chained compose files
+└── compose.env.example          # Copy to .env for the compose wrapper
 ```
 
 ## Modules
@@ -201,13 +231,13 @@ Container images are intentionally excluded from Terraform management via `lifec
 
 ### Tool Apps Module (`modules/tool_apps/`)
 
-Manages the full tool application stack: frontend, backend, PostgreSQL Flexible Server, and Keycloak.
+Manages the full tool application stack: frontend, backend, PostgreSQL Flexible Server, Apache Jena Fuseki (triple store), and Keycloak.
 
 #### Files:
 
 - **`backend.tf`**: Tool backend container app (Spring Boot, path `/popisujeme`)
 - **`frontend.tf`**: Tool frontend container app (Next.js, path `/popisujeme`)
-- **`database.tf`**: PostgreSQL Flexible Server for tool data
+- **`database.tf`**: PostgreSQL Flexible Server for tool data, plus the Apache Jena Fuseki triple store container app and its persistent storage (toggled by `deploy_fuseki`)
 - **`keycloak.tf`**: Keycloak container app for tool authentication (path `/popisujeme/auth`)
 - **`outputs.tf`**: Module outputs (FQDNs, URLs, resource names)
 - **`variables.tf`**: Core module variables
@@ -216,7 +246,23 @@ Manages the full tool application stack: frontend, backend, PostgreSQL Flexible 
 
 Keycloak runs as a Container App in the same environment as the tool and is routed by the App Gateway at `/popisujeme/auth`. It can be disabled via `deploy_keycloak = false`.
 
+Apache Jena Fuseki runs as a Container App (internal ingress) backing the tool backend as its RDF triple store, with data persisted to an Azure File Share. It is toggled by `deploy_fuseki`.
+
 Same `lifecycle { ignore_changes }` image pattern as the validator module — see above.
+
+### Monitoring Module (`modules/monitoring/`)
+
+Per-env module that wires Azure Monitor alert routing to Teams and email. Gated by `deploy_monitoring` and ingestion-capped.
+
+- **Action Groups**: `ag-dia-quiet-{env}` (Teams webhook only) and `ag-dia-paging-{env}` (Teams + email, created only when `paging_email_recipients` is non-empty — primarily PROD).
+- **Logic App**: receives the Azure Monitor common alert schema and posts an Adaptive Card to the configured Teams channel (`teams_group_id` / `teams_channel_id`).
+- **Alert rules**: Container Apps (replicas-zero, 5xx, CPU, memory, restart-count), App Gateway (backend-unhealthy, 5xx), PostgreSQL (db-alive, CPU, memory, storage, connection-failures), GHCR pull failures, Log Analytics ingestion cap, and custom availability probes. Each alert links a runbook under `docs/runbooks/`.
+
+One-time manual step after first apply: OAuth-authorize the Teams connector in the portal (Microsoft requires a user identity; terraform can't). See [`modules/monitoring/README.md`](modules/monitoring/README.md).
+
+### Keycloak Realm Config (`keycloak-config/` + `modules/keycloak_realm/`)
+
+Stage-2 configuration that manages the `ismd` realm **inside** the running Keycloak via its admin API — clients, login/registration flags, and SMTP. It does not deploy Keycloak (that's the `azurerm` container in `tool_apps`). Separate state, workspace-per-env, applied after Keycloak is reachable. See [`keycloak-config/README.md`](keycloak-config/README.md).
 
 ### Application Gateway Architecture
 
@@ -224,7 +270,7 @@ The Application Gateway is part of the `shared_global` module. Routing configura
 
 #### Features:
 
-- **Standard_v2 SKU** with autoscaling (0-10 instances)
+- **WAF_v2 SKU** with autoscaling (1-10 instances), a WAF policy running Microsoft Default Rule Set (DRS) 2.2 with rate limiting, and a pinned modern SSL policy
 - **Zone Redundancy**: Deployed across availability zones 1, 2, 3
 - **Dual-Stack Support**: IPv4 + IPv6 frontend configurations
 - **TLS 1.2+ enforcement** with Key Vault certificate integration
@@ -235,7 +281,7 @@ The Application Gateway is part of the `shared_global` module. Routing configura
   - `/popisujeme/auth`, `/popisujeme/auth/*` → Tool Keycloak
   - `/popisujeme/api/*` → Tool frontend (Next.js API routes incl. NextAuth)
   - `/popisujeme/*` → Tool frontend
-  > Note: Tool backend has internal ingress only — not reachable from App Gateway. Swagger UI and API docs are proxied through the tool frontend via Next.js rewrites.
+  > Note: On TEST/PROD the tool backend uses internal ingress only (pure BFF) — not reachable from App Gateway; Swagger UI and API docs are proxied through the tool frontend via Next.js rewrites. DEV is an exception: `backend_external_enabled = true` and App Gateway exposes a dedicated `/popisujeme/be/*` route (stripped to `/popisujeme/*` by the backend HTTP setting) for the local-frontend → DEV-backend dev loop. See the header comment in `appgw_tool_config.tf`.
 - **Hostname-Based Routing**: Support for custom domains per environment
 - **Lifecycle Protection**: `prevent_destroy` enabled on gateway and public IPs
 
@@ -306,7 +352,7 @@ All environments use dedicated D4 workload profiles with VNet integration for co
 
    Non-sensitive config (resource group names, image tags, hostnames) lives in `environments/<env>/terraform.tfvars` and is committed to the repo. No setup needed here.
 
-   Sensitive variables (Postgres password, Keycloak secrets, NextAuth secret) are loaded from a `.env.<env>` file which is gitignored:
+   Non-secret ops config (operator IPs, alert recipients, Teams ids) lives in a gitignored `.env.<env>` file. Secrets are not put there — `terraw` pulls those from `ismd-kv-<env>` per `.terraw-vault-map`:
    ```bash
    # bash
    cp .env.example .env.dev
@@ -328,7 +374,7 @@ All environments use dedicated D4 workload profiles with VNet integration for co
    .\terraw.ps1 switch dev
    ```
 
-   `switch` exports all `TF_VAR_*` secrets from `.env.<env>`, runs `terraform workspace select <env>`, and persists the env name in `.terraw-env` so subsequent `plan`/`apply` auto-inject `-var-file=environments/<env>/terraform.tfvars` and re-load secrets.
+   `switch` exports all `TF_VAR_*` from `.env.<env>`, resolves the mapped secrets from Key Vault, runs `terraform workspace select <env>`, and persists the env name in `.terraw-env` so subsequent `plan`/`apply` auto-inject `-var-file=environments/<env>/terraform.tfvars` and re-load secrets.
 
    In CI, secrets are injected automatically from GitHub Actions secrets — `terraw` is not used.
 
@@ -592,12 +638,13 @@ docker compose -f docker-compose.yml \
 
 ### Files in this repo
 
-- `docker-compose.yml` — aggregator using `include:` for sibling repos.
-- `docker-compose.frontends.yml` — optional include for containerized frontends.
+- `docker-compose.yml` — aggregator using `include:` for sibling repos (base backend services).
+- `docker-compose.frontends.yml` — optional include for containerized frontends (chained by the wrapper).
+- `docker-compose.full-stack.yml` — standalone full-stack entrypoint for raw `docker compose --profile full-backend`; the wrapper does **not** use it (see [`COMPOSE.md`](COMPOSE.md)).
 - `compose.sh` / `compose.ps1` — wrapper scripts (recommended entrypoint).
-- `docker-compose.dev.yml` / `docker-compose.local.yml` — legacy overrides
-  retained for the validator-only quick start (`docker compose -f
-  docker-compose.yml -f docker-compose.dev.yml up`).
+- `compose.env.example` — copy to `.env` for the compose wrapper (Docker Compose auto-loads `.env`). This is distinct from `.env.example`, which is copied to `.env.<env>` for Terraform secrets via `terraw` — two different files for two different purposes.
+
+> See [`COMPOSE.md`](COMPOSE.md) for the standalone full-stack compose path; this section covers the recommended wrapper.
 
 ## Configuration Management
 
@@ -618,7 +665,8 @@ Key variables managed through Terraform across all container apps:
 
 ### Security Features
 
-- **Application Gateway**: TLS 1.2+ enforcement, WAF capabilities
+- **Application Gateway**: WAF_v2 with Microsoft Default Rule Set (DRS) 2.2 + rate limiting, pinned modern SSL policy (TLS 1.2+)
+- **Monitoring**: Azure Monitor alerts routed to Teams/email via Logic App (gated by `deploy_monitoring`)
 - **Restricted Ingress**: Backend and frontend use external ingress restricted to Application Gateway public IP only
 - **Resource Protection**: Critical resources have `prevent_destroy` lifecycle rules
 

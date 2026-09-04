@@ -73,9 +73,41 @@ resource "azurerm_subnet" "shared_apps" {
 
 # Log Analytics Workspace for shared Container App Environment
 resource "azurerm_log_analytics_workspace" "shared" {
-  name                = "ismd-shared-log-workspace-${var.environment}"
+  name                = "ismd-shared-logs-${var.environment}"
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
+
+  daily_quota_gb = var.log_analytics_daily_cap_gb
+
+  # Container Apps log shipping uses the workspace's shared key for ingestion auth.
+  # Newer azurerm provider versions default to disabling local auth (key auth) in favor
+  # of AAD, which silently breaks Container App log ingestion. Must be explicitly enabled.
+  # Setting must be present at workspace creation — toggling after the fact does not
+  # repair an already-broken ingestion state.
+  local_authentication_enabled = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# Shared Application Insights — one per env, all apps differentiate via cloud_RoleName
+# (auto-set by the SDK from container name). Workspace-based, ingests into the LA workspace above.
+resource "azurerm_application_insights" "shared" {
+  name                = "ismd-app-insights-${var.environment}"
+  location            = azurerm_resource_group.shared.location
+  resource_group_name = azurerm_resource_group.shared.name
+  workspace_id        = azurerm_log_analytics_workspace.shared.id
+  application_type    = "web"
+
+  daily_data_cap_in_gb                  = var.app_insights_daily_cap_gb
+  daily_data_cap_notifications_disabled = false
+  retention_in_days                     = 30
 
   lifecycle {
     prevent_destroy = true

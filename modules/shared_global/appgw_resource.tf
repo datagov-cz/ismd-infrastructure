@@ -9,11 +9,19 @@ resource "azurerm_application_gateway" "appgw" {
   name                = "ismd-app-gateway"
   resource_group_name = azurerm_resource_group.shared_global.name
   location            = azurerm_resource_group.shared_global.location
-  enable_http2        = true
+  http2_enabled       = true
 
   lifecycle {
     prevent_destroy = true
   }
+
+  # The HTTPS-listener cert is pulled from ismd-kv-global via the AppGW's
+  # ismd-identity. That identity's read access is granted by the access policy
+  # below, which references only a plain-string secret id — so without this
+  # explicit edge Terraform could update the cert before the policy lands and
+  # Azure would reject the pull. Ordering the policy first makes the migration
+  # single-pass.
+  depends_on = [azurerm_key_vault_access_policy.appgw]
 
   identity {
     type = "UserAssigned"
@@ -22,15 +30,36 @@ resource "azurerm_application_gateway" "appgw" {
     ]
   }
 
+  # WAF_v2 (required for WAF features — rate limiting, OWASP CRS). Bumped from
+  # Standard_v2; this is an in-place SKU update, not a replacement.
   sku {
-    name = "Standard_v2"
-    tier = "Standard_v2"
+    name = "WAF_v2"
+    tier = "WAF_v2"
+  }
+
+  # Gateway-wide WAF policy (rate limiting + OWASP CRS 3.2). Applies to all
+  # listeners/hostnames. See waf_policy.tf.
+  firewall_policy_id = azurerm_web_application_firewall_policy.appgw.id
+
+  # Modern predefined SSL policy. Default (sslPolicy = null) inherits Azure's
+  # base policy which permits TLS renegotiation on TLS 1.2 connections — that
+  # tripped Azure's App Insights Standard Web Test agents with
+  # "The function requested is not supported" (Windows ERROR_NOT_SUPPORTED
+  # from Schannel when the server requests renegotiation). 20220101 is the
+  # current Microsoft-recommended baseline: TLS 1.2 + 1.3, no renegotiation,
+  # AEAD ciphers only.
+  ssl_policy {
+    policy_type = "Predefined"
+    policy_name = "AppGwSslPolicy20220101"
   }
 
   zones = ["1", "2", "3"]
 
   autoscale_configuration {
-    min_capacity = 0
+    # Warm floor of 1 capacity unit so the gateway never serves from a cold
+    # zero — scale-out to higher capacity takes minutes, so a 0 floor risks
+    # latency/5xx on the first burst after idle. Scales up to max under load.
+    min_capacity = 1
     max_capacity = 10
   }
 

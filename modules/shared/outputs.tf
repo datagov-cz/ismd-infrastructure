@@ -44,3 +44,26 @@ output "shared_log_analytics_workspace_id" {
   description = "The ID of the shared Log Analytics Workspace"
   value       = azurerm_log_analytics_workspace.shared.id
 }
+
+# Application Insights outputs
+output "app_insights_id" {
+  description = "The ID of the shared Application Insights resource"
+  value       = azurerm_application_insights.shared.id
+}
+
+output "app_insights_name" {
+  description = "The name of the shared Application Insights resource"
+  value       = azurerm_application_insights.shared.name
+}
+
+output "app_insights_connection_string" {
+  description = "The connection string for the shared Application Insights resource. Inject into apps as APPLICATIONINSIGHTS_CONNECTION_STRING."
+  value       = azurerm_application_insights.shared.connection_string
+  sensitive   = true
+}
+
+output "app_insights_instrumentation_key" {
+  description = "Legacy instrumentation key. Prefer connection_string for new code."
+  value       = azurerm_application_insights.shared.instrumentation_key
+  sensitive   = true
+}

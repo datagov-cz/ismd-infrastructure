@@ -1,0 +1,38 @@
+# Dependabot — watches Terraform provider versions across the three root modules.
+# Providers are pinned to major in code (~> 4.0 azurerm, ~> 5.0 keycloak) and the
+# .terraform.lock.hcl files are committed, so Dependabot raises a PR for any newer
+# version within the pinned major (and flags the major bump itself when it ships).
+version: 2
+updates:
+  - package-ecosystem: "terraform"
+    directories:
+      - "/"
+      - "/shared-global"
+      - "/keycloak-config"
+    schedule:
+      interval: "weekly"
+    # Scheduled version-update PRs open against dev for review before reaching main.
+    # NOTE: security updates always target the default branch and ignore this.
+    target-branch: "dev"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    # One grouped PR per run instead of a separate PR per provider per directory.
+    groups:
+      terraform-providers:
+        patterns:
+          - "*"
+
+  # Watches action versions pinned in .github/workflows/ (actions/checkout, etc.).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

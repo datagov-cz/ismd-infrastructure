@@ -54,3 +54,15 @@ variable "workload_profile_max_count" {
   type        = number
   default     = 3
 }
+
+variable "log_analytics_daily_cap_gb" {
+  description = "Daily ingestion cap for the Log Analytics workspace in GB. Hard limit — ingestion pauses until UTC midnight when hit. Set higher in prod via env tfvars."
+  type        = number
+  default     = 0.5
+}
+
+variable "app_insights_daily_cap_gb" {
+  description = "Daily ingestion cap for Application Insights in GB. Hard limit; ingestion pauses until UTC midnight when hit. Set higher in prod via env tfvars."
+  type        = number
+  default     = 0.5
+}

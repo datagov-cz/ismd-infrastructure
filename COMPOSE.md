@@ -2,6 +2,25 @@
 
 Aggregates per-repo compose files into a single dev environment.
 
+## Recommended: the `compose.sh` / `compose.ps1` wrapper
+
+For day-to-day use, prefer the wrapper scripts over raw `docker compose`. They
+chain `docker-compose.yml` + `docker-compose.frontends.yml` (and per-repo build
+files) for you, expose `--frontends` / `--no-tool-be` / `--build <target>`
+flags, and print the resolved `docker compose …` command before running it. See
+the [README Docker Compose section](README.md#docker-compose-configuration) for
+the wrapper's flags and build targets.
+
+The rest of this document covers the **raw `docker compose` path** (using
+`docker-compose.full-stack.yml` directly) — the "without the wrapper" option,
+useful when you need full control over `-f` chains and profiles. Note the
+wrapper does **not** use `docker-compose.full-stack.yml`; that file is a
+separate standalone entrypoint.
+
+Env files differ by purpose: copy `compose.env.example` → `.env` for Docker
+Compose (auto-loaded), whereas `.env.example` → `.env.<env>` is for Terraform
+secrets via `terraw`.
+
 ## Which Repos Do I Need?
 
 | I'm working on... | Repos needed | Compose entrypoint |

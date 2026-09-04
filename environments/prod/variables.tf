@@ -53,6 +53,17 @@ variable "backend_image" {
   default     = "ghcr.io/datagov-cz/ismd-validator-backend"
 }
 
+variable "backend_port" {
+  description = "Port the backend Tomcat binds to; must match the running image's Spring server.port"
+  type        = number
+  default     = 8082
+
+  validation {
+    condition     = var.backend_port > 0 && var.backend_port < 65536
+    error_message = "The backend_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "backend_image_tag" {
   description = "Tag for the backend container image (e.g., 'latest', '1.0.0' or '1.0.0-abc1234')"
   type        = string
@@ -109,6 +120,42 @@ variable "app_gateway_public_ip_address" {
   type        = string
 }
 
+variable "shared_global_app_gateway_id" {
+  description = "Resource ID of the shared Application Gateway (from shared-global state). Empty disables AppGW alerts in this env."
+  type        = string
+  default     = ""
+}
+
+variable "deploy_monitoring" {
+  description = "Whether to provision the monitoring module (Action Groups + Logic App + Teams notifier). Default false until Phase A is verified end-to-end."
+  type        = bool
+  default     = false
+}
+
+variable "paging_email_recipients" {
+  description = "Email addresses (or one mail-enabled group address) that receive paging-tier alerts. Empty list → no paging action group is created."
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_card_language" {
+  description = "Language for Teams card labels and severity/status mapping (cs|en). Passed through to the monitoring module."
+  type        = string
+  default     = "cs"
+}
+
+variable "teams_group_id" {
+  description = "Teams group (team) ID the Logic App posts alerts to. Set via TF_VAR_teams_group_id in the gitignored .env.<env> (Phase A: maintainer test channel; Phase B: DIA channel)."
+  type        = string
+  default     = ""
+}
+
+variable "teams_channel_id" {
+  description = "Teams channel ID within teams_group_id. Set via TF_VAR_teams_channel_id in the gitignored .env.<env>."
+  type        = string
+  default     = ""
+}
+
 variable "app_gateway_hostname" {
   description = "Hostname for the production environment (e.g., xn--slovnk-7va.gov.cz)"
   type        = string
@@ -140,6 +187,12 @@ variable "tool_backend_app_name" {
 }
 
 # Tool Database & Fuseki Configuration
+variable "admin_allowed_ips" {
+  description = "Operator/admin public IP(s) allowed direct access to the Tool Postgres server. Set via TF_VAR_admin_allowed_ips in .env.<env>."
+  type        = list(string)
+  default     = []
+}
+
 variable "tool_postgres_url" {
   description = "JDBC URL for Tool PostgreSQL"
   type        = string
@@ -273,6 +326,12 @@ variable "tool_keycloak_client_id" {
   default     = "ismd-app"
 }
 
+variable "tool_keycloak_idp_hint" {
+  description = "Keycloak IdP alias to redirect straight to (e.g. \"caais\"), skipping the Keycloak login page. Empty shows the Keycloak page."
+  type        = string
+  default     = ""
+}
+
 variable "tool_keycloak_client_secret" {
   description = "OIDC client secret used by tool apps"
   type        = string
@@ -286,8 +345,116 @@ variable "tool_caais_client_id" {
   default     = ""
 }
 
+variable "tool_caais_p12_kv_secret_id" {
+  description = "KV secret id in ismd-kv-<env> yielding the base64 CAAIS client PKCS12 — normally the auto-exposed secret of the CAAIS KV Certificate object. Empty = CAAIS mTLS keystore not yet wired."
+  type        = string
+  default     = ""
+}
+
+variable "tool_caais_keystore_password_kv_secret_id" {
+  description = "KV secret id for the CAAIS PKCS12 keystore password."
+  type        = string
+  default     = ""
+}
+
+
+variable "tool_nkd_sparql_endpoint" {
+  description = <<-EOT
+    NKD SPARQL endpoint for the tool backend (NKD_SPARQL_ENDPOINT). One target per
+    environment: pod-develop for DEV, pod-test for TEST, data.gov.cz for PROD.
+    Empty falls back to the image default (production NKD). Keep the path segment
+    percent-encoded (slovn%C3%ADky).
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "tool_app_insights_kv_secret_id" {
+  description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-prod.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_postgres_password_kv_secret_id" {
+  description = "Class A: versionless KV secret id for the tool backend's postgres password (e.g. https://ismd-kv-prod.vault.azure.net/secrets/postgres-password). Empty = inline value. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_client_secret_kv_secret_id" {
+  description = "Class A: versionless KV secret id for the tool backend's keycloak client secret (e.g. https://ismd-kv-prod.vault.azure.net/secrets/keycloak-client-secret). Empty = inline value. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_nextauth_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's NextAuth secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_keycloak_client_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's keycloak client secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_frontend_site_preview_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the tool frontend's site-preview secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_backend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the validator backend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_frontend_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the validator frontend's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "validator_frontend_site_preview_secret_kv_secret_id" {
+  description = "Class A: KV secret id for the validator frontend's site-preview secret. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_admin_password_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak admin password. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_db_password_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak DB password (point at the same postgres-password secret when deploy_postgres). Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_app_insights_kv_secret_id" {
+  description = "Class A: KV secret id for the keycloak container's app-insights connection string. Empty = inline. Set via .env.<env>."
+  type        = string
+  default     = ""
+}
+
 variable "additional_cors_origins" {
   description = "List of additional CORS origins to allow"
+  type        = list(string)
+  default     = []
+}
+
+variable "keyvault_operator_object_ids" {
+  description = "Entra object ids granted data-plane secret management (Get/List/Set/Delete/Recover) on the per-env Key Vault, so operators can seed/rotate secret values via CLI. Set via TF_VAR_keyvault_operator_object_ids in the gitignored .env.<env>; never commit personal principal ids. Empty = vault created with no operator policy."
   type        = list(string)
   default     = []
 }

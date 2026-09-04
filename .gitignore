@@ -8,11 +8,33 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
+
+# Lock files: commit only the real root locks (., shared-global, keycloak-config).
+# environments/* are child modules (sourced via ./environments/<env>) — their lock
+# files are vestigial and unused, so keep them out of the repo.
+environments/*/.terraform.lock.hcl
 terraform.tfvars
 !environments/*/terraform.tfvars
 
 # Terraform plan output (human-readable, for local review only)
 plan.*.txt
+
+# Binary plan files. `*.tfplan` above misses the names terraw.sh produces
+# (`tfplan.bin`, `tfplan-<env>`), so match the prefix directly.
+tfplan
+tfplan*
+
+# Raw log exports pulled during incident investigation (WAF/AppGW). These carry
+# client IPs and attack payloads — keep them local.
+fw.json
+
+# Planning / handover docs — kept locally for reference, not committed.
+# Operational runbooks (docs/runbooks/) and module READMEs ARE committed.
+docs/HANDOVER-monitoring.md
+docs/keycloak-smtp-plan.md
+docs/monitoring-plan.md
+docs/monitoring-overview.md
+docs/secrets-config-plan.md
 
 # Temporary and debug files
 *.log

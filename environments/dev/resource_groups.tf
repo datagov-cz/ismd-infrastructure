@@ -23,3 +23,15 @@ resource "azurerm_resource_group" "tool" {
     Application = "Tool"
   }
 }
+
+resource "azurerm_resource_group" "ai" {
+  count    = var.deploy_ai_apps ? 1 : 0
+  name     = var.ai_resource_group_name
+  location = var.location
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Application = "AI"
+  }
+}

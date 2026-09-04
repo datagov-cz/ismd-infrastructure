@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 4.37.0"
+      version = "~> 4.0"
     }
   }
 }
@@ -48,6 +48,7 @@ module "dev" {
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
+  backend_port       = var.backend_port
 
   # App names
   frontend_app_name = var.frontend_app_name
@@ -62,6 +63,9 @@ module "dev" {
   validator_resource_group_name = var.validator_resource_group_name
   tool_resource_group_name      = var.tool_resource_group_name
 
+  # Per-env Key Vault operator grants (seed/rotate secret values via CLI)
+  keyvault_operator_object_ids = var.keyvault_operator_object_ids
+
   # Tool Apps
   tool_frontend_image     = var.tool_frontend_image
   tool_frontend_image_tag = var.tool_frontend_image_tag
@@ -70,7 +74,11 @@ module "dev" {
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Tool Database & Fuseki
+  admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
@@ -88,11 +96,60 @@ module "dev" {
   tool_keycloak_realm          = var.tool_keycloak_realm
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
+  tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
+
+  tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+
+  tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
+  tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
+  tool_keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+
+  tool_frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
+  tool_frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id
+  tool_frontend_keycloak_client_secret_kv_secret_id = var.tool_frontend_keycloak_client_secret_kv_secret_id
+  tool_frontend_site_preview_secret_kv_secret_id    = var.tool_frontend_site_preview_secret_kv_secret_id
+
+  tool_keycloak_admin_password_kv_secret_id = var.tool_keycloak_admin_password_kv_secret_id
+  tool_keycloak_db_password_kv_secret_id    = var.tool_keycloak_db_password_kv_secret_id
+  tool_keycloak_app_insights_kv_secret_id   = var.tool_keycloak_app_insights_kv_secret_id
 
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
+
+  # AI apps (ismd-ai) — DEV only for now
+  deploy_ai_apps                    = var.deploy_ai_apps
+  ai_resource_group_name            = var.ai_resource_group_name
+  ai_backend_app_name               = var.ai_backend_app_name
+  ai_backend_image                  = var.ai_backend_image
+  ai_backend_image_tag              = var.ai_backend_image_tag
+  ai_app_environment                = var.ai_app_environment
+  ai_llm_enabled                    = var.ai_llm_enabled
+  ai_llm_provider                   = var.ai_llm_provider
+  ai_llm_endpoint_url               = var.ai_llm_endpoint_url
+  ai_llm_model                      = var.ai_llm_model
+  ai_llm_api_key                    = var.ai_llm_api_key
+  ai_llm_api_key_kv_secret_id       = var.ai_llm_api_key_kv_secret_id
+  ai_app_insights_kv_secret_id      = var.ai_app_insights_kv_secret_id
+  ai_postgres_password_kv_secret_id = var.ai_postgres_password_kv_secret_id
+  ai_ghcr_username                  = var.ai_ghcr_username
+
+  # Per-app DB user separation (Phase 2, DEV only). Empty tool_* = admin login;
+  # ai_db_user defaults to admin. Flip via .env.dev after db/user-separation Phase 1.
+  tool_backend_db_user       = var.tool_backend_db_user
+  tool_keycloak_db_user      = var.tool_keycloak_db_user
+  ai_db_user                 = var.ai_db_user
+  ai_ghcr_token              = var.ai_ghcr_token
+  ai_ghcr_token_kv_secret_id = var.ai_ghcr_token_kv_secret_id
+
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
@@ -103,11 +160,17 @@ module "dev" {
   # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
   validator_use_bff = var.validator_use_bff
 
+  # Validator Class A: KV references (empty = inline value)
+  validator_backend_app_insights_kv_secret_id         = var.validator_backend_app_insights_kv_secret_id
+  validator_frontend_app_insights_kv_secret_id        = var.validator_frontend_app_insights_kv_secret_id
+  validator_frontend_site_preview_secret_kv_secret_id = var.validator_frontend_site_preview_secret_kv_secret_id
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }
 
 # Test environment
@@ -115,15 +178,24 @@ module "test" {
   count  = terraform.workspace == "test" ? 1 : 0
   source = "./environments/test"
 
+  # Per-app DB user separation (Phase 2). Empty = admin login until test tfvars
+  # flips it. See infrastructure/db/user-separation/README.md.
+  tool_backend_db_user  = var.tool_backend_db_user
+  tool_keycloak_db_user = var.tool_keycloak_db_user
+
   # Common variables
   environment = "test"
   location    = var.location
+
+  # Per-env Key Vault operator grants (seed/rotate secret values via CLI)
+  keyvault_operator_object_ids = var.keyvault_operator_object_ids
 
   # Validator Apps
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
+  backend_port       = var.backend_port
   frontend_app_name  = var.frontend_app_name
   backend_app_name   = var.backend_app_name
 
@@ -140,7 +212,11 @@ module "test" {
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Tool Database & Fuseki
+  admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
@@ -158,8 +234,25 @@ module "test" {
   tool_keycloak_realm          = var.tool_keycloak_realm
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
+  tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
+
+  tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+
+  tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
+  tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
+  tool_keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+
+  tool_frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
+  tool_frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id
+  tool_frontend_keycloak_client_secret_kv_secret_id = var.tool_frontend_keycloak_client_secret_kv_secret_id
+  tool_frontend_site_preview_secret_kv_secret_id    = var.tool_frontend_site_preview_secret_kv_secret_id
+
+  tool_keycloak_admin_password_kv_secret_id = var.tool_keycloak_admin_password_kv_secret_id
+  tool_keycloak_db_password_kv_secret_id    = var.tool_keycloak_db_password_kv_secret_id
+  tool_keycloak_app_insights_kv_secret_id   = var.tool_keycloak_app_insights_kv_secret_id
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
@@ -167,6 +260,13 @@ module "test" {
 
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
+
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
@@ -177,11 +277,17 @@ module "test" {
   # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
   validator_use_bff = var.validator_use_bff
 
+  # Validator Class A: KV references (empty = inline value)
+  validator_backend_app_insights_kv_secret_id         = var.validator_backend_app_insights_kv_secret_id
+  validator_frontend_app_insights_kv_secret_id        = var.validator_frontend_app_insights_kv_secret_id
+  validator_frontend_site_preview_secret_kv_secret_id = var.validator_frontend_site_preview_secret_kv_secret_id
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }
 
 # Production environment
@@ -193,11 +299,15 @@ module "prod" {
   environment = "prod"
   location    = var.location
 
+  # Per-env Key Vault operator grants (seed/rotate secret values via CLI)
+  keyvault_operator_object_ids = var.keyvault_operator_object_ids
+
   # Validator Apps
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
   backend_image      = var.backend_image
   backend_image_tag  = var.backend_image_tag
+  backend_port       = var.backend_port
   frontend_app_name  = var.frontend_app_name
   backend_app_name   = var.backend_app_name
 
@@ -214,7 +324,11 @@ module "prod" {
   tool_frontend_app_name  = var.tool_frontend_app_name
   tool_backend_app_name   = var.tool_backend_app_name
 
+  # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
   # Tool Database & Fuseki
+  admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
@@ -232,8 +346,25 @@ module "prod" {
   tool_keycloak_realm          = var.tool_keycloak_realm
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
+  tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
+  tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
+
+  tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+
+  tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
+  tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
+  tool_keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+
+  tool_frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
+  tool_frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id
+  tool_frontend_keycloak_client_secret_kv_secret_id = var.tool_frontend_keycloak_client_secret_kv_secret_id
+  tool_frontend_site_preview_secret_kv_secret_id    = var.tool_frontend_site_preview_secret_kv_secret_id
+
+  tool_keycloak_admin_password_kv_secret_id = var.tool_keycloak_admin_password_kv_secret_id
+  tool_keycloak_db_password_kv_secret_id    = var.tool_keycloak_db_password_kv_secret_id
+  tool_keycloak_app_insights_kv_secret_id   = var.tool_keycloak_app_insights_kv_secret_id
 
   # CORS
   additional_cors_origins = var.additional_cors_origins
@@ -241,6 +372,13 @@ module "prod" {
 
   # Toggle for Tool apps deployment
   deploy_tool_apps = var.deploy_tool_apps
+
+  # Toggle for monitoring module deployment
+  deploy_monitoring       = var.deploy_monitoring
+  paging_email_recipients = var.paging_email_recipients
+  alert_card_language     = var.alert_card_language
+  teams_group_id          = var.teams_group_id
+  teams_channel_id        = var.teams_channel_id
 
   # Frontend gating
   validator_site_status         = var.validator_site_status
@@ -251,9 +389,15 @@ module "prod" {
   # Validator BFF mode (false = legacy public backend + NEXT_PUBLIC_BE_URL)
   validator_use_bff = var.validator_use_bff
 
+  # Validator Class A: KV references (empty = inline value)
+  validator_backend_app_insights_kv_secret_id         = var.validator_backend_app_insights_kv_secret_id
+  validator_frontend_app_insights_kv_secret_id        = var.validator_frontend_app_insights_kv_secret_id
+  validator_frontend_site_preview_secret_kv_secret_id = var.validator_frontend_site_preview_secret_kv_secret_id
+
   # Remote state (guarded for initial plan)
   shared_global_vnet_id             = try(data.terraform_remote_state.shared_global.outputs.vnet_id, "")
   shared_global_vnet_name           = try(data.terraform_remote_state.shared_global.outputs.vnet_name, "")
   shared_global_resource_group_name = try(data.terraform_remote_state.shared_global.outputs.resource_group_name, "")
   app_gateway_public_ip_address     = try(data.terraform_remote_state.shared_global.outputs.app_gateway_public_ip_address, "")
+  shared_global_app_gateway_id      = try(data.terraform_remote_state.shared_global.outputs.app_gateway_id, "")
 }
