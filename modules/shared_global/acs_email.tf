@@ -9,7 +9,7 @@
 #   "Communication and Email Service Owner" role assignment on the ACS resource +
 #   the ACS "SMTP Username" mapping) is NOT defined here. The terraform SP is
 #   Contributor-only and cannot create role assignments or Entra app registrations.
-#   That piece is provisioned out-of-band — see docs/acs-smtp-setup.md.
+#   That piece is provisioned out-of-band — see docs/runbooks/acs-smtp-setup.md.
 #
 # Domains:
 #   - Azure-managed domain: auto-verified, sendable immediately, sender is

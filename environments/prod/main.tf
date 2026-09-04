@@ -72,17 +72,20 @@ module "validator_apps" {
 # because tool, keycloak and the AI app all have databases on it. Each app module
 # creates its own database against server_id.
 #
-# resource_group_name: still the TOOL rg. Relocating to ismd-shared-prod is a
-# separate step — changing it here forces replacement (total data loss). Move the
-# resource with `az resource move`, re-import the addresses, then change it.
-# See docs/postgres-shared-move-plan.md.
+# resource_group_name is the SHARED rg, matching dev and test (both moved
+# 2026-09-02). No prod server exists yet, so this needs no `az resource move`:
+# whenever prod is first stood up the server is created in ismd-shared-prod
+# directly. If a prod server is ever created before this is applied, do NOT
+# simply edit this line — changing resource_group_name on an existing server
+# forces replacement and total data loss; move it in Azure first, re-import,
+# then change the config.
 module "postgres" {
   count  = var.deploy_tool_apps ? 1 : 0
   source = "../../modules/postgres"
 
   environment         = var.environment
   location            = var.location
-  resource_group_name = var.tool_resource_group_name
+  resource_group_name = var.shared_resource_group_name
 
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password

@@ -84,9 +84,15 @@ module "postgres" {
   count  = var.deploy_tool_apps ? 1 : 0
   source = "../../modules/postgres"
 
-  environment         = var.environment
-  location            = var.location
-  resource_group_name = var.tool_resource_group_name
+  environment = var.environment
+  location    = var.location
+
+  # The server lives in the shared RG, not the tool RG: it backs three tenants
+  # (ismd_tool_db, keycloak_db, ismd_ai), so it is a per-env shared resource.
+  # Moved in Azure with `az resource move` on 2026-09-02 and re-imported; the
+  # config change had to follow the move, because changing resource_group_name
+  # on an existing server forces replacement and total data loss.
+  resource_group_name = var.shared_resource_group_name
 
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password
@@ -256,6 +262,12 @@ module "tool_apps" {
   # tool backend image is deployed on DEV. TEST/PROD stay default false until
   # their jar images ship.
   enable_app_insights_agent = true
+
+  # Activate server-side App Insights on the Next.js frontend (injects
+  # OTEL_SERVICE_NAME). Safe here because the dep-bearing image is deployed on
+  # DEV: ismd-tool-frontend-dev:1.0.2-640eed0 carries @azure/monitor-opentelemetry
+  # 1.18.1. TEST stays default false — its released 1.0.2 image predates the dep.
+  enable_frontend_app_insights = true
 
   depends_on = [
     module.shared,
