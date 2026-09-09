@@ -66,5 +66,8 @@ nia_jwks_url          = "https://tnia.identita.gov.cz/FPSTS/oidc/openid-configur
 # A URN, not a URL — and the SAME on test and prod.
 nia_issuer             = "urn:microsoft:cgg2010:fpsts"
 nia_validate_signature = true
-# "profile" is not a supported NIA scope. Append the LoA scope once DIA decides.
-nia_default_scopes = "openid"
+# "profile" is not a supported NIA scope. LoA is "loalow" — the least level that
+# satisfies the service, decided 2026-09-07. It rides on the scope as the floor that
+# no caller can forget; acr_values carries the same level from the frontend and is
+# what NIA reads first. With no comparison scope, NIA defaults to loamin ("or better").
+nia_default_scopes = "openid loalow"

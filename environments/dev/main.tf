@@ -233,6 +233,8 @@ module "tool_apps" {
   keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   keycloak_client_id      = var.tool_keycloak_client_id
   keycloak_idp_hint       = var.tool_keycloak_idp_hint
+  keycloak_acr_values     = var.tool_keycloak_acr_values
+  keycloak_nia_enabled    = var.tool_keycloak_nia_enabled
   keycloak_client_secret  = var.tool_keycloak_client_secret
   caais_client_id         = var.tool_caais_client_id
 

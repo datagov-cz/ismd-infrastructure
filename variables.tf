@@ -212,6 +212,18 @@ variable "tool_keycloak_idp_hint" {
   default     = ""
 }
 
+variable "tool_keycloak_acr_values" {
+  description = "Level of Assurance requested on the authorization request (e.g. \"loalow\"). Forwarded by Keycloak to the upstream IdP. Empty sends nothing."
+  type        = string
+  default     = ""
+}
+
+variable "tool_keycloak_nia_enabled" {
+  description = "Show the NIA login button in the tool frontend. Flip together with enable_nia in keycloak-config — a button without the IdP is a Keycloak error page."
+  type        = bool
+  default     = false
+}
+
 variable "tool_keycloak_client_secret" {
   description = "OIDC client secret used by tool apps"
   type        = string
