@@ -39,6 +39,12 @@ tool_keycloak_hostname = "xn--slovnk-test-scb.dia.gov.cz"
 # + the CAAIS button). The IdP itself stays enabled. Restore with "caais".
 tool_keycloak_idp_hint = ""
 
+# Level of Assurance requested per login. Injected as KEYCLOAK_ACR_VALUES; auth.ts turns
+# it into acr_values, which Keycloak forwards to the upstream IdP. NIA reads acr in
+# preference to the LoA scope, and both carry the same level (see keycloak-config).
+# Inert until enable_nia = true; CAAIS ignores acr_values.
+tool_keycloak_acr_values = "loalow"
+
 # App names
 frontend_app_name = "ismd-validator-frontend"
 backend_app_name  = "ismd-validator-backend"
