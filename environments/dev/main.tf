@@ -5,12 +5,13 @@
 module "shared" {
   source = "../../modules/shared"
 
-  environment                     = var.environment
-  location                        = var.location
-  resource_group_name             = var.shared_resource_group_name
-  vnet_address_space              = "10.0.0.0/16"        # DEV: 10.0.x.x (default, already deployed)
-  vnet_address_space_ipv6         = "fd00:db8:deca::/48" # DEV: default IPv6 (already deployed)
-  validator_subnet_address_prefix = "10.0.2.0/23"        # DEV: within 10.0.0.0/16 (already deployed)
+  environment                            = var.environment
+  location                               = var.location
+  resource_group_name                    = var.shared_resource_group_name
+  vnet_address_space                     = "10.0.0.0/16"        # DEV: 10.0.x.x (default, already deployed)
+  vnet_address_space_ipv6                = "fd00:db8:deca::/48" # DEV: default IPv6 (already deployed)
+  validator_subnet_address_prefix        = "10.0.2.0/23"        # DEV: within 10.0.0.0/16 (already deployed)
+  private_endpoint_subnet_address_prefix = "10.0.6.0/24"        # DEV: private endpoints, not delegated
 }
 
 # Create validator apps using shared Container App Environment
@@ -106,9 +107,16 @@ module "postgres" {
   postgres_sku_name       = "B_Standard_B1ms" # Burstable tier for dev
   postgres_storage_mb     = 32768             # 32GB
 
-  # Firewall allowlist. No NAT gateway on the apps subnet yet, so apps egress via
-  # dynamic Azure SNAT and need allow_azure_services (default true).
-  # app_outbound_ips stays empty until a NAT gateway provides a stable egress IP.
+  # Private endpoint in this env's VNet; the apps reach the server through it.
+  # allow_azure_services stays true until the private path is verified, then flips
+  # to false (see modules/postgres/main.tf).
+  enable_private_endpoint    = true
+  private_endpoint_subnet_id = module.shared.private_endpoint_subnet_id
+  vnet_id                    = module.shared.virtual_network_id
+  allow_azure_services       = false
+
+  # Firewall allowlist: operator IPs only. app_outbound_ips is unused — the apps come
+  # in over the private endpoint, not the public one.
   app_outbound_ips  = []
   admin_allowed_ips = var.admin_allowed_ips
 }
@@ -477,7 +485,7 @@ module "monitoring" {
     }
   } : {}
 
-  depends_on = [
-    module.shared,
-  ]
+  # No module-level depends_on: the module.shared outputs above already order this
+  # module, and depends_on would defer data.azurerm_client_config on ANY module.shared
+  # change, forcing replacement of the Teams API connection (manual re-consent).
 }

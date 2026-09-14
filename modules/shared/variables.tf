@@ -37,6 +37,12 @@ variable "tool_subnet_address_prefix" {
   default     = "10.0.4.0/23"
 }
 
+variable "private_endpoint_subnet_address_prefix" {
+  description = "Address prefix for the private-endpoint subnet (not delegated). Empty creates no subnet."
+  type        = string
+  default     = ""
+}
+
 variable "workload_profile_type" {
   description = "Workload profile type for the shared Container App Environment"
   type        = string

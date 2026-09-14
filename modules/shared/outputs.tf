@@ -25,6 +25,11 @@ output "shared_apps_subnet_id" {
   value       = azurerm_subnet.shared_apps.id
 }
 
+output "private_endpoint_subnet_id" {
+  description = "The ID of the private-endpoint subnet, or null when the environment sets no prefix"
+  value       = try(azurerm_subnet.private_endpoints[0].id, null)
+}
+
 output "shared_container_app_environment_id" {
   description = "The ID of the shared Container App Environment"
   value       = azurerm_container_app_environment.shared.id
