@@ -347,7 +347,7 @@ module "monitoring" {
     }
   } : {}
 
-  depends_on = [
-    module.shared,
-  ]
+  # No module-level depends_on: the module.shared outputs above already order this
+  # module, and depends_on would defer data.azurerm_client_config on ANY module.shared
+  # change, forcing replacement of the Teams API connection (manual re-consent).
 }
