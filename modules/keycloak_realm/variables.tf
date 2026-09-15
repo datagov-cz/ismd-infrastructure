@@ -199,7 +199,7 @@ variable "nia_client_id" {
 }
 
 variable "nia_client_secret" {
-  description = "Shared secret for the NIA token endpoint. REQUIRED when enable_nia = true — NIA advertises client_secret_post as its only supported auth method, so unlike CAAIS there is no certificate fallback. Supply via TF_VAR_nia_client_secret, never in tfvars."
+  description = "Client secret for the NIA token endpoint. Leave empty — NIA issues none; its token request takes client_id, grant_type and code only (NIA developer wiki, OpenID Connect protokol). If one is ever issued, supply via TF_VAR_nia_client_secret, never in tfvars."
   type        = string
   default     = ""
   sensitive   = true

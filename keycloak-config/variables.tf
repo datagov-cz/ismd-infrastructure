@@ -142,7 +142,7 @@ variable "nia_client_id" {
 }
 
 variable "nia_client_secret" {
-  description = "Shared secret for the NIA token endpoint, if one is issued. Supply via TF_VAR_nia_client_secret — never commit."
+  description = "Client secret for the NIA token endpoint. Leave empty — NIA issues none. If one is ever issued, supply via TF_VAR_nia_client_secret — never commit."
   type        = string
   default     = ""
   sensitive   = true

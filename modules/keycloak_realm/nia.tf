@@ -18,15 +18,21 @@
 # several places (the handbook lists only 4 endpoints; discovery has 6). Re-read it
 # before changing anything here. What it establishes:
 #
-#   - token_endpoint_auth_methods_supported = ["client_secret_post"] ONLY. So NIA
-#     is a SHARED-SECRET integration, NOT mTLS like CAAIS. No outbound keystore, no
-#     init container, no certificate. Set nia_client_secret and that is the whole
-#     of it. The only open question is how DIA receives that secret — the
-#     registration form has no field that issues one.
+#   - token_endpoint_auth_methods_supported = ["client_secret_post"] ONLY. NOT mTLS
+#     like CAAIS: no outbound keystore, no init container, no certificate.
+#     But NO SECRET IS ISSUED either. The NIA developer wiki ("OpenID Connect
+#     protokol", Token endpoint) lists the token request as client_id, grant_type,
+#     code — plus redirect_uri and code_verifier, both "hodnota je ignorována".
+#     No client_secret anywhere on the page, and the registration form issues none.
+#     NIA identifies the SeP by client_id + the registered redirect_uri, so
+#     nia_client_secret stays empty. Confirmed 2026-09-15: the token call succeeds
+#     with client_id + code alone.
 #   - jwks_uri exists, so signature validation is on by default here.
-#   - NO id_token_encryption_alg_values_supported → NIA does not do JWE on OIDC,
-#     which is consistent with the registration form's encryption certificate
-#     (field 12) being a SAML-only concern. Nothing here depends on it.
+#   - NO id_token_encryption_alg_values_supported — but NIA DOES encrypt the
+#     id_token anyway (verified 2026-09-15): JWE, alg RSA-OAEP, enc A256CBC-HS512,
+#     no kid. It encrypts to the certificate uploaded in registration field 12, and
+#     Keycloak decrypts with the realm's active RSA-OAEP key. If those two do not
+#     pair, login fails with "Padding error in decryption".
 #   - NO code_challenge_methods_supported → PKCE is NOT advertised; see below.
 #   - Claim names are eIDAS-style (CurrentGivenName, …), NOT the OIDC standard
 #     given_name/family_name that CAAIS uses. See the mappers at the bottom.
@@ -52,8 +58,9 @@ resource "keycloak_oidc_identity_provider" "nia" {
   logout_url = var.nia_logout_url
 
   client_id = var.nia_client_id
-  # REQUIRED when enabled — NIA supports client_secret_post only. Supply via
-  # TF_VAR_nia_client_secret / Key Vault, never in tfvars.
+  # Empty by default — NIA issues no secret (see header). Optional in provider
+  # 5.7.0. If NIA ever issues one, supply via TF_VAR_nia_client_secret / Key Vault,
+  # never in tfvars.
   client_secret = var.nia_client_secret
 
   default_scopes = var.nia_default_scopes
@@ -78,13 +85,13 @@ resource "keycloak_oidc_identity_provider" "nia" {
   hide_on_login_page = false
 
   extra_config = {
-    # The only method NIA advertises. Ordinary shared-secret auth in the request body.
+    # The only method NIA advertises. In practice only client_id goes in the body
+    # that NIA reads; no secret is issued (see header).
     clientAuthMethod = var.nia_client_auth_method
 
     # PKCE OFF, unlike CAAIS. NIA's discovery document advertises no
-    # code_challenge_methods_supported, so it is presumed unsupported — sending a
-    # code_challenge risks the authorize call being rejected outright. Revisit if
-    # NIA confirms support; it is a plain apply to turn on.
+    # code_challenge_methods_supported, and the developer wiki says code_verifier
+    # is ignored at the token endpoint — PKCE would add nothing.
     pkceEnabled = "false"
   }
 }

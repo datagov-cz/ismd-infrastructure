@@ -56,8 +56,8 @@ caais_issuer            = "https://rest-openidconnectapi.caais.gov.cz/" # traili
 # From NIA's discovery document at the non-standard path
 # https://tnia.identita.gov.cz/fpsts/oidc/openid-configuration (no .well-known).
 # See NIA-INTEGRATION-REQUEST.md.
-enable_nia            = false
-nia_client_id         = "" # = "https://xn--slovnk-test-scb.dia.gov.cz/popisujeme" once registered
+enable_nia            = true
+nia_client_id         = "https://xn--slovnk-test-scb.dia.gov.cz/popisujeme" # registered Unikátní URL, confirmed by NIA 2026-09-15
 nia_authorization_url = "https://tnia.identita.gov.cz/FPSTS/oidc/authorize"
 nia_token_url         = "https://tnia.identita.gov.cz/FPSTS/oidc/token"
 nia_logout_url        = "https://tnia.identita.gov.cz/FPSTS/oidc/endsession"
