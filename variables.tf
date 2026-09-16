@@ -444,7 +444,7 @@ variable "ai_llm_endpoint_url" {
 }
 
 variable "ai_llm_model" {
-  description = "LLM model name. For AZURE_OPENAI this is the *deployment* name (substituted into {model} in the endpoint URL), e.g. gpt-4o-mini-dev."
+  description = "LLM model name. For AZURE_OPENAI this is the *deployment* name, sent in the request body, e.g. gpt-4o-mini-dev."
   type        = string
   default     = "gpt-4o-mini"
 }
@@ -460,6 +460,55 @@ variable "ai_llm_api_key_kv_secret_id" {
   description = "Key Vault secret id for the LLM API key (empty = inline value)"
   type        = string
   default     = ""
+}
+
+# Azure OpenAI (Foundry) — DEV only for now; see environments/dev/ai_foundry.tf.
+
+variable "deploy_ai_foundry" {
+  description = "Create the Azure OpenAI account + deployment. Pay-per-token: costs nothing until tokens are consumed."
+  type        = bool
+  default     = false
+}
+
+variable "ai_foundry_location" {
+  description = "Region for the Azure OpenAI account. Not var.location — model availability is per region."
+  type        = string
+  default     = "swedencentral"
+}
+
+variable "ai_foundry_deployment_name" {
+  description = "Deployment name; what ismd-ai sends as ai_llm_model for AZURE_OPENAI."
+  type        = string
+  default     = "gpt-4o-mini-dev"
+}
+
+variable "ai_foundry_model_name" {
+  description = "Underlying model id to deploy."
+  type        = string
+  default     = "gpt-4o-mini"
+}
+
+variable "ai_foundry_model_version" {
+  description = "Model version. Must be offered for the chosen SKU in ai_foundry_location."
+  type        = string
+  default     = "2024-07-18"
+}
+
+variable "ai_foundry_deployment_sku" {
+  description = "Deployment type. Standard family only — pay-per-token, zero cost at rest."
+  type        = string
+  default     = "DataZoneStandard"
+
+  validation {
+    condition     = contains(["Standard", "GlobalStandard", "DataZoneStandard"], var.ai_foundry_deployment_sku)
+    error_message = "Only pay-per-token SKUs are allowed. *ProvisionedManaged bills hourly from creation and must not be set here."
+  }
+}
+
+variable "ai_foundry_deployment_capacity" {
+  description = "Quota in thousands of tokens per minute (TPM)."
+  type        = number
+  default     = 10
 }
 
 variable "ai_app_insights_kv_secret_id" {

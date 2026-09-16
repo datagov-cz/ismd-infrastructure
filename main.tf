@@ -134,6 +134,13 @@ module "dev" {
   ai_llm_model                      = var.ai_llm_model
   ai_llm_api_key                    = var.ai_llm_api_key
   ai_llm_api_key_kv_secret_id       = var.ai_llm_api_key_kv_secret_id
+  deploy_ai_foundry                 = var.deploy_ai_foundry
+  ai_foundry_location               = var.ai_foundry_location
+  ai_foundry_deployment_name        = var.ai_foundry_deployment_name
+  ai_foundry_model_name             = var.ai_foundry_model_name
+  ai_foundry_model_version          = var.ai_foundry_model_version
+  ai_foundry_deployment_sku         = var.ai_foundry_deployment_sku
+  ai_foundry_deployment_capacity    = var.ai_foundry_deployment_capacity
   ai_app_insights_kv_secret_id      = var.ai_app_insights_kv_secret_id
   ai_postgres_password_kv_secret_id = var.ai_postgres_password_kv_secret_id
   ai_ghcr_username                  = var.ai_ghcr_username
