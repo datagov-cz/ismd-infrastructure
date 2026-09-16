@@ -51,6 +51,11 @@ deploy_tool_apps = true
 # (inline values first, then flip to KV refs). Flip back once that's fixed.
 deploy_ai_apps = true
 
+# Azure OpenAI account + gpt-4o-mini DataZoneStandard deployment (ai_foundry.tf).
+# Pay-per-token, so creating it costs nothing; spend starts only when ai_llm_enabled
+# flips to true. gpt-4o-mini 2024-07-18 is Deprecating (inference retires 2027-04-14).
+deploy_ai_foundry = true
+
 # Frontend gating — DEV is open for the engineering team
 validator_site_status = "live"
 tool_site_status      = "live"
