@@ -87,6 +87,14 @@ variable "postgres_servers" {
   default = {}
 }
 
+# Service Health notices are subscription-wide, and every env shares one
+# subscription. Enable in exactly one env, or each env posts the same notice.
+variable "enable_service_health_alerts" {
+  description = "Create the subscription-scoped Service Health alert (planned maintenance, incidents) for all services. Enable in one env only."
+  type        = bool
+  default     = false
+}
+
 # Application Gateway alert scope. Optional — when set, the AppGW alert rules
 # (backend-unhealthy, 5xx) are deployed and scoped to this AppGW. Cross-state
 # reference via data.terraform_remote_state.shared_global from the env's main.tf.

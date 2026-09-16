@@ -108,6 +108,12 @@ module "postgres" {
   # in over the private endpoint, not the public one.
   app_outbound_ips  = []
   admin_allowed_ips = var.admin_allowed_ips
+
+  # Maintenance: Wednesday 00:00 UTC (02:00 Prague) — three days after dev.
+  maintenance_window = { day_of_week = 3, start_hour = 0, start_minute = 0 }
+
+  # Server logs + Query Store to the env workspace.
+  log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
