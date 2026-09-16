@@ -12,6 +12,10 @@ module "shared" {
   vnet_address_space_ipv6                = "fd00:db8:deca::/48" # DEV: default IPv6 (already deployed)
   validator_subnet_address_prefix        = "10.0.2.0/23"        # DEV: within 10.0.0.0/16 (already deployed)
   private_endpoint_subnet_address_prefix = "10.0.6.0/24"        # DEV: private endpoints, not delegated
+
+  # ~0.3 GB/day of app telemetry left no headroom under 0.5 for Postgres logs.
+  # Keep in sync with module.monitoring below.
+  log_analytics_daily_cap_gb = 1
 }
 
 # Create validator apps using shared Container App Environment
@@ -119,6 +123,12 @@ module "postgres" {
   # in over the private endpoint, not the public one.
   app_outbound_ips  = []
   admin_allowed_ips = var.admin_allowed_ips
+
+  # Maintenance: Sunday 00:00 UTC (02:00 Prague) — dev is patched first.
+  maintenance_window = { day_of_week = 0, start_hour = 0, start_minute = 0 }
+
+  # Server logs + Query Store to the env workspace.
+  log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
@@ -378,6 +388,7 @@ module "monitoring" {
   resource_group_name = var.shared_resource_group_name
 
   log_analytics_workspace_id       = module.shared.shared_log_analytics_workspace_id
+  log_analytics_daily_cap_gb       = 1 # must match module.shared
   application_insights_id          = module.shared.app_insights_id
   app_insights_instrumentation_key = module.shared.app_insights_instrumentation_key
   container_app_environment_id     = module.shared.shared_container_app_environment_id
@@ -477,6 +488,9 @@ module "monitoring" {
       }
     } : {},
   )
+
+  # Subscription-wide Service Health alert lives in dev only (one subscription for all envs).
+  enable_service_health_alerts = true
 
   postgres_servers = var.deploy_tool_apps ? {
     "tool-postgres" = {
