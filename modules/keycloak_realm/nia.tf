@@ -18,19 +18,42 @@
 # several places (the handbook lists only 4 endpoints; discovery has 6). Re-read it
 # before changing anything here. What it establishes:
 #
-#   - token_endpoint_auth_methods_supported = ["client_secret_post"] ONLY. So NIA
-#     is a SHARED-SECRET integration, NOT mTLS like CAAIS. No outbound keystore, no
-#     init container, no certificate. Set nia_client_secret and that is the whole
-#     of it. The only open question is how DIA receives that secret — the
-#     registration form has no field that issues one.
+#   - token_endpoint_auth_methods_supported = ["client_secret_post"] ONLY. NOT mTLS
+#     like CAAIS: no outbound keystore, no init container, no certificate.
+#     But NO SECRET IS ISSUED either. The NIA developer wiki ("OpenID Connect
+#     protokol", Token endpoint) lists the token request as client_id, grant_type,
+#     code — plus redirect_uri and code_verifier, both "hodnota je ignorována".
+#     No client_secret anywhere on the page, and the registration form issues none.
+#     NIA identifies the SeP by client_id + the registered redirect_uri, so
+#     nia_client_secret stays empty. Confirmed 2026-09-15: the token call succeeds
+#     with client_id + code alone.
 #   - jwks_uri exists, so signature validation is on by default here.
-#   - NO id_token_encryption_alg_values_supported → NIA does not do JWE on OIDC,
-#     which is consistent with the registration form's encryption certificate
-#     (field 12) being a SAML-only concern. Nothing here depends on it.
+#   - NO id_token_encryption_alg_values_supported — but NIA DOES encrypt the
+#     id_token anyway (verified 2026-09-15): JWE, alg RSA-OAEP, enc A256CBC-HS512,
+#     no kid. It encrypts to the certificate uploaded in registration field 12, and
+#     Keycloak decrypts with the realm's active RSA-OAEP key. If those two do not
+#     pair, login fails with "Padding error in decryption".
 #   - NO code_challenge_methods_supported → PKCE is NOT advertised; see below.
 #   - Claim names are eIDAS-style (CurrentGivenName, …), NOT the OIDC standard
 #     given_name/family_name that CAAIS uses. See the mappers at the bottom.
 #   - scopes_supported has NO "profile" — requesting it may be rejected.
+#
+# Verified live 2026-09-16, and why the stock "oidc" provider cannot work:
+#   - The id_token has NO "sub". Keycloak (24.0.2 and 26.7.3) takes the brokered
+#     identity id from sub and fails ("No identifier provider for identity").
+#   - Attributes, including PersonIdentifier, are only released when the authorize
+#     request carries a "claims" JSON parameter. Userinfo returns {}.
+# So provider_id is the custom "nia-oidc" broker (ismd-tool-backend docker/keycloak,
+# image ismd-tool-keycloak): it sends niaClaims on every login and uses
+# PersonIdentifier as the subject. That image must be running BEFORE provider_id is
+# switched, or Keycloak rejects the unknown provider type.
+
+locals {
+  # {"id_token":{"<claim>":null,...}} — the NIA wiki format. Empty list = no claims sent.
+  nia_claims_json = length(var.nia_requested_claims) == 0 ? "" : jsonencode({
+    id_token = { for claim in var.nia_requested_claims : claim => null }
+  })
+}
 
 resource "keycloak_oidc_identity_provider" "nia" {
   count = var.enable_nia ? 1 : 0
@@ -38,12 +61,17 @@ resource "keycloak_oidc_identity_provider" "nia" {
   realm        = keycloak_realm.ismd.id
   alias        = "nia"
   display_name = "Identita občana (NIA)"
+  provider_id  = var.nia_provider_id
 
   authorization_url = var.nia_authorization_url
   token_url         = var.nia_token_url
   jwks_url          = var.nia_jwks_url
-  user_info_url     = var.nia_user_info_url # NIA documents none; empty = id_token claims only
+  user_info_url     = var.nia_user_info_url
   issuer            = var.nia_issuer
+
+  # NIA's userinfo returns {} — calling it would overwrite the id taken from the
+  # id_token with null. Everything we map comes from the id_token.
+  disable_user_info = true
 
   # NIA end_session. Same reasoning as CAAIS: without IdP logout the národní bod
   # session survives our logout and the next login silently re-authenticates the
@@ -52,8 +80,9 @@ resource "keycloak_oidc_identity_provider" "nia" {
   logout_url = var.nia_logout_url
 
   client_id = var.nia_client_id
-  # REQUIRED when enabled — NIA supports client_secret_post only. Supply via
-  # TF_VAR_nia_client_secret / Key Vault, never in tfvars.
+  # Empty by default — NIA issues no secret (see header). Optional in provider
+  # 5.7.0. If NIA ever issues one, supply via TF_VAR_nia_client_secret / Key Vault,
+  # never in tfvars.
   client_secret = var.nia_client_secret
 
   default_scopes = var.nia_default_scopes
@@ -67,26 +96,39 @@ resource "keycloak_oidc_identity_provider" "nia" {
   # server-to-server; that silently no-ops and leaves the NIA session alive.
   # false makes Keycloak redirect the browser there instead.
   #
-  # store_token = true — required for Keycloak to send id_token_hint on logout,
-  # which it can only do if it kept the brokered id_token. Costs us national-identity
-  # tokens at rest in the Keycloak DB. Both settled by the CAAIS debugging.
+  # store_token = false — unlike CAAIS, NIA's logout must NOT get an id_token_hint
+  # (see sendIdTokenOnLogout below), so there is no reason to keep national-identity
+  # tokens at rest in the Keycloak DB.
   backchannel_supported = false
-  store_token           = true
+  store_token           = false
 
   trust_email        = false
   validate_signature = var.nia_validate_signature
   hide_on_login_page = false
 
-  extra_config = {
-    # The only method NIA advertises. Ordinary shared-secret auth in the request body.
+  extra_config = merge({
+    # The only method NIA advertises. In practice only client_id goes in the body
+    # that NIA reads; no secret is issued (see header).
     clientAuthMethod = var.nia_client_auth_method
 
     # PKCE OFF, unlike CAAIS. NIA's discovery document advertises no
-    # code_challenge_methods_supported, so it is presumed unsupported — sending a
-    # code_challenge risks the authorize call being rejected outright. Revisit if
-    # NIA confirms support; it is a plain apply to turn on.
+    # code_challenge_methods_supported, and the developer wiki says code_verifier
+    # is ignored at the token endpoint — PKCE would add nothing.
     pkceEnabled = "false"
-  }
+
+    # Logout, verified against tnia 2026-09-18. NIA's endsession needs client_id
+    # unless id_token_hint identifies the SeP, and answers ANY id_token_hint it
+    # cannot read with erc=202 "Invalid OpenID Connect protocol request" - even
+    # when client_id is also present. Keycloak's hint is the stored raw id_token,
+    # which for NIA is the JWE, and Keycloak 24 sends no client_id by default.
+    # client_id alone succeeds and returns to the registered signout URL, which is
+    # Keycloak's .../broker/nia/endpoint/logout_response.
+    sendClientIdOnLogout = "true"
+    sendIdTokenOnLogout  = "false"
+    },
+    # Read by the nia-oidc broker and sent as the authorize "claims" parameter.
+    local.nia_claims_json == "" ? {} : { niaClaims = local.nia_claims_json }
+  )
 }
 
 # --- Claim mappers ---
@@ -104,44 +146,60 @@ resource "keycloak_oidc_identity_provider" "nia" {
 #
 # PersonIdentifier is the BSI pseudonym — the stable per-provider-group identifier
 # for a citizen, and the right thing to key the local user on.
+#
+# Generic keycloak_custom_identity_provider_mapper, NOT the typed importer resources:
+# provider 5.7.0 derives the mapper type from the IdP's provider_id, so for
+# "nia-oidc" it refuses attribute importers ("identity provider is not supported yet")
+# and writes an invalid "nia-oidc-username-idp-mapper" type for the username template.
+# The stock OIDC mapper types work on the nia-oidc broker: Keycloak 24 applies mappers
+# at login by type lookup, without a provider-compatibility filter
+# (IdentityBrokerService). Config keys: claim / user.attribute (AbstractClaimMapper,
+# UserAttributeMapper), template (UsernameTemplateMapper).
 
-resource "keycloak_attribute_importer_identity_provider_mapper" "nia_first_name" {
+resource "keycloak_custom_identity_provider_mapper" "nia_first_name" {
   count = var.enable_nia ? 1 : 0
 
-  realm                   = keycloak_realm.ismd.id
-  name                    = "nia-given-name"
-  identity_provider_alias = keycloak_oidc_identity_provider.nia[0].alias
-  claim_name              = "CurrentGivenName"
-  user_attribute          = "firstName"
+  realm                    = keycloak_realm.ismd.id
+  name                     = "nia-given-name"
+  identity_provider_alias  = keycloak_oidc_identity_provider.nia[0].alias
+  identity_provider_mapper = "oidc-user-attribute-idp-mapper"
 
   extra_config = {
-    syncMode = "INHERIT"
+    syncMode         = "INHERIT"
+    claim            = "CurrentGivenName"
+    "user.attribute" = "firstName"
   }
 }
 
-resource "keycloak_attribute_importer_identity_provider_mapper" "nia_last_name" {
+resource "keycloak_custom_identity_provider_mapper" "nia_last_name" {
   count = var.enable_nia ? 1 : 0
 
-  realm                   = keycloak_realm.ismd.id
-  name                    = "nia-family-name"
-  identity_provider_alias = keycloak_oidc_identity_provider.nia[0].alias
-  claim_name              = "CurrentFamilyName"
-  user_attribute          = "lastName"
+  realm                    = keycloak_realm.ismd.id
+  name                     = "nia-family-name"
+  identity_provider_alias  = keycloak_oidc_identity_provider.nia[0].alias
+  identity_provider_mapper = "oidc-user-attribute-idp-mapper"
 
   extra_config = {
-    syncMode = "INHERIT"
+    syncMode         = "INHERIT"
+    claim            = "CurrentFamilyName"
+    "user.attribute" = "lastName"
   }
 }
 
-resource "keycloak_user_template_importer_identity_provider_mapper" "nia_username" {
+resource "keycloak_custom_identity_provider_mapper" "nia_username" {
   count = var.enable_nia ? 1 : 0
 
-  realm                   = keycloak_realm.ismd.id
-  name                    = "nia-username"
-  identity_provider_alias = keycloak_oidc_identity_provider.nia[0].alias
-  template                = "$${CLAIM.PersonIdentifier}"
+  realm                    = keycloak_realm.ismd.id
+  name                     = "nia-username"
+  identity_provider_alias  = keycloak_oidc_identity_provider.nia[0].alias
+  identity_provider_mapper = "oidc-username-idp-mapper"
 
+  # niaUsername is added by the nia-oidc broker: PersonIdentifier with '/' replaced
+  # by '-' ("CZ-CZ-<id>"). The raw value is rejected by the realm's
+  # username-prohibited-characters validator, which forces the "Update Account
+  # Information" page. The federated identity link keeps the raw PersonIdentifier.
   extra_config = {
     syncMode = "INHERIT"
+    template = "$${CLAIM.niaUsername}"
   }
 }

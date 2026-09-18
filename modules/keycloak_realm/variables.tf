@@ -199,7 +199,7 @@ variable "nia_client_id" {
 }
 
 variable "nia_client_secret" {
-  description = "Shared secret for the NIA token endpoint. REQUIRED when enable_nia = true — NIA advertises client_secret_post as its only supported auth method, so unlike CAAIS there is no certificate fallback. Supply via TF_VAR_nia_client_secret, never in tfvars."
+  description = "Client secret for the NIA token endpoint. Leave empty — NIA issues none; its token request takes client_id, grant_type and code only (NIA developer wiki, OpenID Connect protokol). If one is ever issued, supply via TF_VAR_nia_client_secret, never in tfvars."
   type        = string
   default     = ""
   sensitive   = true
@@ -257,6 +257,48 @@ variable "nia_validate_signature" {
   description = "Validate NIA id_token signatures against nia_jwks_url. Defaults TRUE: NIA publishes a JWKS endpoint in its discovery document and signs with RS256."
   type        = bool
   default     = true
+}
+
+variable "manage_user_profile" {
+  description = "Manage the realm's declarative user profile from Terraform (user_profile.tf). Off = Keycloak's default profile, which requires email."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_email_required" {
+  description = "Require email in the user profile. Neither CAAIS nor NIA supplies one, so requiring it stops every new federated user on an 'Update Account Information' page."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_names_required" {
+  description = "Require first and last name in the user profile. NIA releases names only with the citizen's consent, and the application does not need them."
+  type        = bool
+  default     = true
+}
+
+variable "account_console_enabled" {
+  description = "Keep the account client roles (account/*) in the default roles. Off strips them from extra_default_roles, closing /realms/<realm>/account to every user who does not hold them directly."
+  type        = bool
+  default     = true
+}
+
+variable "disable_realm_admin_console" {
+  description = "Manage the realm's built-in security-admin-console client and set it disabled. The client must be imported into state first (keycloak-config/main.tf)."
+  type        = bool
+  default     = false
+}
+
+variable "nia_provider_id" {
+  description = "Keycloak identity-provider type for NIA. \"nia-oidc\" is the custom broker from the ismd-tool-keycloak image (fills the missing sub from PersonIdentifier, sends claims); the stock \"oidc\" cannot complete a NIA login. Switch only once that image runs in the environment."
+  type        = string
+  default     = "oidc"
+}
+
+variable "nia_requested_claims" {
+  description = "eIDAS attributes requested from NIA on every login (sent as the claims parameter by nia-oidc). PersonIdentifier is required — it becomes the brokered user id."
+  type        = list(string)
+  default     = []
 }
 
 # --- SMTP (ACS) ---

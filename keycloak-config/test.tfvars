@@ -56,8 +56,8 @@ caais_issuer            = "https://rest-openidconnectapi.caais.gov.cz/" # traili
 # From NIA's discovery document at the non-standard path
 # https://tnia.identita.gov.cz/fpsts/oidc/openid-configuration (no .well-known).
 # See NIA-INTEGRATION-REQUEST.md.
-enable_nia            = false
-nia_client_id         = "" # = "https://xn--slovnk-test-scb.dia.gov.cz/popisujeme" once registered
+enable_nia            = true
+nia_client_id         = "https://xn--slovnk-test-scb.dia.gov.cz/popisujeme" # registered Unikátní URL, confirmed by NIA 2026-09-15
 nia_authorization_url = "https://tnia.identita.gov.cz/FPSTS/oidc/authorize"
 nia_token_url         = "https://tnia.identita.gov.cz/FPSTS/oidc/token"
 nia_logout_url        = "https://tnia.identita.gov.cz/FPSTS/oidc/endsession"
@@ -66,5 +66,29 @@ nia_jwks_url          = "https://tnia.identita.gov.cz/FPSTS/oidc/openid-configur
 # A URN, not a URL — and the SAME on test and prod.
 nia_issuer             = "urn:microsoft:cgg2010:fpsts"
 nia_validate_signature = true
-# "profile" is not a supported NIA scope. Append the LoA scope once DIA decides.
-nia_default_scopes = "openid"
+# "profile" is not a supported NIA scope. LoA is "loalow" — the least level that
+# satisfies the service, decided 2026-09-07. It rides on the scope as the floor that
+# no caller can forget; acr_values carries the same level from the frontend and is
+# what NIA reads first. With no comparison scope, NIA defaults to loamin ("or better").
+nia_default_scopes = "openid loalow"
+
+# User profile. Email optional: neither IdP supplies one. Names REQUIRED: NIA
+# releases them only with consent, and a citizen who switches them off is asked once
+# for a name by Keycloak's first-login profile step (it runs only when something is
+# missing), instead of the app showing "cz-cz-<uuid>". Users who consent never see it.
+# Username is read-only for users. See user_profile.tf.
+manage_user_profile         = true
+user_profile_email_required = false
+user_profile_names_required = true
+
+# Federated and app users get nothing from Keycloak's own pages: no account console
+# (/realms/ismd/account) and no ismd admin console (/admin/ismd/console). Master
+# admins still manage the realm from the master console.
+account_console_enabled         = false
+disable_realm_admin_console     = true
+realm_admin_console_client_uuid = "6f16a313-4161-4f4e-8d16-0ec88dfc6696"
+
+# Custom broker from the ismd-tool-keycloak image — NIA's id_token has no sub and
+# releases attributes only when requested. Apply only once that image runs on TEST.
+nia_provider_id      = "nia-oidc"
+nia_requested_claims = ["PersonIdentifier", "CurrentGivenName", "CurrentFamilyName"]
