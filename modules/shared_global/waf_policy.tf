@@ -134,6 +134,43 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     }
   }
 
+  # Keycloak session cookies carry a random identifier that DRS rule 942100
+  # ("SQL Injection Attack Detected via libinjection") occasionally fingerprints
+  # as SQL, scoring 10 and making 949110 block the login with a 403. Observed on
+  # TEST 2026-09-18 on /popisujeme/auth/realms/ismd/protocol/openid-connect/auth,
+  # with the match inside REQUEST_COOKIES:AUTH_SESSION_ID. The exclusion that
+  # suppresses it is below, under managed_rules.
+  #
+  # This rule replaces the protection the exclusion gives up, and is stricter
+  # than 942100 was: Keycloak's AUTH_SESSION_ID is an id of the form
+  # "<uuid>[.<node>]", so any character outside the URL-unreserved set is
+  # malformed and cannot be anything but an injection attempt. Written as a
+  # positive match on a forbidden character rather than a negated match on the
+  # whole value, so a request WITHOUT the cookie can never match.
+  #
+  # Priority 18: after BlockScannerUserAgents (15) and before AllowKeycloakAdmin
+  # (20), so the admin Allow cannot whitelist a tampered session cookie.
+  custom_rules {
+    name      = "BlockMalformedKeycloakSessionCookie"
+    priority  = 18
+    rule_type = "MatchRule"
+    action    = "Block"
+
+    match_conditions {
+      match_variables {
+        variable_name = "RequestCookies"
+        selector      = "AUTH_SESSION_ID"
+      }
+      match_variables {
+        variable_name = "RequestCookies"
+        selector      = "AUTH_SESSION_ID_LEGACY"
+      }
+      operator           = "Regex"
+      negation_condition = false
+      match_values       = ["[^0-9A-Za-z._~-]"]
+    }
+  }
+
   # Blocked requests return different status codes by rule type: the custom
   # RateLimitRule Block returns HTTP 429 (Too Many Requests), while the managed
   # DRS rules return HTTP 403 (Forbidden) — the App Gateway WAF default. The
@@ -154,6 +191,37 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
   #     (rate limiting included) while you tune.
   # Watch ApplicationGatewayFirewallLog for matched rule IDs before tightening.
   managed_rules {
+    # False positive suppressed: DRS 942100 (libinjection) fires on the random
+    # value of Keycloak's session cookie and blocks every login (see
+    # BlockMalformedKeycloakSessionCookie above). Kept as narrow as Azure allows:
+    #   * RequestCookieValues, not ...Names/Keys - only the cookie's VALUE is
+    #     skipped; the cookie name is still evaluated;
+    #   * Equals on the exact cookie name, not a prefix or Contains;
+    #   * one rule id, 942100 - every other SQLI rule, and every other group
+    #     (XSS, LFI, RCE, protocol enforcement), still inspects the value.
+    # AUTH_SESSION_ID_LEGACY is Keycloak's copy of the same value without
+    # SameSite=None, for older browsers, and is excluded on the same terms. KC_RESTART is deliberately NOT excluded:
+    # it has never matched.
+    dynamic "exclusion" {
+      for_each = ["AUTH_SESSION_ID", "AUTH_SESSION_ID_LEGACY"]
+
+      content {
+        match_variable          = "RequestCookieValues"
+        selector                = exclusion.value
+        selector_match_operator = "Equals"
+
+        excluded_rule_set {
+          type    = "Microsoft_DefaultRuleSet"
+          version = "2.2"
+
+          rule_group {
+            rule_group_name = "SQLI"
+            excluded_rules  = ["942100"]
+          }
+        }
+      }
+    }
+
     managed_rule_set {
       type    = "Microsoft_DefaultRuleSet"
       version = "2.2"
