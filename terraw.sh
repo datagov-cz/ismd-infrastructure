@@ -3,6 +3,8 @@
 #   ./terraw.sh switch dev
 #   ./terraw.sh plan -out=tfplan
 #   ./terraw.sh apply tfplan
+#   ./terraw.sh plan test          # switch to test, then plan
+#   ./terraw.sh apply dev          # switch to dev, then apply
 #   ./terraw.sh env
 #
 # Optional: add an alias for less typing —
@@ -153,6 +155,72 @@ resolve_tfvars() {
     fi
 }
 
+# .terraw-env lives next to this script; the selected workspace lives in the cwd's
+# .terraform/environment. Nothing ties the two together, so a workspace selected any
+# other way (bare terraform, another worktree's terraw) leaves them disagreeing — and
+# plan then applies <env> variables to another env's state. Seen 2026-09-11: workspace
+# dev, .terraw-env test, plan proposed replacing every ismd-*-dev resource group.
+#
+# Only where an env tfvars resolves: shared-global has one state in the default
+# workspace, so there is nothing to mismatch.
+workspace_guard() {
+    local env="$1"
+    [ -n "$(resolve_tfvars "$env")" ] || return 0
+
+    local ws
+    ws="$(terraform workspace show 2>/dev/null | tr -d '\r\n')"
+    [ "$ws" = "$env" ] && return 0
+
+    echo "[terraw] ERROR: env/workspace mismatch in $(pwd)" >&2
+    echo "[terraw]   .terraw-env         = $env" >&2
+    echo "[terraw]   terraform workspace = ${ws:-<unknown>}" >&2
+    echo "[terraw] refusing '$cmd': it would apply $env variables to ${ws:-another} state." >&2
+    echo "[terraw] fix: $0 switch <env>   (e.g. $0 switch $env)" >&2
+    return 1
+}
+
+# Pass-through subcommands that never read or write state, so they skip the guard.
+# 'workspace' in particular must stay usable to repair a mismatch.
+stateless_cmd() {
+    case "$1" in
+        init|workspace|version|-version|--version|fmt|validate|providers|get|graph|login|logout|metadata|test) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Several git worktrees of this repo exist side by side, each with its own
+# shared-global/ and keycloak-config/. A plan from the wrong one quietly reports
+# "No changes" (seen 2026-09-18), so every state-touching run says where it is.
+checkout_banner() {
+    local top branch dirty
+    top="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" || return 0
+    branch="$(git -C "$SCRIPT_DIR" branch --show-current 2>/dev/null)"
+    dirty="$(git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    echo "[terraw] checkout: $(basename "$top") @ ${branch:-<detached>} ($dirty uncommitted)" >&2
+}
+
+# An env name is anything with a .env.<name> next to this script — so "plan dev"
+# switches, while "apply tfplan" (a saved plan file) still passes through.
+known_env() {
+    [[ "$1" =~ ^[a-z0-9-]+$ ]] && [ -f "$SCRIPT_DIR/.env.$1" ]
+}
+
+# The persisting half of 'switch', for "plan <env>" / "apply <env>". Env vars and
+# secrets are loaded by the plan/apply path itself, so they are not fetched twice.
+# Only selects a workspace where an env tfvars resolves: shared-global has one state
+# in the default workspace.
+select_env() {
+    local env="$1"
+    echo "$env" > "$STATE_FILE"
+    echo "[terraw] env → $env (persisted to .terraw-env)" >&2
+    [ -n "$(resolve_tfvars "$env")" ] || return 0
+    if ! terraform workspace select "$env" >/dev/null; then
+        echo "[terraw] ERROR: could not select workspace '$env'" >&2
+        return 1
+    fi
+    echo "[terraw] workspace selected: $env" >&2
+}
+
 cmd="${1:-}"
 [ $# -gt 0 ] && shift
 
@@ -202,11 +270,22 @@ case "$cmd" in
         fi
         ;;
     plan|apply|destroy|refresh|import|console)
+        checkout_banner
+        if [ $# -gt 0 ] && known_env "$1"; then
+            select_env "$1" || exit 1
+            shift
+        fi
         env="$(current_env)"
+        if [ "$env" = "prod" ]; then
+            case "$cmd" in
+                apply|destroy|import) echo "[terraw] *** PROD *** '$cmd' against production" >&2 ;;
+            esac
+        fi
         args=()
         if [ -z "$env" ]; then
             echo "[terraw] WARN: no env set — running plain 'terraform $cmd'. Run 'terraw switch <env>' first if you wanted env-scoped vars." >&2
         else
+            workspace_guard "$env" || exit 1
             load_env_file "$env" || exit 1
             resolve_vault_secrets "$env"
             vault_guard "$cmd" || exit 1
@@ -227,6 +306,7 @@ Usage:
   ./terraw.sh switch <env>     Persist <env> + load .env.<env> + select workspace
   ./terraw.sh env              Show current env + tfvars resolution
   ./terraw.sh plan|apply|...   terraform with auto-injected -var-file
+  ./terraw.sh plan <env> ...   switch to <env> first, then plan (same for apply etc.)
   ./terraw.sh <other>          Pass-through to terraform
 
 Secrets: TF_VARs listed in .terraw-vault-map are read from ismd-kv-<env> into this
@@ -244,6 +324,7 @@ EOF
         # or 'state list' have TF_VAR_* available.
         env="$(current_env)"
         if [ -n "$env" ]; then
+            stateless_cmd "$cmd" || workspace_guard "$env" || exit 1
             load_env_file "$env" >/dev/null 2>&1
             resolve_vault_secrets "$env" >/dev/null 2>&1
         fi
