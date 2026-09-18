@@ -71,3 +71,24 @@ nia_validate_signature = true
 # no caller can forget; acr_values carries the same level from the frontend and is
 # what NIA reads first. With no comparison scope, NIA defaults to loamin ("or better").
 nia_default_scopes = "openid loalow"
+
+# User profile. Email optional: neither IdP supplies one. Names REQUIRED: NIA
+# releases them only with consent, and a citizen who switches them off is asked once
+# for a name by Keycloak's first-login profile step (it runs only when something is
+# missing), instead of the app showing "cz-cz-<uuid>". Users who consent never see it.
+# Username is read-only for users. See user_profile.tf.
+manage_user_profile         = true
+user_profile_email_required = false
+user_profile_names_required = true
+
+# Federated and app users get nothing from Keycloak's own pages: no account console
+# (/realms/ismd/account) and no ismd admin console (/admin/ismd/console). Master
+# admins still manage the realm from the master console.
+account_console_enabled         = false
+disable_realm_admin_console     = true
+realm_admin_console_client_uuid = "6f16a313-4161-4f4e-8d16-0ec88dfc6696"
+
+# Custom broker from the ismd-tool-keycloak image — NIA's id_token has no sub and
+# releases attributes only when requested. Apply only once that image runs on TEST.
+nia_provider_id      = "nia-oidc"
+nia_requested_claims = ["PersonIdentifier", "CurrentGivenName", "CurrentFamilyName"]

@@ -43,18 +43,34 @@ module "ismd_realm" {
   # CAAIS. Endpoints are pre-filled per env in tfvars; enable_nia stays false
   # until the "Unikátní URL" is registered on identita.gov.cz and returned as
   # the client_id.
-  enable_nia             = var.enable_nia
-  nia_client_id          = var.nia_client_id
-  nia_client_secret      = var.nia_client_secret
-  nia_client_auth_method = var.nia_client_auth_method
-  nia_authorization_url  = var.nia_authorization_url
-  nia_token_url          = var.nia_token_url
-  nia_jwks_url           = var.nia_jwks_url
-  nia_user_info_url      = var.nia_user_info_url
-  nia_issuer             = var.nia_issuer
-  nia_logout_url         = var.nia_logout_url
-  nia_default_scopes     = var.nia_default_scopes
-  nia_validate_signature = var.nia_validate_signature
+  enable_nia                  = var.enable_nia
+  nia_client_id               = var.nia_client_id
+  nia_client_secret           = var.nia_client_secret
+  nia_client_auth_method      = var.nia_client_auth_method
+  nia_authorization_url       = var.nia_authorization_url
+  nia_token_url               = var.nia_token_url
+  nia_jwks_url                = var.nia_jwks_url
+  nia_user_info_url           = var.nia_user_info_url
+  nia_issuer                  = var.nia_issuer
+  nia_logout_url              = var.nia_logout_url
+  nia_default_scopes          = var.nia_default_scopes
+  nia_validate_signature      = var.nia_validate_signature
+  manage_user_profile         = var.manage_user_profile
+  user_profile_email_required = var.user_profile_email_required
+  user_profile_names_required = var.user_profile_names_required
+  nia_provider_id             = var.nia_provider_id
+  nia_requested_claims        = var.nia_requested_claims
+  account_console_enabled     = var.account_console_enabled
+  disable_realm_admin_console = var.disable_realm_admin_console
+}
+
+# security-admin-console is created by Keycloak with the realm, so Terraform adopts it
+# rather than creating it. The id is the client's UUID, looked up per environment
+# (GET /admin/realms/ismd/clients?clientId=security-admin-console) and set in tfvars.
+import {
+  for_each = var.disable_realm_admin_console ? toset([var.realm_admin_console_client_uuid]) : toset([])
+  to       = module.ismd_realm.keycloak_openid_client.security_admin_console[0]
+  id       = "ismd/${each.value}"
 }
 
 output "ismd_realm_id" {

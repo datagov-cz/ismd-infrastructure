@@ -259,6 +259,48 @@ variable "nia_validate_signature" {
   default     = true
 }
 
+variable "manage_user_profile" {
+  description = "Manage the realm's declarative user profile from Terraform (user_profile.tf). Off = Keycloak's default profile, which requires email."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_email_required" {
+  description = "Require email in the user profile. Neither CAAIS nor NIA supplies one, so requiring it stops every new federated user on an 'Update Account Information' page."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_names_required" {
+  description = "Require first and last name in the user profile. NIA releases names only with the citizen's consent, and the application does not need them."
+  type        = bool
+  default     = true
+}
+
+variable "account_console_enabled" {
+  description = "Keep the account client roles (account/*) in the default roles. Off strips them from extra_default_roles, closing /realms/<realm>/account to every user who does not hold them directly."
+  type        = bool
+  default     = true
+}
+
+variable "disable_realm_admin_console" {
+  description = "Manage the realm's built-in security-admin-console client and set it disabled. The client must be imported into state first (keycloak-config/main.tf)."
+  type        = bool
+  default     = false
+}
+
+variable "nia_provider_id" {
+  description = "Keycloak identity-provider type for NIA. \"nia-oidc\" is the custom broker from the ismd-tool-keycloak image (fills the missing sub from PersonIdentifier, sends claims); the stock \"oidc\" cannot complete a NIA login. Switch only once that image runs in the environment."
+  type        = string
+  default     = "oidc"
+}
+
+variable "nia_requested_claims" {
+  description = "eIDAS attributes requested from NIA on every login (sent as the claims parameter by nia-oidc). PersonIdentifier is required — it becomes the brokered user id."
+  type        = list(string)
+  default     = []
+}
+
 # --- SMTP (ACS) ---
 
 variable "smtp_enabled" {

@@ -202,6 +202,54 @@ variable "nia_validate_signature" {
   default     = true
 }
 
+variable "manage_user_profile" {
+  description = "Manage the realm user profile from Terraform. Off = Keycloak default (email required)."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_email_required" {
+  description = "Require email in the user profile. CAAIS and NIA supply none."
+  type        = bool
+  default     = false
+}
+
+variable "user_profile_names_required" {
+  description = "Require first and last name in the user profile. NIA releases names only with consent; the app does not need them."
+  type        = bool
+  default     = true
+}
+
+variable "account_console_enabled" {
+  description = "Give every realm user Keycloak's account console (account/view-profile, account/manage-account via the default roles). Off = only users granted those roles by hand."
+  type        = bool
+  default     = true
+}
+
+variable "disable_realm_admin_console" {
+  description = "Disable the ismd realm's own security-admin-console client (/admin/ismd/console). No ismd user holds realm-management roles; admins use the master console. Imported, not created: see main.tf."
+  type        = bool
+  default     = false
+}
+
+variable "realm_admin_console_client_uuid" {
+  description = "UUID of the ismd realm's security-admin-console client, for the import in main.tf. Differs per environment; only read when disable_realm_admin_console = true."
+  type        = string
+  default     = ""
+}
+
+variable "nia_provider_id" {
+  description = "Identity-provider type for NIA: \"nia-oidc\" (custom broker in the ismd-tool-keycloak image) or the stock \"oidc\". Switch only once that image runs here."
+  type        = string
+  default     = "oidc"
+}
+
+variable "nia_requested_claims" {
+  description = "eIDAS attributes requested from NIA on every login. Must include PersonIdentifier."
+  type        = list(string)
+  default     = []
+}
+
 # --- SMTP (ACS) — supply once Layer A creds exist ---
 
 variable "smtp_enabled" {
