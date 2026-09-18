@@ -2,6 +2,8 @@
 #   .\terraw.ps1 switch dev
 #   .\terraw.ps1 plan -out=tfplan
 #   .\terraw.ps1 apply tfplan
+#   .\terraw.ps1 plan test          # switch to test, then plan
+#   .\terraw.ps1 apply dev          # switch to dev, then apply
 #   .\terraw.ps1 env
 #
 # Optional alias for less typing (per-shell):
@@ -27,11 +29,26 @@ param(
 if (-not $Command) { $Command = '' }
 
 $ScriptDir = $PSScriptRoot
+# Path as it would be typed from the cwd, e.g. ..\terraw.ps1 from keycloak-config.
+$Invoked   = Resolve-Path -Relative $PSCommandPath
 $StateFile = Join-Path $ScriptDir ".terraw-env"
 $VaultMap  = Join-Path $ScriptDir ".terraw-vault-map"
 
 # Names of mapped TF_VARs that could not be resolved. Gates apply; see Test-VaultGuard.
 $script:VaultMissing = @()
+
+# Env vars this run created. `& .\terraw.ps1` runs INSIDE the caller's session, so
+# anything set with Set-Item env: outlives the script - Key Vault secrets included.
+# Because an already-set variable wins over the vault, "plan dev" then "plan test" in
+# one window gave test the DEV passwords. Everything recorded here is removed in the
+# finally block at the bottom, however the script exits.
+$script:SetByTerraw = @()
+
+function Set-TerrawEnv {
+    param([string]$Name, [string]$Value)
+    if (-not (Test-Path "env:$Name")) { $script:SetByTerraw += $Name }
+    Set-Item -Path "env:$Name" -Value $Value
+}
 
 function Get-CurrentEnv {
     if (Test-Path $StateFile) { (Get-Content $StateFile -Raw).Trim() } else { "" }
@@ -48,7 +65,7 @@ function Import-EnvFile {
     Get-Content $envFile | ForEach-Object {
         $name, $value = $_.Split('=', 2)
         if ($name -and $value) {
-            Set-Item -Path "env:$name" -Value $value
+            Set-TerrawEnv $name $value
             $count++
         }
     }
@@ -101,7 +118,7 @@ function Resolve-VaultSecrets {
             continue
         }
 
-        Set-Item -Path "env:$name" -Value $value
+        Set-TerrawEnv $name $value
         Remove-Variable value
         $fetched++
     }
@@ -130,6 +147,85 @@ function Test-VaultGuard {
     return $true
 }
 
+# Resolve the per-env tfvars file relative to the current dir. Supports both
+# layouts: the main state (environments/<env>/terraform.tfvars, run from root)
+# and per-dir states like keycloak-config (<env>.tfvars, run from inside the dir).
+# Returns the path if found, empty otherwise. shared-global has neither -> pass-through.
+function Resolve-Tfvars {
+    param([string]$EnvName)
+    if (Test-Path "environments/$EnvName/terraform.tfvars") { return "environments/$EnvName/terraform.tfvars" }
+    if (Test-Path "$EnvName.tfvars") { return "$EnvName.tfvars" }
+    return ""
+}
+
+# .terraw-env lives next to this script; the selected workspace lives in the cwd's
+# .terraform/environment. Nothing ties the two together, so a workspace selected any
+# other way (bare terraform, another worktree's terraw) leaves them disagreeing - and
+# plan then applies <env> variables to another env's state. Seen 2026-09-11: workspace
+# dev, .terraw-env test, plan proposed replacing every ismd-*-dev resource group.
+#
+# Only where an env tfvars resolves: shared-global has one state in the default
+# workspace, so there is nothing to mismatch.
+function Test-WorkspaceGuard {
+    param([string]$EnvName, [string]$Cmd)
+    if (-not (Resolve-Tfvars $EnvName)) { return $true }
+
+    $ws = (terraform workspace show 2>$null | Out-String).Trim()
+    if ($ws -eq $EnvName) { return $true }
+
+    $shown = if ($ws) { $ws } else { '<unknown>' }
+    $target = if ($ws) { $ws } else { 'another' }
+    Write-Host "[terraw] ERROR: env/workspace mismatch in $(Get-Location)"
+    Write-Host "[terraw]   .terraw-env         = $EnvName"
+    Write-Host "[terraw]   terraform workspace = $shown"
+    Write-Host "[terraw] refusing '$Cmd': it would apply $EnvName variables to $target state."
+    Write-Host "[terraw] fix: $Invoked switch <env>   (e.g. $Invoked switch $EnvName)"
+    return $false
+}
+
+# Several git worktrees of this repo exist side by side, each with its own
+# shared-global/ and keycloak-config/. A plan from the wrong one quietly reports
+# "No changes" (seen 2026-09-18), so every state-touching run says where it is.
+function Write-CheckoutBanner {
+    $top = git -C $ScriptDir rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $top) { return }
+    $branch = git -C $ScriptDir branch --show-current 2>$null
+    if (-not $branch) { $branch = '<detached>' }
+    $dirty = @(git -C $ScriptDir status --porcelain 2>$null).Count
+    Write-Host "[terraw] checkout: $(Split-Path -Leaf $top) @ $branch ($dirty uncommitted)"
+}
+
+# An env name is anything with a .env.<name> next to this script - so "plan dev"
+# switches, while "apply tfplan" (a saved plan file) still passes through.
+function Test-KnownEnv {
+    param([string]$Name)
+    return ($Name -cmatch '^[a-z0-9-]+$') -and (Test-Path (Join-Path $ScriptDir ".env.$Name"))
+}
+
+# The persisting half of 'switch', for "plan <env>" / "apply <env>". Env vars and
+# secrets are loaded by the plan/apply path itself, so they are not fetched twice.
+# Only selects a workspace where an env tfvars resolves: shared-global has one state
+# in the default workspace.
+function Select-Env {
+    param([string]$EnvName)
+    Set-Content -Path $StateFile -Value $EnvName -NoNewline
+    Write-Host "[terraw] env -> $EnvName (persisted to .terraw-env)"
+    if (-not (Resolve-Tfvars $EnvName)) { return $true }
+    terraform workspace select $EnvName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[terraw] ERROR: could not select workspace '$EnvName'"
+        return $false
+    }
+    Write-Host "[terraw] workspace selected: $EnvName"
+    return $true
+}
+
+# Pass-through subcommands that never read or write state, so they skip the guard.
+# 'workspace' in particular must stay usable to repair a mismatch.
+$StatelessCmds = 'init', 'workspace', 'version', '-version', '--version', 'fmt', 'validate',
+                 'providers', 'get', 'graph', 'login', 'logout', 'metadata', 'test'
+
+try {
 switch ($Command) {
     'switch' {
         $envName = if ($RestArgs.Count -gt 0) { $RestArgs[0] } else { 'dev' }
@@ -156,9 +252,9 @@ switch ($Command) {
         Write-Host "STATE_FILE=$StateFile"
         Write-Host "CWD=$(Get-Location)"
         if ($envName) {
-            $tfv = "environments/$envName/terraform.tfvars"
-            if (Test-Path $tfv) { Write-Host "tfvars   = $tfv (would auto-inject)" }
-            else { Write-Host "tfvars   = $tfv (NOT FOUND - pass-through)" }
+            $tfv = Resolve-Tfvars $envName
+            if ($tfv) { Write-Host "tfvars   = $tfv (would auto-inject)" }
+            else { Write-Host "tfvars   = none in $(Get-Location) (pass-through, e.g. shared-global)" }
             # Names only, and no vault call - this is a "what would happen" view.
             if (Test-Path $VaultMap) {
                 Write-Host "vault    = ismd-kv-$envName, via .terraw-vault-map:"
@@ -174,20 +270,29 @@ switch ($Command) {
         }
     }
     { $_ -in 'plan', 'apply', 'destroy', 'refresh', 'import', 'console' } {
+        Write-CheckoutBanner
+        if ($RestArgs.Count -gt 0 -and (Test-KnownEnv $RestArgs[0])) {
+            if (-not (Select-Env $RestArgs[0])) { exit 1 }
+            $RestArgs = @($RestArgs | Select-Object -Skip 1)
+        }
         $envName = Get-CurrentEnv
+        if ($envName -eq 'prod' -and $Command -in 'apply', 'destroy', 'import') {
+            Write-Warning "[terraw] *** PROD *** '$Command' against production"
+        }
         $tfArgs = @()
         if (-not $envName) {
             Write-Warning "[terraw] no env set - running plain 'terraform $Command'. Run 'terraw switch <env>' first if you wanted env-scoped vars."
         } else {
+            if (-not (Test-WorkspaceGuard $envName $Command)) { exit 1 }
             if (-not (Import-EnvFile $envName)) { exit 1 }
             Resolve-VaultSecrets $envName
             if (-not (Test-VaultGuard $Command)) { exit 1 }
-            $tfv = "environments/$envName/terraform.tfvars"
-            if (Test-Path $tfv) {
+            $tfv = Resolve-Tfvars $envName
+            if ($tfv) {
                 $tfArgs += "-var-file=$tfv"
                 Write-Host "[terraw] $Command -> injecting -var-file=$tfv"
             } else {
-                Write-Host "[terraw] $Command -> no $tfv in $(Get-Location) (pass-through, e.g. shared-global)"
+                Write-Host "[terraw] $Command -> no env tfvars in $(Get-Location) (pass-through, e.g. shared-global)"
             }
         }
         terraform $Command @tfArgs @RestArgs
@@ -201,6 +306,7 @@ Usage:
   .\terraw.ps1 switch <env>     Persist <env> + load .env.<env> + select workspace
   .\terraw.ps1 env              Show current env + tfvars resolution
   .\terraw.ps1 plan|apply|...   terraform with auto-injected -var-file
+  .\terraw.ps1 plan <env> ...   switch to <env> first, then plan (same for apply etc.)
   .\terraw.ps1 <other>          Pass-through to terraform
 
 Secrets: TF_VARs listed in .terraw-vault-map are read from ismd-kv-<env> into this
@@ -218,10 +324,16 @@ Current state:
         # or 'state list' have TF_VAR_* available.
         $envName = Get-CurrentEnv
         if ($envName) {
+            if ($Command -notin $StatelessCmds -and -not (Test-WorkspaceGuard $envName $Command)) { exit 1 }
             Import-EnvFile $envName | Out-Null
             Resolve-VaultSecrets $envName | Out-Null
         }
         terraform $Command @RestArgs
         exit $LASTEXITCODE
+    }
+}
+} finally {
+    foreach ($name in $script:SetByTerraw) {
+        Remove-Item -Path "env:$name" -ErrorAction SilentlyContinue
     }
 }
