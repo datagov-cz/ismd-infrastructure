@@ -198,8 +198,15 @@ resource "keycloak_custom_identity_provider_mapper" "nia_username" {
   # by '-' ("CZ-CZ-<id>"). The raw value is rejected by the realm's
   # username-prohibited-characters validator, which forces the "Update Account
   # Information" page. The federated identity link keeps the raw PersonIdentifier.
+  #
+  # | lowercase is required, not cosmetic. Keycloak stores usernames lowercased, and
+  # the first-login "Review Profile" step submits the brokered username as-is. With
+  # the username read-only for users (user_profile.tf), "CZ-CZ-…" → "cz-cz-…" counts
+  # as a change to a read-only attribute: the step fails on the hidden username field
+  # and returns the same form forever, with no message. Seen on TEST 2026-09-22 for
+  # every new NIA user whose names had to be entered; reproduced and fixed locally.
   extra_config = {
     syncMode = "INHERIT"
-    template = "$${CLAIM.niaUsername}"
+    template = "$${CLAIM.niaUsername | lowercase}"
   }
 }
