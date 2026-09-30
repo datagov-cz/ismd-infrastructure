@@ -369,6 +369,18 @@ variable "tool_caais_keystore_password_kv_secret_id" {
   default     = ""
 }
 
+variable "tool_nia_p12_kv_secret_id" {
+  description = "KV secret id yielding the base64 PKCS12 of the certificate registered with NIA (field 12). Empty = NIA keystore not rendered."
+  type        = string
+  default     = ""
+}
+
+variable "tool_nia_keystore_password_kv_secret_id" {
+  description = "KV secret id for the NIA PKCS12 re-wrap password."
+  type        = string
+  default     = ""
+}
+
 
 variable "tool_nkd_sparql_endpoint" {
   description = <<-EOT

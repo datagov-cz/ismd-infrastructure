@@ -230,6 +230,10 @@ module "tool_apps" {
   caais_p12_kv_secret_id               = var.tool_caais_p12_kv_secret_id
   caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
 
+  # NIA id_token decryption keystore (realm key). Inert while empty.
+  nia_p12_kv_secret_id               = var.tool_nia_p12_kv_secret_id
+  nia_keystore_password_kv_secret_id = var.tool_nia_keystore_password_kv_secret_id
+
   # Class A: KV references (empty = inline value; two-phase cutover)
   app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id

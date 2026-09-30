@@ -107,6 +107,8 @@ module "dev" {
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
 
   tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+  tool_nia_p12_kv_secret_id                 = var.tool_nia_p12_kv_secret_id
+  tool_nia_keystore_password_kv_secret_id   = var.tool_nia_keystore_password_kv_secret_id
 
   tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
@@ -257,6 +259,8 @@ module "test" {
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
 
   tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+  tool_nia_p12_kv_secret_id                 = var.tool_nia_p12_kv_secret_id
+  tool_nia_keystore_password_kv_secret_id   = var.tool_nia_keystore_password_kv_secret_id
 
   tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
@@ -374,6 +378,8 @@ module "prod" {
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
 
   tool_caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
+  tool_nia_p12_kv_secret_id                 = var.tool_nia_p12_kv_secret_id
+  tool_nia_keystore_password_kv_secret_id   = var.tool_nia_keystore_password_kv_secret_id
 
   tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id

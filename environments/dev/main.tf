@@ -270,6 +270,10 @@ module "tool_apps" {
   caais_p12_kv_secret_id               = var.tool_caais_p12_kv_secret_id
   caais_keystore_password_kv_secret_id = var.tool_caais_keystore_password_kv_secret_id
 
+  # NIA id_token decryption keystore (realm key). Inert while empty.
+  nia_p12_kv_secret_id               = var.tool_nia_p12_kv_secret_id
+  nia_keystore_password_kv_secret_id = var.tool_nia_keystore_password_kv_secret_id
+
   # Per-app DB user separation (Phase 2). Empty = admin login until the env flips
   # it. See infrastructure/db/user-separation/README.md.
   backend_db_user  = var.tool_backend_db_user
