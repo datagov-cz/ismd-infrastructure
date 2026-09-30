@@ -18,7 +18,9 @@ tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend-dev"
 tool_backend_image_tag  = "0.0.1-a9a5d5b"
 
 # NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT).
-tool_nkd_sparql_endpoint = "https://pod-develop.dia.gov.cz/slovn%C3%ADky/sparql"
+# pod-develop's NKD has a fulltext-search bug, so dev uses pod-test's NKD for now.
+# Revert to https://pod-develop.dia.gov.cz/slovn%C3%ADky/sparql once that is fixed.
+tool_nkd_sparql_endpoint = "https://pod-test.dia.gov.cz/slovn%C3%ADky/sparql"
 
 # NKOD catalogue SPARQL endpoint the tool backend queries (NKOD_SPARQL_ENDPOINT).
 tool_nkod_sparql_endpoint = "https://pod-develop.dia.gov.cz/sparql"
