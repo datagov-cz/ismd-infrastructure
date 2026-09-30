@@ -129,6 +129,10 @@ module "postgres" {
 
   # Server logs + Query Store to the env workspace.
   log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
+
+  # Per-database logical backups (pg_dump). Storage only at this stage; the job
+  # that writes to it follows. Retention: weekly 14 days, monthly 90.
+  enable_logical_backups = true
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
