@@ -70,6 +70,16 @@ variable "nkd_sparql_endpoint" {
   default     = ""
 }
 
+variable "nkod_sparql_endpoint" {
+  description = <<-EOT
+    NKOD catalogue SPARQL endpoint the backend queries (dcat:Dataset), injected as
+    NKOD_SPARQL_ENDPOINT. Separate from nkd_sparql_endpoint. Set it explicitly in
+    every environment: an empty value is still set on the container.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "postgres_password_kv_secret_id" {
   description = "Versionless KV secret id for the backend's postgres password. Empty keeps the inline value; set to pull from Key Vault via the backend identity."
   type        = string

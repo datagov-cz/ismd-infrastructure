@@ -20,6 +20,9 @@ tool_backend_image_tag  = "0.0.1-a9a5d5b"
 # NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT).
 tool_nkd_sparql_endpoint = "https://pod-develop.dia.gov.cz/slovn%C3%ADky/sparql"
 
+# NKOD catalogue SPARQL endpoint the tool backend queries (NKOD_SPARQL_ENDPOINT).
+tool_nkod_sparql_endpoint = "https://pod-develop.dia.gov.cz/sparql"
+
 # App Gateway - DEV hostname (HTTPS)
 app_gateway_hostname   = "oha03.dia.gov.cz"
 tool_keycloak_hostname = "oha03.dia.gov.cz"
