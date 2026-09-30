@@ -253,6 +253,12 @@ variable "tool_nkd_sparql_endpoint" {
   default     = ""
 }
 
+variable "tool_nkod_sparql_endpoint" {
+  description = "NKOD catalogue SPARQL endpoint the tool backend queries (NKOD_SPARQL_ENDPOINT). Not the NKD vocabulary endpoint. One target per environment: pod-develop (DEV), pod-test (TEST), data.gov.cz (PROD). Set via environments/<env>/terraform.tfvars."
+  type        = string
+  default     = ""
+}
+
 variable "tool_app_insights_kv_secret_id" {
   description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-<env>.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
   type        = string

@@ -142,6 +142,11 @@ resource "azurerm_container_app" "backend" {
         name        = "KEYCLOAK_CLIENT_SECRET"
         secret_name = "keycloak-client-secret"
       }
+      # NKOD catalogue SPARQL endpoint (dcat:Dataset), one target per environment.
+      env {
+        name  = "NKOD_SPARQL_ENDPOINT"
+        value = var.nkod_sparql_endpoint
+      }
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "app-insights-connection-string"

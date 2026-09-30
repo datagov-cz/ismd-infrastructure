@@ -28,6 +28,9 @@ tool_backend_image_tag  = "latest"
 # NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT).
 tool_nkd_sparql_endpoint = "https://data.gov.cz/slovn%C3%ADky/sparql"
 
+# NKOD catalogue SPARQL endpoint the tool backend queries (NKOD_SPARQL_ENDPOINT).
+tool_nkod_sparql_endpoint = "https://data.gov.cz/sparql"
+
 # App Gateway hostname for PROD (slovník.gov.cz, IDN-encoded)
 app_gateway_hostname   = "xn--slovnk-7va.gov.cz"
 tool_keycloak_hostname = "xn--slovnk-7va.gov.cz"

@@ -171,6 +171,9 @@ module "tool_apps" {
   # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
   nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
 
+  # NKOD catalogue SPARQL endpoint (NKOD_SPARQL_ENDPOINT) — per-environment target.
+  nkod_sparql_endpoint = var.tool_nkod_sparql_endpoint
+
   # Validator BE the tool BE calls internally (VALIDATION_SERVICE_URL).
   validator_backend_app_name = module.validator_apps.backend_name
 
