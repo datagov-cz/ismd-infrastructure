@@ -29,6 +29,16 @@ locals {
 
   caais_keystore_ready = var.deploy_keycloak && var.enable_caais && var.caais_client_id != "" && var.caais_p12_kv_secret_id != "" && local.caais_keystore_pw_ready
   caais_keystore_path  = "/opt/keycloak/conf/caais/caais.p12"
+
+  # NIA id_token decryption keystore. NIA encrypts the id_token (JWE, RSA-OAEP) to the
+  # certificate uploaded in the SeP registration — for TEST that was the CAAIS *test*
+  # cert (ismd-test-caais-test-cert), confirmed by decrypting a real token 2026-09-16.
+  # Same mechanics as the CAAIS keystore above (KV PFX -> init container re-wrap ->
+  # EmptyDir), but a separate file, volume and password: this one is not an outbound
+  # mTLS keystore, it is loaded as a REALM key by keycloak-config
+  # (keycloak_realm_keystore_java_keystore, key_use = enc). Nothing here touches the
+  # CAAIS keystore. Both ids must be set for it to render.
+  nia_keystore_ready = var.deploy_keycloak && var.nia_p12_kv_secret_id != "" && var.nia_keystore_password_kv_secret_id != ""
 }
 
 # Identity for pulling keycloak's secrets (admin/db passwords, app-insights, and the
@@ -210,6 +220,15 @@ resource "azurerm_container_app" "keycloak" {
         }
       }
 
+      # NIA realm keystore — read by the realm key provider, not by an SPI env var.
+      dynamic "volume_mounts" {
+        for_each = local.nia_keystore_ready ? [1] : []
+        content {
+          name = "nia-keystore"
+          path = "/opt/keycloak/conf/nia"
+        }
+      }
+
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "app-insights-connection-string"
@@ -291,10 +310,56 @@ resource "azurerm_container_app" "keycloak" {
       }
     }
 
+    # NIA keystore init — decodes the KV PFX like caais-cert-init, but keeps only the
+    # PRIVATE KEY and pairs it with a fresh self-signed certificate.
+    # Why: Keycloak 24's java-keystore provider PKIX-validates the stored chain, trusting
+    # its LAST certificate. The KV PFX holds only the leaf, issued by CAAIS's internal
+    # test CA (CAAIS_DIA_TEST_RSA_2035), which we do not have — so the leaf alone fails
+    # ("Path does not chain with any of the trust anchors"). A self-signed cert is its
+    # own anchor and passes. NIA decryption depends only on the private key, so the
+    # published certificate being different is harmless.
+    # `-name nia` sets the PKCS12 alias the realm key provider's keyAlias must match.
+    # umask 077 keeps the intermediate key.pem private until it is deleted.
+    dynamic "init_container" {
+      for_each = local.nia_keystore_ready ? [1] : []
+      content {
+        name    = "nia-cert-init"
+        image   = var.caais_keystore_init_image
+        cpu     = 0.25
+        memory  = "0.5Gi"
+        command = ["/bin/sh", "-c"]
+        args = [
+          "set -e; umask 077; printf '%s' \"$NIA_P12_B64\" | tr -d '\\r\\n ' | base64 -d > /nia/raw.p12; openssl pkcs12 -in /nia/raw.p12 -passin pass: -nocerts -nodes -out /nia/key.pem; openssl req -new -x509 -key /nia/key.pem -subj '/CN=ismd-nia-enc' -days 3650 -out /nia/cert.pem; openssl pkcs12 -export -name nia -inkey /nia/key.pem -in /nia/cert.pem -out /nia/nia.p12 -passout env:NIA_KEYSTORE_PW; rm -f /nia/raw.p12 /nia/key.pem /nia/cert.pem; chmod 644 /nia/nia.p12"
+        ]
+
+        env {
+          name        = "NIA_P12_B64"
+          secret_name = "nia-p12-b64"
+        }
+        env {
+          name        = "NIA_KEYSTORE_PW"
+          secret_name = "nia-keystore-pw"
+        }
+
+        volume_mounts {
+          name = "nia-keystore"
+          path = "/nia"
+        }
+      }
+    }
+
     dynamic "volume" {
       for_each = local.caais_keystore_ready ? [1] : []
       content {
         name         = "caais-keystore"
+        storage_type = "EmptyDir"
+      }
+    }
+
+    dynamic "volume" {
+      for_each = local.nia_keystore_ready ? [1] : []
+      content {
+        name         = "nia-keystore"
         storage_type = "EmptyDir"
       }
     }
@@ -371,6 +436,25 @@ resource "azurerm_container_app" "keycloak" {
     content {
       name                = "caais-keystore-pw"
       key_vault_secret_id = var.caais_keystore_password_kv_secret_id
+      identity            = azurerm_user_assigned_identity.keycloak_kv[0].id
+    }
+  }
+
+  # NIA decryption keystore secrets — PFX (auto-exposed secret of the KV Certificate)
+  # and the re-wrap password. Read only by the nia-cert-init container.
+  dynamic "secret" {
+    for_each = local.nia_keystore_ready ? [1] : []
+    content {
+      name                = "nia-p12-b64"
+      key_vault_secret_id = var.nia_p12_kv_secret_id
+      identity            = azurerm_user_assigned_identity.keycloak_kv[0].id
+    }
+  }
+  dynamic "secret" {
+    for_each = local.nia_keystore_ready ? [1] : []
+    content {
+      name                = "nia-keystore-pw"
+      key_vault_secret_id = var.nia_keystore_password_kv_secret_id
       identity            = azurerm_user_assigned_identity.keycloak_kv[0].id
     }
   }

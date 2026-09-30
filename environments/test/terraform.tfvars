@@ -45,6 +45,11 @@ tool_keycloak_idp_hint = ""
 # Inert until enable_nia = true; CAAIS ignores acr_values.
 tool_keycloak_acr_values = "loalow"
 
+# Show the NIA login button (and the footer login). Injected as KEYCLOAK_NIA_ENABLED,
+# read server-side by the frontend (>= v1.0.4). The nia IdP is enabled in
+# keycloak-config/test.tfvars (enable_nia = true).
+tool_keycloak_nia_enabled = true
+
 # App names
 frontend_app_name = "ismd-validator-frontend"
 backend_app_name  = "ismd-validator-backend"
@@ -98,3 +103,9 @@ validator_frontend_app_insights_kv_secret_id      = "https://ismd-kv-test.vault.
 tool_caais_client_id                      = "ISMD"
 tool_caais_p12_kv_secret_id               = "https://ismd-kv-test.vault.azure.net/secrets/ismd-test-caais-prod-cert"
 tool_caais_keystore_password_kv_secret_id = "https://ismd-kv-test.vault.azure.net/secrets/caais-keystore-pw"
+
+# NIA id_token decryption key. The TEST SeP registration was sent the CAAIS *stage*
+# cert, so NIA encrypts to it — confirmed by decrypting a real token 2026-09-16.
+# Loaded as a realm key (keycloak-config), separate from the CAAIS mTLS keystore above.
+tool_nia_p12_kv_secret_id               = "https://ismd-kv-test.vault.azure.net/secrets/ismd-test-caais-test-cert"
+tool_nia_keystore_password_kv_secret_id = "https://ismd-kv-test.vault.azure.net/secrets/nia-keystore-pw"
