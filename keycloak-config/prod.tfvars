@@ -1,7 +1,8 @@
 # PROD realm config. Apply with: ../terraw.sh switch prod && ../terraw.sh apply
 # NOTE: the tool + Keycloak are not deployed in PROD yet — do not apply this
 # workspace until PROD Keycloak is up and reachable. Scaffolded for completeness.
-# Secrets (keycloak_admin_password) come from .env.prod as TF_VAR_keycloak_admin_password.
+# Secrets: TF_VAR_tool_keycloak_admin_password is fetched by terraw from
+# ismd-kv-prod/keycloak-admin-password (.terraw-vault-map).
 
 keycloak_url = "https://xn--slovnk-7va.gov.cz"
 app_base_url = "https://xn--slovnk-7va.gov.cz/popisujeme"
@@ -34,9 +35,10 @@ caais_issuer = "https://rest-openidconnectapi.caais.gov.cz/"
 # https://nia.identita.gov.cz/fpsts/oidc/openid-configuration (no .well-known).
 # Note prod advertises its endpoints in lowercase /fpsts/ where test uses /FPSTS/;
 # both hosts answer either casing, but these are the values as published.
-# Do not enable: the tool stack (and Keycloak) is not deployed to PROD.
-enable_nia            = false
-nia_client_id         = "" # = "https://xn--slovnk-7va.gov.cz/popisujeme" once registered
+# Enabled ahead of the prod stack: this workspace is only applied once PROD Keycloak is up
+# (see header), and the registration is live — verified on production NIA 2026-09-30.
+enable_nia            = true
+nia_client_id         = "https://xn--slovnk-7va.gov.cz/popisujeme" # registered Unikátní URL
 nia_authorization_url = "https://nia.identita.gov.cz/fpsts/oidc/authorize"
 nia_token_url         = "https://nia.identita.gov.cz/fpsts/oidc/token"
 nia_logout_url        = "https://nia.identita.gov.cz/fpsts/oidc/endsession"
@@ -45,4 +47,28 @@ nia_jwks_url          = "https://nia.identita.gov.cz/fpsts/oidc/openid-configura
 # Identical to TEST — a URN, and it does NOT distinguish environments.
 nia_issuer             = "urn:microsoft:cgg2010:fpsts"
 nia_validate_signature = true
-nia_default_scopes     = "openid"
+# LoA "loalow", same as TEST: on the scope as the floor, and as acr_values from the frontend.
+nia_default_scopes = "openid loalow"
+
+# Custom broker from the ismd-tool-keycloak image (NIA's id_token has no sub; attributes
+# only when requested). Needs that image on PROD — set in environments/prod/terraform.tfvars.
+nia_provider_id      = "nia-oidc"
+nia_requested_claims = ["PersonIdentifier", "CurrentGivenName", "CurrentFamilyName"]
+
+# NIA encrypts the id_token to the cert in the PROD registration: ismd-caais-prod-cert
+# (verified with a real login 2026-10-02). Its key is NOT Terraform-managed on Keycloak 24
+# (it would put the private key in state). After the first apply, import it from
+# ismd-kv-prod as an rsa-enc realm key (RSA-OAEP, priority 200), the same as on TEST,
+# or every NIA login fails with "Padding error in decryption".
+
+# User profile and account console — same as TEST (see test.tfvars for the reasoning).
+manage_user_profile         = true
+user_profile_email_required = false
+user_profile_names_required = true
+account_console_enabled     = false
+
+# The admin-console lockdown imports the realm's security-admin-console client by UUID,
+# which only exists once the PROD realm is created. Second pass: read the UUID
+# (GET /admin/realms/ismd/clients?clientId=security-admin-console), then set
+# disable_realm_admin_console = true and realm_admin_console_client_uuid.
+disable_realm_admin_console = false
