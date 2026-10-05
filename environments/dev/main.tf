@@ -132,7 +132,10 @@ module "postgres" {
 
   # Per-database logical backups (pg_dump). Storage only at this stage; the job
   # that writes to it follows. Retention: weekly 14 days, monthly 90.
-  enable_logical_backups = true
+  enable_logical_backups       = true
+  container_app_environment_id = module.shared.shared_container_app_environment_id
+  backup_databases             = ["ismd_tool_db", "keycloak_db", "ismd_ai"]
+  backup_encryption_key        = var.pg_backup_encryption_key
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).

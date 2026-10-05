@@ -636,3 +636,10 @@ variable "validator_use_bff" {
   type        = bool
   default     = false
 }
+
+variable "pg_backup_encryption_key" {
+  description = "Passphrase used to encrypt logical-backup dumps. Resolved by terraw from ismd-kv-<env>/pg-backup-encryption-key; Key Vault is the only copy."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

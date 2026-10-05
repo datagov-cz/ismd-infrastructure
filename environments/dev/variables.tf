@@ -693,3 +693,10 @@ variable "validator_use_bff" {
   type        = bool
   default     = false
 }
+
+variable "pg_backup_encryption_key" {
+  description = "Passphrase for logical-backup dump encryption, from ismd-kv-<env>/pg-backup-encryption-key via terraw."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

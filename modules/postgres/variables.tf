@@ -119,3 +119,28 @@ variable "backup_monthly_retention_days" {
   type        = number
   default     = 90
 }
+
+variable "container_app_environment_id" {
+  description = "Shared Container Apps environment the backup job runs in. VNet-integrated, so the job reaches the server over the private endpoint. Required when enable_logical_backups is true."
+  type        = string
+  default     = null
+}
+
+variable "backup_databases" {
+  description = "Databases to dump, one entry each. Differs per environment (test has no ismd_ai), so it is set in tfvars rather than inferred."
+  type        = list(string)
+  default     = []
+}
+
+variable "backup_cron_expression" {
+  description = "Cron for the backup job, UTC. Default Sunday 01:30, clear of the Sunday 00:00 maintenance window on dev."
+  type        = string
+  default     = "30 1 * * 0"
+}
+
+variable "backup_encryption_key" {
+  description = "Passphrase for openssl encryption of the dumps, from ismd-kv-<env>/pg-backup-encryption-key via terraw. Key Vault is the only copy."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

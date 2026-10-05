@@ -85,6 +85,7 @@ module "dev" {
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path
@@ -237,6 +238,7 @@ module "test" {
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path
@@ -356,6 +358,7 @@ module "prod" {
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path
