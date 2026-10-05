@@ -114,6 +114,13 @@ module "postgres" {
 
   # Server logs + Query Store to the env workspace.
   log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
+
+  # Per-database logical backups (pg_dump). No ismd_ai on test — the AI app is
+  # deployed in dev only, so its database does not exist here.
+  enable_logical_backups       = true
+  container_app_environment_id = module.shared.shared_container_app_environment_id
+  backup_databases             = ["ismd_tool_db", "keycloak_db"]
+  backup_encryption_key        = var.pg_backup_encryption_key
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
