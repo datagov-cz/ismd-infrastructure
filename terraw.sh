@@ -65,6 +65,18 @@ load_env_file() {
 #
 # Anything already exported (or present in .env.<env>) is left alone, so an operator
 # can still override one value for a single invocation without touching the vault.
+#
+# EXCEPT when the values belong to a DIFFERENT environment. TERRAW_SECRETS_ENV records
+# which env the resolved values came from; when it disagrees with the target env, the
+# stale values are refetched rather than honoured.
+#
+# This bash wrapper runs terraform as a CHILD process, so its exports die with the run
+# and it cannot bleed across invocations. terraw.ps1 can: a .ps1 runs IN the caller's
+# session, so after `switch dev` the dev secrets persist, and a later `switch test` saw
+# them "already set", skipped the vault, and planned TEST against DEV's secrets — on
+# 2026-10-05 that showed up as `~ administrator_password` on the test Postgres server.
+# The guard is kept here too so both wrappers behave identically, and because an
+# operator can export these vars manually in their own shell.
 resolve_vault_secrets() {
     local env="$1"
     [ -f "$VAULT_MAP" ] || return 0
@@ -74,8 +86,15 @@ resolve_vault_secrets() {
     fi
 
     local vault="ismd-kv-$env"
-    local fetched=0 preset=0
+    local fetched=0 preset=0 stale=0
     VAULT_MISSING=()
+
+    # Set by a previous terraw run in this environment lineage; empty on a fresh shell.
+    local cross_env=0
+    if [ -n "${TERRAW_SECRETS_ENV-}" ] && [ "${TERRAW_SECRETS_ENV}" != "$env" ]; then
+        cross_env=1
+        echo "[terraw] secrets in this shell came from '${TERRAW_SECRETS_ENV}', target is '$env' — refetching" >&2
+    fi
 
     while IFS='=' read -r name secret || [ -n "$name" ]; do
         name="${name//$'
@@ -86,8 +105,14 @@ resolve_vault_secrets() {
         [ -n "$secret" ] || continue
 
         if [ -n "${!name-}" ]; then
-            preset=$((preset + 1))
-            continue
+            if [ "$cross_env" -eq 1 ]; then
+                # Belongs to another environment — drop it and refetch below.
+                unset "$name"
+                stale=$((stale + 1))
+            else
+                preset=$((preset + 1))
+                continue
+            fi
         fi
 
         # Command substitution, not a temp file or an argument: az writes the value
@@ -115,7 +140,13 @@ resolve_vault_secrets() {
         fetched=$((fetched + 1))
     done < "$VAULT_MAP"
 
-    echo "[terraw] vault $vault: $fetched fetched, $preset already set, ${#VAULT_MISSING[@]} unresolved" >&2
+    local stale_note=""
+    [ "$stale" -gt 0 ] && stale_note=", $stale refetched from another env"
+    echo "[terraw] vault $vault: $fetched fetched, $preset already set${stale_note}, ${#VAULT_MISSING[@]} unresolved" >&2
+
+    # Record which env these values belong to, so a later switch can tell a stale
+    # value from a deliberate override.
+    export TERRAW_SECRETS_ENV="$env"
 }
 
 # Every sensitive root variable declares `default = ""`, so an unresolved secret does

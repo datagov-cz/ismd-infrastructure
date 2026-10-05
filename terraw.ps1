@@ -79,6 +79,19 @@ function Import-EnvFile {
 #
 # Anything already set (or present in .env.<env>) is left alone, so an operator can
 # still override one value for a single invocation without touching the vault.
+#
+# EXCEPT when the values belong to a DIFFERENT environment. A .ps1 runs IN the caller's
+# session, so Set-Item env: survives after terraw exits: after `switch dev`, dev's
+# secrets sit in the shell, and a later `switch test` saw them "already set", skipped
+# the vault, and planned TEST against DEV's secrets. On 2026-10-05 that produced
+# `~ administrator_password` on the test Postgres server — an apply would have
+# overwritten test's admin password with dev's, invisibly, because the value is masked.
+# (terraw.sh does not have this failure mode: it runs as a child process.)
+#
+# TERRAW_SECRETS_ENV records which environment the resolved values came from. When it
+# disagrees with the target environment, the stale values are refetched rather than
+# honoured. A manual override still works: export the var yourself with no marker set,
+# or stay within one environment.
 function Resolve-VaultSecrets {
     param([string]$EnvName)
 
@@ -92,6 +105,14 @@ function Resolve-VaultSecrets {
     $vault = "ismd-kv-$EnvName"
     $fetched = 0
     $preset = 0
+    $stale = 0
+
+    # Set by a previous terraw run in this session. Empty on a fresh shell.
+    $secretsEnv = [Environment]::GetEnvironmentVariable('TERRAW_SECRETS_ENV')
+    $crossEnv = $secretsEnv -and ($secretsEnv -ne $EnvName)
+    if ($crossEnv) {
+        Write-Host "[terraw] secrets in this session came from '$secretsEnv', target is '$EnvName' - refetching"
+    }
 
     foreach ($line in (Get-Content $VaultMap)) {
         $line = $line.Trim()
@@ -105,8 +126,14 @@ function Resolve-VaultSecrets {
         if (-not $name -or -not $secret) { continue }
 
         if ([Environment]::GetEnvironmentVariable($name)) {
-            $preset++
-            continue
+            if ($crossEnv) {
+                # Belongs to another environment - drop it and refetch below.
+                Set-Item -Path "env:$name" -Value $null
+                $stale++
+            } else {
+                $preset++
+                continue
+            }
         }
 
         # az writes the value to stdout and it goes straight into the variable -
@@ -123,7 +150,12 @@ function Resolve-VaultSecrets {
         $fetched++
     }
 
-    Write-Host "[terraw] vault ${vault}: $fetched fetched, $preset already set, $($script:VaultMissing.Count) unresolved"
+    $staleNote = if ($stale -gt 0) { ", $stale refetched from another env" } else { "" }
+    Write-Host "[terraw] vault ${vault}: $fetched fetched, $preset already set$staleNote, $($script:VaultMissing.Count) unresolved"
+
+    # Mark which environment this session's secrets belong to, so the next switch can
+    # tell stale values from a deliberate override.
+    Set-Item -Path "env:TERRAW_SECRETS_ENV" -Value $EnvName
 }
 
 # Every sensitive root variable declares a default of "", so an unresolved secret does
