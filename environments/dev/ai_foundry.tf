@@ -1,4 +1,4 @@
-# Dev — Azure OpenAI (Foundry) account + model deployment backing ismd-ai.
+# Dev — Foundry (AIServices) account + model deployment backing ismd-ai.
 #
 # COST MODEL — read before changing the SKU. A Standard-family deployment is billed
 # per token consumed only; an account and a deployment that receive no requests cost
@@ -51,8 +51,17 @@ resource "azurerm_cognitive_account" "openai" {
   name                = "ismd-openai-${var.environment}"
   resource_group_name = var.ai_resource_group_name
   location            = var.ai_foundry_location
-  kind                = "OpenAI"
-  sku_name            = "S0"
+  # AIServices is the Foundry kind. azurerm >= 4.56 switches OpenAI <-> AIServices in
+  # place (PATCH), keeping name, endpoint, keys and deployments; any other kind change
+  # forces replacement. Rolling back needs projects and connections deleted first.
+  kind                       = "AIServices"
+  sku_name                   = "S0"
+  project_management_enabled = true
+
+  # Required by the Foundry upgrade. Not used for auth yet — see local_auth_enabled.
+  identity {
+    type = "SystemAssigned"
+  }
 
   # Required for the https://<subdomain>.openai.azure.com host that the /openai/v1
   # route lives on. Without it the account answers only on the regional
