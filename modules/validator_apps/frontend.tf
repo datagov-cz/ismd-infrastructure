@@ -24,7 +24,7 @@ resource "azurerm_container_app" "frontend" {
   # Set workload profile name based on environment
   # For Consumption profile, set to null
   # For Dedicated profile, use the provided workload profile name
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   identity {
     type         = "UserAssigned"

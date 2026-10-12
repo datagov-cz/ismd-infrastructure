@@ -32,7 +32,7 @@ resource "azurerm_container_app" "frontend" {
   revision_mode                = "Single"
 
   # Set workload profile name based on environment
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   identity {
     type         = "UserAssigned"

@@ -16,6 +16,10 @@ module "shared" {
   # ~0.3 GB/day of app telemetry left no headroom under 0.5 for Postgres logs.
   # Keep in sync with module.monitoring below.
   log_analytics_daily_cap_gb = 1
+
+  # DEV is Consumption only (2026-10, cost): drops the D4 node and the Dedicated
+  # Plan Management fee. All dev apps moved off "default" first.
+  dedicated_workload_profile = false
 }
 
 # Create validator apps using shared Container App Environment

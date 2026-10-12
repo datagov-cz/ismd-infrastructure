@@ -70,7 +70,7 @@ resource "azurerm_container_app" "fuseki" {
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
 
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   template {
     min_replicas = 1

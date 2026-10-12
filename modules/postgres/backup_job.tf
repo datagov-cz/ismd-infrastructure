@@ -65,6 +65,9 @@ resource "azurerm_container_app_job" "backup" {
   location                     = var.location
   container_app_environment_id = var.container_app_environment_id
 
+  # Explicit: left unset, Azure reports "Consumption" and every plan shows a diff.
+  workload_profile_name = "Consumption"
+
   # 30 min ceiling: the databases are single-digit MB, so a normal run is seconds.
   # One retry, because a transient DNS or storage blip should not skip a week.
   replica_timeout_in_seconds = 1800
