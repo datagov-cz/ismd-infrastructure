@@ -179,6 +179,103 @@ function Test-VaultGuard {
     return $true
 }
 
+# -- Dev on/off switch ---------------------------------------------------------
+# One value, ismd-kv-dev/dev-enabled ("true"|"false"), drives both roots that own a
+# piece of dev: the infra root's dev workspace (replicas, uptime probe, alert
+# suppression) and shared-global (the four dev App Gateway pools). It is read on
+# every run of either, so a plain apply always matches the switch and never undoes
+# it. Always from ismd-kv-dev, whatever env is selected - shared-global has no env.
+#
+# az queries here fetch JSON and filter in PowerShell: az.cmd goes through cmd.exe,
+# which mangles JMESPath's &&, >, | and {} (see terraw.sh for the one-line forms).
+$DevSwitchVault  = 'ismd-kv-dev'
+$DevSwitchSecret = 'dev-enabled'
+$DevApps  = @('ismd-validator-dev/ismd-validator-frontend-dev', 'ismd-validator-dev/ismd-validator-backend-dev',
+              'ismd-tool-dev/ismd-tool-frontend-dev', 'ismd-tool-dev/ismd-tool-backend-dev',
+              'ismd-tool-dev/ismd-tool-keycloak-dev', 'ismd-tool-dev/ismd-tool-fuseki-dev', 'ismd-ai-dev/ismd-ai-dev')
+$DevPools = @('validator-dev-fe-pool', 'tool-dev-fe-pool', 'tool-dev-keycloak-pool', 'tool-dev-be-pool')
+$FusekiRg  = 'ismd-tool-dev'
+$FusekiApp = 'ismd-tool-fuseki-dev'
+
+function Get-AzJson {
+    $out = & az @args -o json 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $out) { return $null }
+    return ($out | Out-String | ConvertFrom-Json)
+}
+
+# True where Terraform reads var.dev_enabled: shared-global, or the infra root on dev.
+function Test-DevSwitchApplies {
+    param([string]$EnvName)
+    $sg = Join-Path $ScriptDir 'shared-global'
+    if ((Test-Path $sg) -and ((Resolve-Path .).Path -eq (Resolve-Path $sg).Path)) { return $true }
+    return ($EnvName -eq 'dev') -and ((Resolve-Tfvars $EnvName) -eq 'environments/dev/terraform.tfvars')
+}
+
+# Set TF_VAR_dev_enabled from the vault. An explicit value still wins (one-off
+# override). Missing or not true|false -> recorded as unresolved, so Test-VaultGuard
+# refuses apply: there is deliberately no default to fall back to.
+function Resolve-DevSwitch {
+    param([string]$EnvName)
+    if (-not (Test-DevSwitchApplies $EnvName)) { return }
+    $preset = [Environment]::GetEnvironmentVariable('TF_VAR_dev_enabled')
+    if ($preset) {
+        Write-Host "[terraw] dev switch: $preset (from the environment, not the vault)"
+        return
+    }
+    $v = (az keyvault secret show --vault-name $DevSwitchVault --name $DevSwitchSecret --query value -o tsv 2>$null | Out-String).Trim()
+    if ($v -in 'true', 'false') {
+        Set-TerrawEnv 'TF_VAR_dev_enabled' $v
+        $state = if ($v -eq 'true') { 'ON' } else { 'OFF' }
+        Write-Host "[terraw] dev switch: $state ($DevSwitchVault/$DevSwitchSecret)"
+    } else {
+        $script:VaultMissing += "TF_VAR_dev_enabled ($DevSwitchVault/$DevSwitchSecret, must be true|false)"
+    }
+}
+
+# Fuseki keeps a single-writer TDB2 lock on its Azure Files share. Switching off
+# changes min_replicas, which creates a new revision; that revision first scales to
+# the old replica count and can never take the lock - a deadlock. 'terraw dev off'
+# deactivates the running revision first. Refuse a plain dev apply that would
+# switch off while Fuseki still runs.
+function Get-FusekiRunningRevisions {
+    $revs = Get-AzJson containerapp revision list -g $FusekiRg -n $FusekiApp
+    @($revs | Where-Object { $_.properties.active -and $_.properties.replicas -gt 0 } | ForEach-Object { $_.name })
+}
+
+function Test-FusekiGuard {
+    param([string]$EnvName, [string]$Cmd)
+    if ($Cmd -ne 'apply') { return $true }
+    if (-not ($EnvName -eq 'dev' -and (Test-DevSwitchApplies $EnvName))) { return $true }
+    if ([Environment]::GetEnvironmentVariable('TF_VAR_dev_enabled') -ne 'false') { return $true }
+    if ([Environment]::GetEnvironmentVariable('TERRAW_FUSEKI_STOPPED') -eq '1') { return $true }
+    if ((Get-FusekiRunningRevisions).Count -eq 0) { return $true }
+    Write-Host "[terraw] ERROR: dev switch is OFF but $FusekiApp is still running."
+    Write-Host "[terraw] Applying now would deadlock Fuseki on its TDB2 lock. Use: $Invoked dev off"
+    return $false
+}
+
+function Show-DevStatus {
+    $kv = (az keyvault secret show --vault-name $DevSwitchVault --name $DevSwitchSecret --query value -o tsv 2>$null | Out-String).Trim()
+    if (-not $kv) { $kv = '<missing>' }
+    Write-Host "dev switch ($DevSwitchVault/$DevSwitchSecret): $kv"
+    Write-Host "gateway pools (address count):"
+    foreach ($p in $DevPools) {
+        $pool = Get-AzJson network application-gateway address-pool show -g ismd-shared-global --gateway-name ismd-app-gateway -n $p
+        Write-Host "  ${p}: $(@($pool.backendAddresses).Count)"
+    }
+    Write-Host "apps (min replicas / running replicas):"
+    foreach ($a in $DevApps) {
+        $rg, $name = $a.Split('/')
+        $app = Get-AzJson containerapp show -g $rg -n $name
+        $reps = Get-AzJson containerapp replica list -g $rg -n $name
+        Write-Host "  ${name}: $($app.properties.template.scale.minReplicas) / $(@($reps).Count)"
+    }
+    $wf = Get-AzJson resource show -g ismd-shared-dev -n logic-dia-uptime-dev --resource-type Microsoft.Logic/workflows
+    Write-Host "uptime probe logic-dia-uptime-dev: $($wf.properties.state)"
+    $apr = Get-AzJson resource show -g ismd-shared-dev -n apr-dia-env-off-dev --resource-type Microsoft.AlertsManagement/actionRules
+    Write-Host "alert suppression apr-dia-env-off-dev enabled: $($apr.properties.enabled)"
+}
+
 # Resolve the per-env tfvars file relative to the current dir. Supports both
 # layouts: the main state (environments/<env>/terraform.tfvars, run from root)
 # and per-dir states like keycloak-config (<env>.tfvars, run from inside the dir).
@@ -314,11 +411,15 @@ switch ($Command) {
         $tfArgs = @()
         if (-not $envName) {
             Write-Warning "[terraw] no env set - running plain 'terraform $Command'. Run 'terraw switch <env>' first if you wanted env-scoped vars."
+            Resolve-DevSwitch ''
+            if (-not (Test-VaultGuard $Command)) { exit 1 }
         } else {
             if (-not (Test-WorkspaceGuard $envName $Command)) { exit 1 }
             if (-not (Import-EnvFile $envName)) { exit 1 }
             Resolve-VaultSecrets $envName
+            Resolve-DevSwitch $envName
             if (-not (Test-VaultGuard $Command)) { exit 1 }
+            if (-not (Test-FusekiGuard $envName $Command)) { exit 1 }
             $tfv = Resolve-Tfvars $envName
             if ($tfv) {
                 $tfArgs += "-var-file=$tfv"
@@ -330,6 +431,68 @@ switch ($Command) {
         terraform $Command @tfArgs @RestArgs
         exit $LASTEXITCODE
     }
+    'dev' {
+        $action = if ($RestArgs.Count -gt 0) { $RestArgs[0] } else { 'status' }
+        if ($action -notin 'on', 'off', 'status') { Write-Host "Usage: $Invoked dev on|off|status"; exit 2 }
+        if ($action -eq 'status') { Show-DevStatus; exit 0 }
+
+        # Each toggle applies shared-global, i.e. rewrites the App Gateway that also
+        # serves test and prod. From a branch missing other gateway changes, that apply
+        # reverts them on prod. Refuse a dirty tree; make anything but an up-to-date
+        # dev checkout an explicit choice.
+        if (@(git -C $ScriptDir status --porcelain 2>$null).Count -gt 0) {
+            Write-Host "[terraw] ERROR: uncommitted changes in $ScriptDir - commit or discard before 'dev $action'."
+            exit 1
+        }
+        git -C $ScriptDir fetch -q origin dev 2>$null
+        if ((git -C $ScriptDir rev-parse HEAD) -ne (git -C $ScriptDir rev-parse origin/dev 2>$null)) {
+            Write-Warning "[terraw] checkout is $(git -C $ScriptDir branch --show-current), not an up-to-date origin/dev."
+            Write-Warning "[terraw] The shared-global apply will push THIS branch's gateway config - including to prod's routes."
+            if ((Read-Host "[terraw] Read both plans carefully. Continue? [y/N]") -ne 'y') { exit 1 }
+        }
+
+        $value = if ($action -eq 'on') { 'true' } else { 'false' }
+        # The vault holds the DESIRED state. If an apply below is declined, the next
+        # apply of either root (plain or 'dev $action') completes the switch.
+        az keyvault secret set --vault-name $DevSwitchVault --name $DevSwitchSecret --value $value -o none
+        if ($LASTEXITCODE -ne 0) { Write-Host "[terraw] ERROR: could not write $DevSwitchVault/$DevSwitchSecret"; exit 1 }
+        Write-Host "[terraw] desired state: dev $action ($DevSwitchVault/$DevSwitchSecret=$value)"
+
+        $self = Join-Path $ScriptDir 'terraw.ps1'
+        $unfinished = "[terraw] stopped: dev is only partly switched $action. Run '$Invoked dev $action' again to finish."
+        $applySg = {
+            Write-Host "[terraw] -- shared-global (dev gateway pools) --"
+            Push-Location (Join-Path $ScriptDir 'shared-global')
+            try { & $self apply } finally { Pop-Location }
+            if ($LASTEXITCODE -ne 0) { Write-Host $unfinished; exit 1 }
+        }
+        $applyDev = {
+            Write-Host "[terraw] -- dev workspace (apps, uptime probe, alerts) --"
+            Push-Location $ScriptDir
+            try { & $self apply dev } finally { Pop-Location }
+            if ($LASTEXITCODE -ne 0) { Write-Host $unfinished; exit 1 }
+        }
+
+        if ($action -eq 'off') {
+            # Gateway first: traffic and probes stop before the apps go.
+            . $applySg
+            # Fuseki: stop the running revision so the new min-0 revision has no
+            # replica count to match and never contends for the TDB2 lock.
+            foreach ($rev in (Get-FusekiRunningRevisions)) {
+                Write-Host "[terraw] deactivating Fuseki revision $rev (TDB2 lock)"
+                az containerapp revision deactivate -g $FusekiRg -n $FusekiApp --revision $rev -o none
+                if ($LASTEXITCODE -ne 0) { Write-Host $unfinished; exit 1 }
+            }
+            Set-TerrawEnv 'TERRAW_FUSEKI_STOPPED' '1'
+            . $applyDev
+        } else {
+            # Apps first, so the gateway never routes to replicas that aren't up.
+            . $applyDev
+            . $applySg
+        }
+        Write-Host ""
+        Show-DevStatus
+    }
     { $_ -in '', 'help', '-h', '--help' } {
         $envName = Get-CurrentEnv
         $display = if ($envName) { $envName } else { '<unset>' }
@@ -339,6 +502,9 @@ Usage:
   .\terraw.ps1 env              Show current env + tfvars resolution
   .\terraw.ps1 plan|apply|...   terraform with auto-injected -var-file
   .\terraw.ps1 plan <env> ...   switch to <env> first, then plan (same for apply etc.)
+  .\terraw.ps1 dev on|off       Switch dev on/off: sets $DevSwitchVault/$DevSwitchSecret, then
+                                applies shared-global and the dev workspace (interactive plans)
+  .\terraw.ps1 dev status       Switch value and live state (pools, replicas, probe, alerts)
   .\terraw.ps1 <other>          Pass-through to terraform
 
 Secrets: TF_VARs listed in .terraw-vault-map are read from ismd-kv-<env> into this
@@ -360,6 +526,7 @@ Current state:
             Import-EnvFile $envName | Out-Null
             Resolve-VaultSecrets $envName | Out-Null
         }
+        if ($Command -notin $StatelessCmds) { Resolve-DevSwitch $envName | Out-Null }
         terraform $Command @RestArgs
         exit $LASTEXITCODE
     }
