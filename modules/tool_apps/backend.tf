@@ -140,6 +140,11 @@ resource "azurerm_container_app" "backend" {
         name  = "NKD_SPARQL_ENDPOINT"
         value = var.nkd_sparql_endpoint
       }
+      # NKOD catalogue SPARQL endpoint (dcat:Dataset), one target per environment.
+      env {
+        name  = "NKOD_SPARQL_ENDPOINT"
+        value = var.nkod_sparql_endpoint
+      }
       env {
         name  = "VALIDATION_SERVICE_URL"
         value = "http://${var.validator_backend_app_name}/validujeme"
@@ -155,11 +160,6 @@ resource "azurerm_container_app" "backend" {
       env {
         name        = "KEYCLOAK_CLIENT_SECRET"
         secret_name = "keycloak-client-secret"
-      }
-      # NKOD catalogue SPARQL endpoint (dcat:Dataset), one target per environment.
-      env {
-        name  = "NKOD_SPARQL_ENDPOINT"
-        value = var.nkod_sparql_endpoint
       }
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
