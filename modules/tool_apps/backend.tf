@@ -55,6 +55,20 @@ resource "azurerm_container_app" "backend" {
       percentage      = 100
     }
     allow_insecure_connections = true
+
+    # Restrict ingress to Application Gateway public IP (only when known).
+    # Inert on TEST/PROD, where external_enabled is false. On DEV it keeps the
+    # /popisujeme/be/* dev loop working — that traffic arrives via nginx and the
+    # gateway, so it presents the gateway's IP — while closing the app to the
+    # open internet.
+    dynamic "ip_security_restriction" {
+      for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
+      content {
+        name             = "AllowAppGateway"
+        ip_address_range = "${ip_security_restriction.value}/32"
+        action           = "Allow"
+      }
+    }
   }
 
   template {

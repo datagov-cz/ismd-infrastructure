@@ -92,15 +92,15 @@ resource "azurerm_postgresql_flexible_server_configuration" "idle_in_transaction
 }
 
 # App access — Azure services.
-# The Container Apps subnet has NO NAT gateway, so the apps' outbound traffic to
-# the public Postgres endpoint egresses via Azure's *dynamic* SNAT — NOT the
-# environment's static (inbound) IP. There is therefore no single stable egress
-# IP to allowlist, which is why this blanket "AllowAzureServices" (0.0.0.0) rule
-# is required for the apps (backend, keycloak, fuseki) to reach the database.
+# "AllowAzureServices" (0.0.0.0) admits ANY Azure-hosted resource in ANY tenant, not
+# just ours — the password is then the only control. It was needed because the apps
+# reached the PUBLIC endpoint via Azure's dynamic SNAT (no NAT gateway, so no stable
+# egress IP to allowlist).
 #
-# To tighten this to a real allowlist: add a NAT gateway + static public IP to
-# the Container Apps subnet, put that IP in app_outbound_ips, and set
-# allow_azure_services = false. See app_outbound rule below.
+# With the private endpoint below, the apps no longer use the public endpoint. Set
+# allow_azure_services = false once the private path is verified: every app
+# connection in pg_stat_activity must come from the Container Apps subnet. The
+# NAT-gateway + app_outbound_ips route still works but is no longer needed.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure" {
   count            = var.allow_azure_services ? 1 : 0
   name             = "AllowAzureServices"
@@ -128,4 +128,87 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "admin" {
   server_id        = azurerm_postgresql_flexible_server.tool.id
   start_ip_address = each.value
   end_ip_address   = each.value
+}
+
+# Private endpoint — how the apps reach the server once AllowAzureServices is gone.
+#
+# Additive: a public-access Flexible Server takes a private endpoint without being
+# recreated (the live servers advertise the `postgresqlServer` private-link group).
+# Do NOT switch to VNet integration (delegated_subnet_id) instead — that forces
+# replacement, i.e. total data loss for every tenant.
+#
+# The privatelink zone is linked to this environment's VNet only, so the unchanged
+# FQDN resolves to the private IP from inside the VNet (apps: no config change, no
+# new revision) and to the public IP from outside it (operators via admin_allowed_ips).
+#
+# Gated on enable_private_endpoint, not on private_endpoint_subnet_id != null: the
+# subnet id is unknown until the subnet exists, and count cannot depend on it.
+resource "azurerm_private_dns_zone" "postgres" {
+  count               = var.enable_private_endpoint ? 1 : 0
+  name                = "privatelink.postgres.database.azure.com"
+  resource_group_name = var.resource_group_name
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "Database"
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
+  count                 = var.enable_private_endpoint ? 1 : 0
+  name                  = "ismd-vnet-${var.environment}-link"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.postgres[0].name
+  virtual_network_id    = var.vnet_id
+  registration_enabled  = false
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "Database"
+    ManagedBy   = "Terraform"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.vnet_id != null
+      error_message = "enable_private_endpoint requires vnet_id."
+    }
+  }
+}
+
+resource "azurerm_private_endpoint" "postgres" {
+  count               = var.enable_private_endpoint ? 1 : 0
+  name                = "${azurerm_postgresql_flexible_server.tool.name}-pe"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.private_endpoint_subnet_id
+
+  private_service_connection {
+    name                           = "${azurerm_postgresql_flexible_server.tool.name}-psc"
+    private_connection_resource_id = azurerm_postgresql_flexible_server.tool.id
+    subresource_names              = ["postgresqlServer"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.postgres[0].id]
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "Database"
+    ManagedBy   = "Terraform"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.private_endpoint_subnet_id != null
+      error_message = "enable_private_endpoint requires private_endpoint_subnet_id."
+    }
+  }
 }

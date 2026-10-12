@@ -71,6 +71,19 @@ resource "azurerm_subnet" "shared_apps" {
   }
 }
 
+# Subnet for private endpoints (Postgres today).
+# Deliberately NOT delegated: a private endpoint cannot sit in a subnet delegated to
+# Microsoft.App/environments, so it cannot share the Container Apps subnets above.
+# Count-gated on the prefix: an environment that does not set one (prod, for now)
+# gets no subnet.
+resource "azurerm_subnet" "private_endpoints" {
+  count                = var.private_endpoint_subnet_address_prefix != "" ? 1 : 0
+  name                 = "ismd-private-endpoints-subnet-${var.environment}"
+  resource_group_name  = azurerm_resource_group.shared.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.private_endpoint_subnet_address_prefix]
+}
+
 # Log Analytics Workspace for shared Container App Environment
 resource "azurerm_log_analytics_workspace" "shared" {
   name                = "ismd-shared-logs-${var.environment}"
