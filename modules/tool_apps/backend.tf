@@ -72,7 +72,7 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     max_replicas = 1 # Pinned to singleton: avoids DB connection pool exhaustion, no concurrency hardening needed
     container {
       name   = "ismd-tool-backend-${var.environment}"

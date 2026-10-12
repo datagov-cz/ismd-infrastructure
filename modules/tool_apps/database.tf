@@ -73,7 +73,7 @@ resource "azurerm_container_app" "fuseki" {
   workload_profile_name = var.workload_profile_name
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     # LOAD-BEARING — do not scale above 1. This is a data-integrity constraint, not
     # a cost choice. Fuseki stores TDB2 on the Azure Files share mounted below, and
     # TDB2 is strictly single-writer: it guards the dataset with an on-disk lock.

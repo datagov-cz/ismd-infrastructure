@@ -32,6 +32,10 @@ resource "azurerm_logic_app_workflow" "uptime" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
+  # Off while the environment is switched off: every probe would wake the apps
+  # and post a failed availability result.
+  enabled = var.uptime_enabled
+
   tags = local.common_tags
 }
 

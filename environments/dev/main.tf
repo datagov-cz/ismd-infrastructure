@@ -41,11 +41,13 @@ module "validator_apps" {
   # dev hostname (2026-08-29: three bursts at ~450-575 req/min against a single
   # replica produced 966 x 503 while Container Apps scaled 1 -> 10). Test and
   # prod keep the module default of 1 — do not raise them without their own
-  # traffic evidence.
-  frontend_min_replicas = 2
-  backend_image         = var.backend_image
-  backend_image_tag     = var.backend_image_tag
-  backend_port          = var.backend_port
+  # traffic evidence. 0 while dev is switched off.
+  frontend_min_replicas = var.dev_enabled ? 2 : 0
+  backend_min_replicas  = var.dev_enabled ? 1 : 0
+
+  backend_image     = var.backend_image
+  backend_image_tag = var.backend_image_tag
+  backend_port      = var.backend_port
 
   # IP Restrictions
   app_gateway_public_ip = var.app_gateway_public_ip_address
@@ -227,6 +229,9 @@ module "tool_apps" {
   # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
   workload_profile_name = "Consumption"
 
+  # Dev on/off switch: frontend, backend, Keycloak and Fuseki at 0 while off.
+  min_replicas = var.dev_enabled ? 1 : 0
+
   # Database & Fuseki Configuration
   deploy_postgres         = true
   deploy_fuseki           = true
@@ -347,6 +352,9 @@ module "ai_apps" {
   # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
   workload_profile_name = "Consumption"
 
+  # Dev on/off switch.
+  min_replicas = var.dev_enabled ? 1 : 0
+
   # Database — dedicated ismd_ai DB on the tool's Postgres server.
   postgres_server_id = module.postgres[0].server_id
   postgres_fqdn      = module.postgres[0].fqdn
@@ -410,6 +418,11 @@ module "monitoring" {
   environment         = var.environment
   location            = var.location
   resource_group_name = var.shared_resource_group_name
+
+  # Dev on/off switch: no uptime probing and no alert notifications while off.
+  uptime_enabled             = var.dev_enabled
+  enable_notification_switch = true
+  suppress_notifications     = !var.dev_enabled
 
   log_analytics_workspace_id       = module.shared.shared_log_analytics_workspace_id
   log_analytics_daily_cap_gb       = 1 # must match module.shared

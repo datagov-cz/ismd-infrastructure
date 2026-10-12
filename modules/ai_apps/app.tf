@@ -62,7 +62,7 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     # LOAD-BEARING — do not scale above 1. This is a correctness constraint, not a
     # cost or capacity choice. SuggestionJobService keeps suggestion jobs AND the
     # per-user daily token budget in in-memory ConcurrentHashMaps, not in Postgres

@@ -48,6 +48,7 @@ module "shared_global" {
 
   # Hostname-based routing inputs (must be ASCII/punycode)
   dev_hostname  = var.dev_hostname
+  dev_enabled   = var.dev_enabled
   test_hostname = var.test_hostname
   prod_hostname = var.prod_hostname
 

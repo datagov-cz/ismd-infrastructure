@@ -276,3 +276,9 @@ variable "site_preview_secret" {
     error_message = "site_preview_secret must not equal the literal 'ne' (reserved for cookie clearing via ?nahled=ne)."
   }
 }
+
+variable "min_replicas" {
+  description = "Minimum replicas for every tool app (frontend, backend, Keycloak, Fuseki). 0 = scaled to zero — the dev on/off switch."
+  type        = number
+  default     = 1
+}

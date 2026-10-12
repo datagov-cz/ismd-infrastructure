@@ -40,7 +40,7 @@ resource "azurerm_container_app" "frontend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     container {
       name   = "ismd-tool-frontend-${var.environment}"
       image  = "${var.frontend_image}:${var.frontend_image_tag}"

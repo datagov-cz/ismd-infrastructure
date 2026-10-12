@@ -72,7 +72,7 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.backend_min_replicas
     container {
       name   = "ismd-validator-backend-${var.environment}"
       image  = "${var.backend_image}:${var.backend_image_tag}"
