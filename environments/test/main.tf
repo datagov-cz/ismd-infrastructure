@@ -211,6 +211,12 @@ module "tool_apps" {
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password
 
+  # Fuseki's ~4 GiB was Jena's default -Xmx4G, not the dataset (peak 4.05 GiB over
+  # 14 days). Capping the heap halves the reservation on the D4 node; an extra
+  # lock-blocked 6 GiB replica on 2026-10-09 had pushed TEST onto a second node.
+  fuseki_memory   = "3Gi"
+  fuseki_jvm_args = "-Xmx2g"
+
   # The server lives in module.postgres; this module only creates its databases.
   postgres_server_id = module.postgres[0].server_id
   postgres_fqdn      = module.postgres[0].fqdn
