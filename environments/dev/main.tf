@@ -54,8 +54,8 @@ module "validator_apps" {
   frontend_app_name = var.frontend_app_name
   backend_app_name  = var.backend_app_name
 
-  # Workload profile configuration
-  workload_profile_name = "default"
+  # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
+  workload_profile_name = "Consumption"
 
   # Frontend gating (live | coming_soon | maintenance)
   site_status         = var.validator_site_status
@@ -220,8 +220,8 @@ module "tool_apps" {
   # Validator BE the tool BE calls internally (VALIDATION_SERVICE_URL).
   validator_backend_app_name = module.validator_apps.backend_name
 
-  # Workload profile configuration
-  workload_profile_name = "default"
+  # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
+  workload_profile_name = "Consumption"
 
   # Database & Fuseki Configuration
   deploy_postgres         = true
@@ -229,6 +229,12 @@ module "tool_apps" {
   postgres_db_name        = "ismd_tool_db"
   postgres_admin_user     = "ismdadmin"
   postgres_admin_password = var.tool_postgres_password
+
+  # Consumption needs cpu:memory 1:2. Fuseki's old 4 GiB peak was Jena's default
+  # -Xmx4G, not the dataset; cap the heap and leave room for TDB2's mmap.
+  fuseki_cpu      = 1.5
+  fuseki_memory   = "3Gi"
+  fuseki_jvm_args = "-Xmx2g"
 
   # The server lives in module.postgres; this module only creates its databases.
   postgres_server_id = module.postgres[0].server_id
@@ -334,8 +340,8 @@ module "ai_apps" {
   backend_image     = var.ai_backend_image
   backend_image_tag = var.ai_backend_image_tag
 
-  # Workload profile configuration
-  workload_profile_name = "default"
+  # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
+  workload_profile_name = "Consumption"
 
   # Database — dedicated ismd_ai DB on the tool's Postgres server.
   postgres_server_id = module.postgres[0].server_id
