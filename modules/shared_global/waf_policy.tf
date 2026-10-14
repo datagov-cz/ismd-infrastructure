@@ -171,6 +171,46 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
     }
   }
 
+  # Block every path the gateway does not route. The path maps only send
+  # /validujeme and /popisujeme to an app; anything else used to hit a default
+  # redirect to /validujeme, which turned junk into a full page render. Seen
+  # 2026-10-01..07: ~97k such requests, none served by an app, incl. ~81k
+  # from a rotating-proxy bot fetching /favicon.ico?v=1 via the redirect.
+  #
+  # Only effective because the path maps default to a backend, not a redirect
+  # (appgw_validator_config.tf): App Gateway does not run the WAF on requests
+  # answered by a redirect.
+  #
+  # Exempt: /errorpages/ (App Gateway's own custom error page assets), and
+  # "//validujeme" / "//popisujeme" (the gateway collapses the double slash and
+  # routes them; real browsers and Googlebot send them). Bare "/" is blocked
+  # too — prod's "/" is answered by the client's proxy and never reaches us.
+  #
+  # Priority 16: after scanner UAs (15), before the Keycloak cookie (18) and
+  # admin Allow (20) rules — both of which only match /popisujeme paths.
+  custom_rules {
+    name      = "BlockUnroutedPaths"
+    priority  = 16
+    rule_type = "MatchRule"
+    action    = "Block"
+
+    match_conditions {
+      match_variables {
+        variable_name = "RequestUri"
+      }
+      operator           = "BeginsWith"
+      negation_condition = true
+      transforms         = ["Lowercase"]
+      match_values = [
+        "/validujeme",
+        "/popisujeme",
+        "//validujeme",
+        "//popisujeme",
+        "/errorpages/",
+      ]
+    }
+  }
+
   # Blocked requests return different status codes by rule type: the custom
   # RateLimitRule Block returns HTTP 429 (Too Many Requests), while the managed
   # DRS rules return HTTP 403 (Forbidden) — the App Gateway WAF default. The

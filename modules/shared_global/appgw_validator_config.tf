@@ -96,26 +96,19 @@ locals {
     for listener in local.validator_http_listeners : listener if listener.enabled
   ]
 
-  # Redirect Configurations (use hostname if set, otherwise use IP)
-  validator_redirect_configurations = [
-    for env in local.validator_environments : {
-      name          = "redirect-root-to-validujeme-${env}"
-      redirect_type = "Found"
-      # Use hostname with HTTPS if set, otherwise use IP with HTTP
-      target_url           = (env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname) != "" ? "https://${env == "dev" ? var.dev_hostname : env == "test" ? var.test_hostname : var.prod_hostname}/validujeme" : "http://${azurerm_public_ip.appgw.ip_address}/validujeme"
-      target_listener_name = null
-      include_path         = false
-      include_query_string = true
-    }
-  ]
-
   # URL Path Maps (combined validator + tool paths)
+  #
+  # Default is a backend, not a redirect: App Gateway skips the WAF for requests
+  # answered by a redirect, so the old default redirect to /validujeme let every
+  # unrouted path bypass it (verified 2026-10-07). With a backend default the WAF
+  # sees them and BlockUnroutedPaths (waf_policy.tf) answers 403 before the
+  # validator is reached.
   validator_url_path_maps = [
     for env in local.validator_environments : {
       name                                = "path-map-${env}"
-      default_backend_address_pool_name   = null
-      default_backend_http_settings_name  = null
-      default_redirect_configuration_name = "redirect-root-to-validujeme-${env}"
+      default_backend_address_pool_name   = "validator-${env}-fe-pool"
+      default_backend_http_settings_name  = "validator-${env}-fe-http-settings"
+      default_redirect_configuration_name = null
       # api-rule removed — backend is internal only. All /validujeme/* routes to frontend;
       # Next.js rewrites proxy /validujeme/api/* → backend server-side.
       path_rules = concat([
