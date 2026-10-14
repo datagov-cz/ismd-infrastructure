@@ -258,6 +258,19 @@ variable "tool_caais_keystore_password_kv_secret_id" {
   default     = ""
 }
 
+# NIA id_token decryption keystore (realm key, not mTLS). Both empty = not rendered.
+variable "tool_nia_p12_kv_secret_id" {
+  description = "Versionless KV secret id yielding the base64 PKCS12 of the certificate registered with NIA (field 12)."
+  type        = string
+  default     = ""
+}
+
+variable "tool_nia_keystore_password_kv_secret_id" {
+  description = "Versionless KV secret id for the password the NIA p12 is re-wrapped with."
+  type        = string
+  default     = ""
+}
+
 
 variable "tool_nkd_sparql_endpoint" {
   description = "NKD SPARQL endpoint the tool backend queries (NKD_SPARQL_ENDPOINT). One target per environment: pod-develop (DEV), pod-test (TEST), data.gov.cz (PROD). Empty falls back to the image default. Keep the path segment percent-encoded (slovn%C3%ADky). Set via environments/<env>/terraform.tfvars."

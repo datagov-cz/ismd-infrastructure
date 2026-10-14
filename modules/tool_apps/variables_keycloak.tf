@@ -173,6 +173,19 @@ variable "caais_keystore_init_image" {
   default     = "mcr.microsoft.com/azure-cli:latest"
 }
 
+# NIA id_token decryption keystore — see the nia_keystore_ready local in keycloak.tf.
+variable "nia_p12_kv_secret_id" {
+  description = "Versionless KV secret id yielding the base64 PKCS12 whose certificate was uploaded to NIA's SeP registration (field 12). NIA encrypts the id_token to it. Empty = NIA keystore not rendered."
+  type        = string
+  default     = ""
+}
+
+variable "nia_keystore_password_kv_secret_id" {
+  description = "Versionless KV secret id for the password the NIA p12 is re-wrapped with. keycloak-config opens the keystore with the same value."
+  type        = string
+  default     = ""
+}
+
 # Keycloak database (uses shared PostgreSQL when deploy_postgres = true)
 variable "keycloak_db_name" {
   description = "Database name used by Keycloak"
