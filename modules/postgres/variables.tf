@@ -29,7 +29,7 @@ variable "postgres_admin_user" {
 }
 
 variable "postgres_admin_password" {
-  description = "PostgreSQL admin password. Seeded once at create, then owned out-of-band (Key Vault is the source of truth) — see ignore_changes on the server."
+  description = "PostgreSQL admin password, resolved from Key Vault by terraw. Managed by Terraform: a new KV version plus an apply rotates the live password."
   type        = string
   sensitive   = true
 }
@@ -62,6 +62,22 @@ variable "admin_allowed_ips" {
   description = "Operator/admin public IP(s) allowed direct access for troubleshooting. Set via TF_VAR_admin_allowed_ips in .env.<env>."
   type        = list(string)
   default     = []
+}
+
+variable "maintenance_window" {
+  description = "Custom maintenance window, UTC. day_of_week 0 = Sunday. null = system-managed (Azure picks the slot)."
+  type = object({
+    day_of_week  = number
+    start_hour   = number
+    start_minute = number
+  })
+  default = null
+}
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics workspace for server logs and Query Store. null = no diagnostic setting."
+  type        = string
+  default     = null
 }
 
 variable "enable_private_endpoint" {

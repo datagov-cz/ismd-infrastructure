@@ -45,6 +45,20 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   # Public access for simplicity (can be restricted later with firewall rules)
   public_network_access_enabled = true
 
+  # Custom maintenance window. With the system-managed default Azure picks the slot
+  # itself: 2026-09-13 it patched dev at 22:04 UTC and test at 23:33 UTC, the same
+  # night, with CPU at ~100% and a restart on each (Service Health TYGS-S5Z). A
+  # custom window makes the slot predictable and staggers dev ahead of test.
+  # Times are UTC; day_of_week 0 = Sunday.
+  dynamic "maintenance_window" {
+    for_each = var.maintenance_window == null ? [] : [var.maintenance_window]
+    content {
+      day_of_week  = maintenance_window.value.day_of_week
+      start_hour   = maintenance_window.value.start_hour
+      start_minute = maintenance_window.value.start_minute
+    }
+  }
+
   tags = {
     Environment = var.environment
     Application = "Tool"
@@ -53,12 +67,17 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   }
 
   lifecycle {
-    # administrator_password: seeded once at create, then owned out-of-band (KV is
-    # the source of truth; rotate via `az postgres flexible-server update` + KV +
-    # a NEW REVISION on every consuming app — a restart does not re-resolve a Key
-    # Vault reference). Ignored so a stray `.env`/config drift can't rotate the
-    # live DB admin password on apply.
-    ignore_changes = [zone, administrator_password]
+    # administrator_password is NOT ignored. It used to be, but the server was
+    # re-imported on 2026-09-02 and import stores no password, so ignore_changes
+    # sent null on every update and the provider refused any in-place change
+    # ("administrator_password ... is required when password_auth_enabled").
+    #
+    # The value comes from Key Vault (terraw resolves TF_VAR_tool_postgres_password
+    # from ismd-kv-<env>/postgres-password and refuses apply if it is unresolved),
+    # so KV is the source of truth. To rotate: set the new KV version, apply, then
+    # create a NEW REVISION on every consuming app — a restart does not re-resolve
+    # a Key Vault reference.
+    ignore_changes = [zone]
   }
 }
 
@@ -89,6 +108,69 @@ resource "azurerm_postgresql_flexible_server_configuration" "idle_in_transaction
   name      = "idle_in_transaction_session_timeout"
   server_id = azurerm_postgresql_flexible_server.tool.id
   value     = "300000" # 5 min — guards against leaked open transactions
+}
+
+# --- Audit and diagnostics ---------------------------------------------------
+# Server logs keep 3 days on the server and were never exported, so the 2026-09-13
+# CPU spike could not be attributed. These settings are all dynamic (no restart).
+# pgaudit is deliberately NOT here: it needs shared_preload_libraries, which
+# restarts the server.
+
+# Statement lines carry no user/db/client with the default "%t-%c-" prefix, so a
+# logged statement cannot be traced to anyone.
+resource "azurerm_postgresql_flexible_server_configuration" "log_line_prefix" {
+  name      = "log_line_prefix"
+  server_id = azurerm_postgresql_flexible_server.tool.id
+  value     = "%t-%c-user=%u,db=%d,client=%h,app=%a-"
+}
+
+# Schema changes only (CREATE/ALTER/DROP). "mod" or "all" would log every
+# Hibernate/Keycloak write and blow the Log Analytics daily cap.
+resource "azurerm_postgresql_flexible_server_configuration" "log_statement" {
+  name      = "log_statement"
+  server_id = azurerm_postgresql_flexible_server.tool.id
+  value     = "ddl"
+}
+
+# Query Store: records the top queries by resource use, including Azure's own
+# internal ones. This is what answers "what burned the CPU", which pgaudit does not.
+resource "azurerm_postgresql_flexible_server_configuration" "query_store_capture" {
+  name      = "pg_qs.query_capture_mode"
+  server_id = azurerm_postgresql_flexible_server.tool.id
+  value     = "top"
+}
+
+resource "azurerm_postgresql_flexible_server_configuration" "wait_sampling_capture" {
+  name      = "pgms_wait_sampling.query_capture_mode"
+  server_id = azurerm_postgresql_flexible_server.tool.id
+  value     = "all"
+}
+
+# Export server logs and Query Store to Log Analytics (30-day retention there vs
+# 3 days on the server). Metrics are already available via Azure Monitor and
+# the metric alerts, so AllMetrics is not shipped.
+resource "azurerm_monitor_diagnostic_setting" "postgres" {
+  count                      = var.log_analytics_workspace_id == null ? 0 : 1
+  name                       = "diag-postgres-${var.environment}"
+  target_resource_id         = azurerm_postgresql_flexible_server.tool.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "PostgreSQLLogs"
+  }
+
+  enabled_log {
+    category = "PostgreSQLFlexQueryStoreRuntime"
+  }
+
+  enabled_log {
+    category = "PostgreSQLFlexQueryStoreWaitStats"
+  }
+
+  # Maps Query Store query ids to SQL text.
+  enabled_log {
+    category = "PostgreSQLQueryStoreSqlText"
+  }
 }
 
 # App access — Azure services.
