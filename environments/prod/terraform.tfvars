@@ -21,7 +21,7 @@ backend_port = 8080
 # because the variables are required at the root module. Flip deploy_tool_apps
 # to true once tool is ready for PROD.
 tool_frontend_image     = "ghcr.io/datagov-cz/ismd-tool-frontend"
-tool_frontend_image_tag = "latest"
+tool_frontend_image_tag = "1.0.4" # pinned, not "latest": the NIA login button needs >= 1.0.4
 tool_backend_image      = "ghcr.io/datagov-cz/ismd-tool-backend"
 tool_backend_image_tag  = "latest"
 
@@ -34,6 +34,23 @@ tool_nkod_sparql_endpoint = "https://data.gov.cz/sparql"
 # App Gateway hostname for PROD (slovník.gov.cz, IDN-encoded)
 app_gateway_hostname   = "xn--slovnk-7va.gov.cz"
 tool_keycloak_hostname = "xn--slovnk-7va.gov.cz"
+
+# Custom Keycloak image (nia-oidc broker), same build as TEST. Terraform ignores the image
+# after creation (ignore_changes), so this only takes effect when the prod Keycloak is
+# CREATED. Without it, prod starts on stock quay.io 24.0.2 and nia_provider_id = "nia-oidc"
+# in keycloak-config/prod.tfvars fails.
+tool_keycloak_image     = "ghcr.io/datagov-cz/ismd-tool-keycloak"
+tool_keycloak_image_tag = "24.0.2-bdb4e0d"
+
+# Level of Assurance requested per login. Injected as KEYCLOAK_ACR_VALUES; same as TEST.
+tool_keycloak_acr_values = "loalow"
+
+# NIA login button (KEYCLOAK_NIA_ENABLED, frontend >= 1.0.4). Moves with enable_nia in
+# keycloak-config/prod.tfvars. The id_token decryption key is NOT wired here (no
+# tool_nia_p12_kv_secret_id): on Keycloak 24 it is imported into the realm by hand after
+# the prod Keycloak is created. It moves to Terraform with the Keycloak 26 upgrade (vault
+# references keep the keystore password out of state; 24 has no vault lookup for it).
+tool_keycloak_nia_enabled = true
 
 # App names
 frontend_app_name = "ismd-validator-frontend"
