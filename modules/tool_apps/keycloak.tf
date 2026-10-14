@@ -385,6 +385,20 @@ resource "azurerm_container_app" "keycloak" {
       latest_revision = true
       percentage      = 100
     }
+
+    # Restrict ingress to Application Gateway public IP (only when known).
+    # Keycloak has to stay external_enabled — App Gateway reaches every backend
+    # over its public FQDN and egresses from its own public IP, so internal
+    # ingress would take it off the gateway's tool-<env>-keycloak-pool route.
+    # This allowlist is therefore the only control on the app's public surface.
+    dynamic "ip_security_restriction" {
+      for_each = var.app_gateway_public_ip != "" ? [var.app_gateway_public_ip] : []
+      content {
+        name             = "AllowAppGateway"
+        ip_address_range = "${ip_security_restriction.value}/32"
+        action           = "Allow"
+      }
+    }
   }
 
   tags = {

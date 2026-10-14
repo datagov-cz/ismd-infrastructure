@@ -88,6 +88,31 @@ variable "keycloak_idp_hint" {
   default     = ""
 }
 
+# Level of Assurance to request, per eIDAS. Injected as KEYCLOAK_ACR_VALUES into the
+# frontend; auth.ts adds it as acr_values on the authorization request only when
+# non-empty. Keycloak forwards acr_values to the upstream IdP unconditionally when the
+# incoming request carries it (AbstractOAuth2IdentityProvider.createAuthorizationUrl) —
+# there is no IdP-level setting for it, so the value has to originate here.
+# NIA reads acr in preference to the LoA scope; the two are set to the same level.
+variable "keycloak_acr_values" {
+  description = "Level of Assurance requested on the authorization request (e.g. \"loalow\"). Forwarded by Keycloak to the upstream IdP. Empty sends nothing."
+  type        = string
+  default     = ""
+}
+
+# Shows the NIA login button in the frontend. Injected as KEYCLOAK_NIA_ENABLED and read
+# server-side per request in app/layout.tsx, so flipping it is an env-var change and a
+# new revision — not a rebuild (NEXT_PUBLIC_* would be baked into the image instead).
+#
+# Must move together with enable_nia in keycloak-config, which lives in a separate state
+# and cannot be referenced from here: a button without the IdP gives a Keycloak error
+# page, and the IdP without the button is simply unreachable from the UI.
+variable "keycloak_nia_enabled" {
+  description = "Show the NIA login button in the tool frontend. Flip together with enable_nia in keycloak-config."
+  type        = bool
+  default     = false
+}
+
 # CAAIS federation
 variable "caais_client_id" {
   description = "CAAIS client ID configured in Keycloak"

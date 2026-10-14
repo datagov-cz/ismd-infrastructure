@@ -47,7 +47,7 @@ variable "postgres_storage_mb" {
 }
 
 variable "allow_azure_services" {
-  description = "Emit the blanket AllowAzureServices (0.0.0.0) firewall rule. Required while the Container Apps subnet has no NAT gateway and egresses via dynamic Azure SNAT."
+  description = "Emit the blanket AllowAzureServices (0.0.0.0) firewall rule, which admits any Azure-hosted resource in any tenant. Only needed while apps reach the PUBLIC endpoint; set false once they use the private endpoint."
   type        = bool
   default     = true
 }
@@ -62,4 +62,22 @@ variable "admin_allowed_ips" {
   description = "Operator/admin public IP(s) allowed direct access for troubleshooting. Set via TF_VAR_admin_allowed_ips in .env.<env>."
   type        = list(string)
   default     = []
+}
+
+variable "enable_private_endpoint" {
+  description = "Create the private endpoint, privatelink DNS zone and VNet link. An explicit bool rather than a null check on the subnet id, because count cannot depend on a value unknown until apply."
+  type        = bool
+  default     = false
+}
+
+variable "private_endpoint_subnet_id" {
+  description = "Subnet for the server's private endpoint (must not be delegated). Required when enable_private_endpoint is true."
+  type        = string
+  default     = null
+}
+
+variable "vnet_id" {
+  description = "VNet the privatelink DNS zone is linked to, so the server FQDN resolves to the private endpoint from inside it. Required when enable_private_endpoint is true."
+  type        = string
+  default     = null
 }

@@ -97,6 +97,8 @@ module "dev" {
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
   tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
+  tool_keycloak_acr_values     = var.tool_keycloak_acr_values
+  tool_keycloak_nia_enabled    = var.tool_keycloak_nia_enabled
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
@@ -235,6 +237,8 @@ module "test" {
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
   tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
+  tool_keycloak_acr_values     = var.tool_keycloak_acr_values
+  tool_keycloak_nia_enabled    = var.tool_keycloak_nia_enabled
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id
@@ -347,6 +351,8 @@ module "prod" {
   tool_keycloak_issuer_uri     = var.tool_keycloak_issuer_uri
   tool_keycloak_client_id      = var.tool_keycloak_client_id
   tool_keycloak_idp_hint       = var.tool_keycloak_idp_hint
+  tool_keycloak_acr_values     = var.tool_keycloak_acr_values
+  tool_keycloak_nia_enabled    = var.tool_keycloak_nia_enabled
   tool_keycloak_client_secret  = var.tool_keycloak_client_secret
   tool_caais_client_id         = var.tool_caais_client_id
   tool_caais_p12_kv_secret_id  = var.tool_caais_p12_kv_secret_id

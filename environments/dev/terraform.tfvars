@@ -33,6 +33,12 @@ tool_keycloak_hostname = "oha03.dia.gov.cz"
 # once CAAIS logins are available here, or when a local-account escape hatch exists.
 # tool_keycloak_idp_hint = "caais"
 
+# Level of Assurance requested per login. Injected as KEYCLOAK_ACR_VALUES; auth.ts turns
+# it into acr_values, which Keycloak forwards to the upstream IdP. NIA reads acr in
+# preference to the LoA scope, and both carry the same level (see keycloak-config).
+# Inert until enable_nia = true; CAAIS ignores acr_values.
+tool_keycloak_acr_values = "loalow"
+
 deploy_tool_apps = true
 
 # AI apps (ismd-ai) — internal-only Spring Boot service; DB lives on the tool's

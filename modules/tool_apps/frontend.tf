@@ -76,6 +76,23 @@ resource "azurerm_container_app" "frontend" {
           value = var.keycloak_idp_hint
         }
       }
+      # Requested Level of Assurance, same emit-only-when-set pattern. Keycloak
+      # forwards acr_values upstream only when the incoming request carries it.
+      dynamic "env" {
+        for_each = var.keycloak_acr_values != "" ? [1] : []
+        content {
+          name  = "KEYCLOAK_ACR_VALUES"
+          value = var.keycloak_acr_values
+        }
+      }
+      # Renders the NIA login button. Absent env var reads as false in layout.tsx.
+      dynamic "env" {
+        for_each = var.keycloak_nia_enabled ? [1] : []
+        content {
+          name  = "KEYCLOAK_NIA_ENABLED"
+          value = "true"
+        }
+      }
       env {
         name  = "NEXTAUTH_URL"
         value = local.tool_nextauth_url
