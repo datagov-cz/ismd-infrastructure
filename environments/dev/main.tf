@@ -129,6 +129,13 @@ module "postgres" {
 
   # Server logs + Query Store to the env workspace.
   log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
+
+  # Per-database logical backups (pg_dump). Storage only at this stage; the job
+  # that writes to it follows. Retention: weekly 14 days, monthly 90.
+  enable_logical_backups       = true
+  container_app_environment_id = module.shared.shared_container_app_environment_id
+  backup_databases             = ["ismd_tool_db", "keycloak_db", "ismd_ai"]
+  backup_encryption_key        = var.pg_backup_encryption_key
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
@@ -206,6 +213,9 @@ module "tool_apps" {
 
   # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
   nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
+
+  # NKOD catalogue SPARQL endpoint (NKOD_SPARQL_ENDPOINT) — per-environment target.
+  nkod_sparql_endpoint = var.tool_nkod_sparql_endpoint
 
   # Validator BE the tool BE calls internally (VALIDATION_SERVICE_URL).
   validator_backend_app_name = module.validator_apps.backend_name

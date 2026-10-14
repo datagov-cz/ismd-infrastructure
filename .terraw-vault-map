@@ -22,3 +22,9 @@ TF_VAR_tool_postgres_password=postgres-password
 
 # Keycloak admin password — used by the keycloak-config provider against the admin API.
 TF_VAR_tool_keycloak_admin_password=keycloak-admin-password
+
+# Logical-backup dump encryption passphrase — consumed by the pg-backup Container
+# App Job, which pipes pg_dump through `openssl enc -aes-256-cbc`. Key Vault is the
+# ONLY copy: no personal escrow, because the estate hands over to DIA. Losing it
+# makes every dump unreadable, and immutability blocks deleting them early.
+TF_VAR_pg_backup_encryption_key=pg-backup-encryption-key

@@ -77,11 +77,15 @@ module "dev" {
   # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
   tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
 
+  # NKOD catalogue SPARQL endpoint (NKOD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkod_sparql_endpoint = var.tool_nkod_sparql_endpoint
+
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path
@@ -226,11 +230,15 @@ module "test" {
   # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
   tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
 
+  # NKOD catalogue SPARQL endpoint (NKOD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkod_sparql_endpoint = var.tool_nkod_sparql_endpoint
+
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path
@@ -342,11 +350,15 @@ module "prod" {
   # NKD SPARQL endpoint (NKD_SPARQL_ENDPOINT) — per-environment target.
   tool_nkd_sparql_endpoint = var.tool_nkd_sparql_endpoint
 
+  # NKOD catalogue SPARQL endpoint (NKOD_SPARQL_ENDPOINT) — per-environment target.
+  tool_nkod_sparql_endpoint = var.tool_nkod_sparql_endpoint
+
   # Tool Database & Fuseki
   admin_allowed_ips            = var.admin_allowed_ips
   tool_postgres_url            = var.tool_postgres_url
   tool_postgres_user           = var.tool_postgres_user
   tool_postgres_password       = var.tool_postgres_password
+  pg_backup_encryption_key     = var.pg_backup_encryption_key
   tool_fuseki_url              = var.tool_fuseki_url
   tool_nextauth_secret         = var.tool_nextauth_secret
   tool_base_path               = var.tool_base_path

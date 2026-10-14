@@ -393,6 +393,17 @@ variable "tool_nkd_sparql_endpoint" {
   default     = ""
 }
 
+variable "tool_nkod_sparql_endpoint" {
+  description = <<-EOT
+    NKOD catalogue SPARQL endpoint for the tool backend (NKOD_SPARQL_ENDPOINT).
+    Not the NKD vocabulary endpoint: this one serves dcat:Dataset records. One
+    target per environment: pod-develop for DEV, pod-test for TEST, data.gov.cz
+    for PROD.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "tool_app_insights_kv_secret_id" {
   description = "Class A pilot: versionless KV secret id for the tool backend's app-insights connection string. Empty keeps the inline value; set (e.g. https://ismd-kv-test.vault.azure.net/secrets/app-insights-connection-string) to pull from Key Vault. Set via .env.<env>."
   type        = string
@@ -505,4 +516,11 @@ variable "validator_use_bff" {
   description = "True if the deployed validator frontend image supports the BFF pattern (server-side BE_URL)."
   type        = bool
   default     = false
+}
+
+variable "pg_backup_encryption_key" {
+  description = "Passphrase for logical-backup dump encryption, from ismd-kv-<env>/pg-backup-encryption-key via terraw."
+  type        = string
+  sensitive   = true
+  default     = ""
 }

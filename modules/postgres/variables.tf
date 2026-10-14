@@ -97,3 +97,50 @@ variable "vnet_id" {
   type        = string
   default     = null
 }
+
+variable "enable_logical_backups" {
+  description = <<-EOT
+    Create the logical-backup storage account, containers, immutability and lifecycle
+    policies for this environment. The Container App Job that writes dumps is added
+    separately (slice 2). Off everywhere until an environment is explicitly opted in.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "backup_weekly_retention_days" {
+  description = "Retention for weekly/ dumps, in days. Sets BOTH the immutability period and the lifecycle delete age — they must stay equal, or the lifecycle delete fails against the immutability window."
+  type        = number
+  default     = 14
+}
+
+variable "backup_monthly_retention_days" {
+  description = "Retention for monthly/ dumps, in days. Sets BOTH the immutability period and the lifecycle delete age — see backup_weekly_retention_days."
+  type        = number
+  default     = 90
+}
+
+variable "container_app_environment_id" {
+  description = "Shared Container Apps environment the backup job runs in. VNet-integrated, so the job reaches the server over the private endpoint. Required when enable_logical_backups is true."
+  type        = string
+  default     = null
+}
+
+variable "backup_databases" {
+  description = "Databases to dump, one entry each. Differs per environment (test has no ismd_ai), so it is set in tfvars rather than inferred."
+  type        = list(string)
+  default     = []
+}
+
+variable "backup_cron_expression" {
+  description = "Cron for the backup job, UTC. Default Sunday 01:30, clear of the Sunday 00:00 maintenance window on dev."
+  type        = string
+  default     = "30 1 * * 0"
+}
+
+variable "backup_encryption_key" {
+  description = "Passphrase for openssl encryption of the dumps, from ismd-kv-<env>/pg-backup-encryption-key via terraw. Key Vault is the only copy."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
