@@ -139,7 +139,7 @@ Recommended rollout: set this up **after** the baseline is triaged (existing fin
 
 ### Rolling the reusable Trivy workflow forward
 
-The stub workflows pin to `@dev` (matches existing `terraform.yml` convention). When you edit `trivy-reusable.yml`:
+The stub workflows pin to `@dev`. When you edit `trivy-reusable.yml`:
 
 - Push to `dev` → stubs pick up changes immediately.
 - Once stable, consider switching stubs to a version tag (`@v1`) for explicit rollouts.

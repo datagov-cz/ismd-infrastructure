@@ -149,9 +149,6 @@ Use `./terraw.sh switch <env>` to switch workspaces — it calls `terraform work
 │   ├── variables.tf             # Input variables
 │   └── terraform.tfvars         # Global configuration values (gitignored — not committed)
 ├── .github/workflows/           # CI/CD pipelines
-│   ├── terraform.yml                  # Manual infrastructure updates
-│   ├── terraform-plan.yml             # Plan-only run (e.g. on PRs)
-│   ├── terraform-shared-global.yml    # App Gateway management
 │   └── trivy-reusable.yml             # Reusable Trivy IaC scan (see docs/security-scanning.md)
 ├── main.tf                      # Root configuration with environment module calls
 ├── backend.tf                   # Azure Storage backend configuration
@@ -503,18 +500,16 @@ Image tag variables validate that the value is either `latest` or a valid semver
 
 The infrastructure uses a **decoupled deployment architecture** where infrastructure and application images are managed independently.
 
-#### Infrastructure Repository Workflows:
+#### Infrastructure changes are applied locally
 
-- **`terraform.yml`**: Manual infrastructure updates via `workflow_dispatch`
-  - Manages Container App infrastructure (environment variables, ingress, probes, resource allocation)
-  - Does NOT manage container images (handled by `lifecycle ignore_changes`)
-  - Runs: `shared_global_pre` → `terraform` → `shared_global_post`
-  - Triggered manually when infrastructure changes are needed
-  
-- **`terraform-shared-global.yml`**: Application Gateway management
-  - Reusable workflow for updating App Gateway routing
-  - Called by `terraform.yml` after infrastructure changes
-  - Can also be triggered manually for gateway-only updates
+There is no CI workflow that plans or applies Terraform. Changes are planned and applied
+locally, per environment, with `terraw.sh` / `terraw.ps1`, which load `.env.<env>` and inject
+the right `-var-file`.
+
+The previous `terraform.yml`, `terraform-plan.yml` and `terraform-shared-global.yml` workflows
+were removed: they passed no `-var-file`, so a run would have applied variable defaults over
+the committed `environments/<env>/terraform.tfvars` — tearing down count-gated stacks and
+clearing Key Vault references — and they auto-approved the apply.
 
 #### Application Repository Workflows:
 
@@ -547,13 +542,11 @@ Application Changes:
   Container App updated with new image
   
 Infrastructure Changes:
-  Developer creates PR with Terraform changes
+  Developer plans locally with terraw.sh, per environment
     ↓
-  Merge to dev branch
+  Applies locally after reviewing the plan
     ↓
-  Manual: Run terraform.yml workflow
-    ↓
-  Infrastructure updated (Terraform apply)
+  Creates PR with the Terraform changes and merges to dev
 ```
 
 ## Docker Compose Configuration
