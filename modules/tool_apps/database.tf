@@ -70,10 +70,10 @@ resource "azurerm_container_app" "fuseki" {
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
 
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     # LOAD-BEARING — do not scale above 1. This is a data-integrity constraint, not
     # a cost choice. Fuseki stores TDB2 on the Azure Files share mounted below, and
     # TDB2 is strictly single-writer: it guards the dataset with an on-disk lock.
@@ -86,16 +86,22 @@ resource "azurerm_container_app" "fuseki" {
     container {
       name  = "fuseki"
       image = var.fuseki_image
-      cpu   = 1.0
-      # Bumped 2 → 4 GiB (2026-05-26) after observing OOM-kill restart loop in DEV.
-      # Bumped 4 → 6 GiB (2026-05-27) after memory_high alert fired the next day —
-      # Fuseki crossed 3.4 GiB (85% of 4 GiB) sustained 15m. Underlying cause still
-      # unexplored (Fuseki JVM heap config or dataset growth); bump again to buy
-      # headroom. If we see the alert at 5.1 GiB (85% of 6) revisit by either:
-      #   - investigating Fuseki -Xmx / dataset size,
-      #   - splitting dev/test data smaller,
-      #   - or accepting 8+ GiB.
-      memory = "6Gi"
+      cpu   = var.fuseki_cpu
+      # Defaults 1.0 / 6Gi. Bumped 2 → 4 GiB (2026-05-26) after an OOM-kill restart
+      # loop in DEV, 4 → 6 GiB (2026-05-27) after memory_high fired at 3.4 GiB.
+      # Cause found 2026-10-07: the image never sets JVM_ARGS, so Jena's
+      # fuseki-server script falls back to -Xmx4G (Jena 5.4.0, line 105) and the
+      # heap simply grows towards 4 GiB. Set fuseki_jvm_args to cap it instead of
+      # raising memory further (DEV does, to fit the Consumption 1:2 ratio).
+      memory = var.fuseki_memory
+
+      dynamic "env" {
+        for_each = var.fuseki_jvm_args != "" ? [var.fuseki_jvm_args] : []
+        content {
+          name  = "JVM_ARGS"
+          value = env.value
+        }
+      }
 
       volume_mounts {
         name = "fuseki-data"

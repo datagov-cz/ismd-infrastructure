@@ -41,6 +41,9 @@ module "dev" {
   count  = terraform.workspace == "dev" ? 1 : 0
   source = "./environments/dev"
 
+  # On/off switch (terraw reads ismd-kv-dev/dev-enabled)
+  dev_enabled = var.dev_enabled
+
   # Common variables
   environment        = "dev"
   location           = var.location

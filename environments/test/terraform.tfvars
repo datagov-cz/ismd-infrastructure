@@ -10,9 +10,6 @@ frontend_image     = "ghcr.io/datagov-cz/ismd-validator-frontend"
 frontend_image_tag = "1.0.2"
 backend_image      = "ghcr.io/datagov-cz/ismd-validator-backend"
 backend_image_tag  = "1.0.1"
-# TEMPORARY: this image binds 8080. Delete this override (defaults to 8082) when
-# TEST is redeployed with an 8082-binding backend image.
-backend_port = 8080
 
 # Tool container images (using dev images for TEST)
 tool_frontend_image     = "ghcr.io/datagov-cz/ismd-tool-frontend-dev"

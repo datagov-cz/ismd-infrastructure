@@ -104,11 +104,14 @@ resource "azurerm_application_gateway" "appgw" {
   # ========================================
   # Backend Address Pools
   # ========================================
+  # Dev on/off switch: while dev is off its four pools are emptied — the gateway
+  # stops sending traffic and probes, visitors get the 502 page. Pools, rules and
+  # probes all stay, so switching on only restores the addresses.
   dynamic "backend_address_pool" {
     for_each = concat(local.validator_backend_pools, local.tool_backend_pools)
     content {
       name  = backend_address_pool.value.name
-      fqdns = backend_address_pool.value.fqdns
+      fqdns = !var.dev_enabled && contains(local.dev_backend_pool_names, backend_address_pool.value.name) ? [] : backend_address_pool.value.fqdns
     }
   }
 
