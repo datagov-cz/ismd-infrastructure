@@ -274,7 +274,7 @@ variable "user_profile_email_required" {
 variable "user_profile_names_required" {
   description = "Require first and last name in the user profile. NIA releases names only with the citizen's consent, and the application does not need them."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "account_console_enabled" {

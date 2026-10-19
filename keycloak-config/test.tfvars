@@ -79,7 +79,7 @@ nia_default_scopes = "openid loalow"
 # Username is read-only for users. See user_profile.tf.
 manage_user_profile         = true
 user_profile_email_required = false
-user_profile_names_required = true
+user_profile_names_required = false
 
 # Federated and app users get nothing from Keycloak's own pages: no account console
 # (/realms/ismd/account) and no ismd admin console (/admin/ismd/console). Master
