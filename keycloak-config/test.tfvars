@@ -72,11 +72,11 @@ nia_validate_signature = true
 # what NIA reads first. With no comparison scope, NIA defaults to loamin ("or better").
 nia_default_scopes = "openid loalow"
 
-# User profile. Email optional: neither IdP supplies one. Names REQUIRED: NIA
-# releases them only with consent, and a citizen who switches them off is asked once
-# for a name by Keycloak's first-login profile step (it runs only when something is
-# missing), instead of the app showing "cz-cz-<uuid>". Users who consent never see it.
-# Username is read-only for users. See user_profile.tf.
+# User profile. Email optional and hidden: neither IdP supplies one. Names optional:
+# NIA releases them only with consent, and a citizen who consents to the identifier
+# alone must get straight in, not land on Keycloak's "Update Account Information"
+# page. The app handles empty names. Username is read-only for users. See
+# user_profile.tf.
 manage_user_profile         = true
 user_profile_email_required = false
 user_profile_names_required = false

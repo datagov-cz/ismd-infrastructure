@@ -60,3 +60,23 @@ nia_validate_signature = true
 # no caller can forget; acr_values carries the same level from the frontend and is
 # what NIA reads first. With no comparison scope, NIA defaults to loamin ("or better").
 nia_default_scopes = "openid loalow"
+# Same as test. Inert while enable_nia = false; they take effect IF NIA is ever
+# registered on dev. nia-oidc needs the ismd-tool-keycloak image running first.
+nia_provider_id      = "nia-oidc"
+nia_requested_claims = ["PersonIdentifier", "CurrentGivenName", "CurrentFamilyName"]
+
+# User profile — same as test. Email optional and hidden: neither IdP supplies one.
+# Names optional: NIA releases them only with consent, and a citizen who consents to
+# the identifier alone must get straight in. Username is read-only for users. See
+# user_profile.tf.
+manage_user_profile         = true
+user_profile_email_required = false
+user_profile_names_required = false
+
+# Same lockdown as test: realm users get no account console (/realms/ismd/account)
+# and no ismd admin console (/admin/ismd/console). Master admins still manage the
+# realm from the master console. UUID is dev's own security-admin-console client,
+# read live 2026-10-19.
+account_console_enabled         = false
+disable_realm_admin_console     = true
+realm_admin_console_client_uuid = "9531a62a-2164-4fbc-a64b-f3893c313572"
