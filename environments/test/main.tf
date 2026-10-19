@@ -77,6 +77,12 @@ module "validator_apps" {
 # separate step — changing it here forces replacement (total data loss). Move the
 # resource with `az resource move`, re-import the addresses, then change it.
 # See docs/postgres-shared-move-plan.md.
+locals {
+  # Maintenance: Wednesday 00:00 UTC (02:00 Prague) — three days after dev. Shared
+  # with module.monitoring, which flags alerts fired inside this window.
+  postgres_maintenance_window = { day_of_week = 3, start_hour = 0, start_minute = 0 }
+}
+
 module "postgres" {
   count  = var.deploy_tool_apps ? 1 : 0
   source = "../../modules/postgres"
@@ -109,8 +115,7 @@ module "postgres" {
   app_outbound_ips  = []
   admin_allowed_ips = var.admin_allowed_ips
 
-  # Maintenance: Wednesday 00:00 UTC (02:00 Prague) — three days after dev.
-  maintenance_window = { day_of_week = 3, start_hour = 0, start_minute = 0 }
+  maintenance_window = local.postgres_maintenance_window
 
   # Server logs + Query Store to the env workspace.
   log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
@@ -329,6 +334,9 @@ module "monitoring" {
 
   paging_email_recipients = var.paging_email_recipients
   alert_card_language     = var.alert_card_language
+
+  # Banner on cards fired in the Postgres maintenance window (null when no server here).
+  postgres_maintenance_window = var.deploy_tool_apps ? local.postgres_maintenance_window : null
 
   # Public-endpoint availability probes.
   # Keycloak omitted: the `ismd` realm doesn't exist in TEST yet.
