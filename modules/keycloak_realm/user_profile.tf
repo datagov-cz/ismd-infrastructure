@@ -5,15 +5,17 @@
 # "Review Profile" step (update.profile.on.first.login = missing) and the
 # VERIFY_PROFILE required action stop every new federated user on an
 # "Update Account Information" page. Nothing downstream uses email — the backend
-# keys users on preferred_username / sub — so email is optional here.
+# keys users on preferred_username / sub — so email is optional and hidden from users.
 #
 # First and last name (user_profile_names_required) are the display name only —
 # users are identified by username (derived from NIA's PersonIdentifier / CAAIS's
-# subject). When required, a citizen who switches names off at NIA's consent screen
-# is asked for them once; the NIA mappers only overwrite them when NIA sends a value.
+# subject). Optional by default: a citizen who switches names off at NIA's consent
+# screen must get straight in, not land on "Update Account Information". Names then
+# stay empty until NIA sends them — the NIA mappers only overwrite on a value.
 #
 # This resource owns the WHOLE profile: every attribute below restates the Keycloak
-# 24 defaults as read from the live test realm on 2026-09-17, except email.required.
+# 24 defaults as read from the live test realm on 2026-09-17, except email.required
+# and email's user permissions.
 # An attribute left out here would be removed from the realm.
 
 resource "keycloak_realm_user_profile" "this" {
@@ -58,9 +60,12 @@ resource "keycloak_realm_user_profile" "this" {
       config = { max = "255" }
     }
 
+    # Hidden from users: nothing uses email and neither IdP supplies one, so the
+    # first-login profile form must not offer it. Admin-only, so it cannot be
+    # combined with user_profile_email_required — users could never fill it.
     permissions {
-      view = ["admin", "user"]
-      edit = ["admin", "user"]
+      view = ["admin"]
+      edit = ["admin"]
     }
   }
 
