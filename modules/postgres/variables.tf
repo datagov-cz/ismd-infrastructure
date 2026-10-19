@@ -29,9 +29,15 @@ variable "postgres_admin_user" {
 }
 
 variable "postgres_admin_password" {
-  description = "PostgreSQL admin password, resolved from Key Vault by terraw. Managed by Terraform: a new KV version plus an apply rotates the live password."
+  description = "PostgreSQL admin password, resolved from Key Vault by terraw. Write-only: never stored in state. Changing it has no effect until postgres_admin_password_version is bumped."
   type        = string
   sensitive   = true
+}
+
+variable "postgres_admin_password_version" {
+  description = "Bump to make Azure re-apply postgres_admin_password (write-only arguments are only sent when their version changes)."
+  type        = number
+  default     = 1
 }
 
 variable "postgres_sku_name" {

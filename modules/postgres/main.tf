@@ -26,8 +26,11 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   location            = var.location
   version             = "16"
 
-  administrator_login    = var.postgres_admin_user
-  administrator_password = var.postgres_admin_password
+  administrator_login = var.postgres_admin_user
+  # Write-only: sent to Azure, never stored in state. Azure re-applies it only when
+  # the _version changes, so a new KV value alone does not rotate the live password.
+  administrator_password_wo         = var.postgres_admin_password
+  administrator_password_wo_version = var.postgres_admin_password_version
 
   # Burstable tier - cost-effective for dev/test
   sku_name   = var.postgres_sku_name
@@ -67,16 +70,15 @@ resource "azurerm_postgresql_flexible_server" "tool" {
   }
 
   lifecycle {
-    # administrator_password is NOT ignored. It used to be, but the server was
-    # re-imported on 2026-09-02 and import stores no password, so ignore_changes
-    # sent null on every update and the provider refused any in-place change
-    # ("administrator_password ... is required when password_auth_enabled").
+    # The admin password is write-only (administrator_password_wo), so there is
+    # nothing in state to drift against and nothing to ignore. It used to be the
+    # plain administrator_password, which kept the value in state in plaintext.
     #
     # The value comes from Key Vault (terraw resolves TF_VAR_tool_postgres_password
     # from ismd-kv-<env>/postgres-password and refuses apply if it is unresolved),
-    # so KV is the source of truth. To rotate: set the new KV version, apply, then
-    # create a NEW REVISION on every consuming app — a restart does not re-resolve
-    # a Key Vault reference.
+    # so KV is the source of truth. To rotate: set the new KV version, bump
+    # postgres_admin_password_version, apply, then create a NEW REVISION on every
+    # consuming app — a restart does not re-resolve a Key Vault reference.
     ignore_changes = [zone]
   }
 }
