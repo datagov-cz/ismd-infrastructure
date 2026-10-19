@@ -37,12 +37,11 @@ module "validator_apps" {
   frontend_image     = var.frontend_image
   frontend_image_tag = var.frontend_image_tag
 
-  # DEV ONLY. Absorbs the scale-out gap during scanner bursts against the public
-  # dev hostname (2026-08-29: three bursts at ~450-575 req/min against a single
-  # replica produced 966 x 503 while Container Apps scaled 1 -> 10). Test and
-  # prod keep the module default of 1 — do not raise them without their own
-  # traffic evidence. 0 while dev is switched off.
-  frontend_min_replicas = var.dev_enabled ? 2 : 0
+  # Was 2 to absorb the 2026-08-29 scanner bursts (966 x 503 while scaling
+  # 1 -> 10). Back to 1 (2026-10-19): the WAF now blocks unrouted paths, and a
+  # week of dev logs showed gateway probes, the uptime prober and a few real
+  # users, no scanner traffic. 0 while dev is switched off.
+  frontend_min_replicas = var.dev_enabled ? 1 : 0
   backend_min_replicas  = var.dev_enabled ? 1 : 0
 
   backend_image     = var.backend_image
