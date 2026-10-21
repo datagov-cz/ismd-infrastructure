@@ -150,3 +150,15 @@ variable "backup_encryption_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "backup_postgres_password_kv_secret_id" {
+  description = "Key Vault secret id of the admin password for the backup job (empty = inline postgres_admin_password, which lands in state). Set only after the backup_kv identity's vault grant exists."
+  type        = string
+  default     = ""
+}
+
+variable "backup_encryption_key_kv_secret_id" {
+  description = "Key Vault secret id of the dump encryption passphrase (empty = inline backup_encryption_key, which lands in state). Set only after the backup_kv identity's vault grant exists."
+  type        = string
+  default     = ""
+}

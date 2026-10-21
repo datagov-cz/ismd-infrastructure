@@ -12,3 +12,8 @@ output "name" {
   description = "Name of the Flexible Server"
   value       = azurerm_postgresql_flexible_server.tool.name
 }
+
+output "backup_kv_identity_principal_id" {
+  description = "Principal (object) id of the backup job's KV identity, or null when logical backups are off. Granted 'get' in environments/<env>/keyvault.tf."
+  value       = var.enable_logical_backups ? azurerm_user_assigned_identity.backup_kv[0].principal_id : null
+}

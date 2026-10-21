@@ -96,6 +96,18 @@ resource "azurerm_key_vault_access_policy" "tool_keycloak" {
   secret_permissions = ["Get", "List"]
 }
 
+# Logical-backup job's KV identity — resolves pgpassword (postgres-password) and
+# backupkey (pg-backup-encryption-key). Same two-phase rationale as tool_backend.
+resource "azurerm_key_vault_access_policy" "pg_backup" {
+  count = var.deploy_tool_apps ? 1 : 0
+
+  key_vault_id = azurerm_key_vault.env.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = module.postgres[0].backup_kv_identity_principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
 # Validator backend + frontend KV identities (validator_apps is always deployed).
 resource "azurerm_key_vault_access_policy" "validator_backend" {
   key_vault_id = azurerm_key_vault.env.id
