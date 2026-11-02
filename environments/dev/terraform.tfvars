@@ -49,19 +49,31 @@ tool_keycloak_acr_values = "loalow"
 deploy_tool_apps = true
 
 # AI apps (ismd-ai) — internal-only Spring Boot service; DB lives on the tool's
-# Postgres server. LLM stays disabled until the API key secret is seeded (then set
-# ai_llm_enabled = true and provide ai_llm_api_key or ai_llm_api_key_kv_secret_id).
-# Temporarily off: the ai_apps module can't create yet — its ai_kv identity has no
-# Key Vault access policy (no principal_id output, no policy in keyvault.tf), and it
-# borrows tool's postgres_password_kv_secret_id, so it demands a KV reference on
-# first create before any grant exists. Needs the Class A phase-1/phase-2 treatment
-# (inline values first, then flip to KV refs). Flip back once that's fixed.
+# Postgres server.
 deploy_ai_apps = true
 
 # Azure OpenAI account + gpt-4o-mini DataZoneStandard deployment (ai_foundry.tf).
-# Pay-per-token, so creating it costs nothing; spend starts only when ai_llm_enabled
-# flips to true. gpt-4o-mini 2024-07-18 is Deprecating (inference retires 2027-04-14).
+# Pay-per-token, so creating it costs nothing; spend starts now ai_llm_enabled is
+# true. gpt-4o-mini 2024-07-18 is Deprecating (inference retires 2027-04-14).
 deploy_ai_foundry = true
+# 50k tokens per minute. Legal-act input counts towards this, and 10k returned 429s
+# on real vocabulary jobs (2026-11-02). Also the spend ceiling: the app's daily cap
+# only meters output tokens.
+ai_foundry_deployment_capacity = 50
+
+# LLM wiring for ismd-ai. The key lives in ismd-kv-dev, seeded out of band (see
+# ai_foundry.tf); ai_llm_model is the deployment name.
+ai_llm_enabled              = true
+ai_llm_provider             = "AZURE_OPENAI"
+ai_llm_endpoint_url         = "https://ismd-openai-dev.openai.azure.com/openai/v1/responses"
+ai_llm_model                = "gpt-4o-mini-dev"
+ai_llm_api_key_kv_secret_id = "https://ismd-kv-dev.vault.azure.net/secrets/app-llm-api-key"
+
+# 'production' is the app's real mode (JWT auth, LLM calls); 'development' returns
+# mock suggestions. A default vocabulary job makes 11 LLM calls, so the app's own
+# 1000 output tokens per user per day stops it partway.
+ai_app_environment            = "production"
+ai_tokens_max_allowed_per_day = 50000
 
 # Frontend gating — DEV is open for the engineering team
 validator_site_status = "live"
