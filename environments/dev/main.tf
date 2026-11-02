@@ -233,6 +233,10 @@ module "tool_apps" {
   # Validator BE the tool BE calls internally (VALIDATION_SERVICE_URL).
   validator_backend_app_name = module.validator_apps.backend_name
 
+  # AI BE the tool BE calls internally (ISMD_AI_SERVICE_URL). Built from the name,
+  # not module.ai_apps: that module depends on this one, so the output would cycle.
+  ai_backend_full_app_name = var.deploy_ai_apps ? "${var.ai_backend_app_name}-${var.environment}" : ""
+
   # Workload profile configuration — DEV runs on Consumption (2026-10, cost).
   workload_profile_name = "Consumption"
 
@@ -392,8 +396,14 @@ module "ai_apps" {
   llm_api_key              = var.ai_llm_api_key
   llm_api_key_kv_secret_id = var.ai_llm_api_key_kv_secret_id
 
-  # Auth: development (no OIDC) for now.
-  app_environment = var.ai_app_environment
+  # Auth: 'production' validates the Keycloak JWT the tool BE forwards. JWKS uses the
+  # same public issuer path as the tool BE. Internal-only ingress, so this is not
+  # the production environment despite the mode's name.
+  app_environment  = var.ai_app_environment
+  oidc_issuer_uri  = module.tool_apps[0].keycloak_issuer_uri
+  oidc_jwk_set_uri = "${module.tool_apps[0].keycloak_issuer_uri}/protocol/openid-connect/certs"
+
+  tokens_max_allowed_per_day = var.ai_tokens_max_allowed_per_day
 
   # GHCR pull auth — only needed while the ismd-ai package is private. Leave
   # empty once the package (or repo) is made public; the registry block then

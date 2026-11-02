@@ -445,9 +445,15 @@ variable "ai_backend_image_tag" {
 }
 
 variable "ai_app_environment" {
-  description = "AI app environment mode: 'development' disables OIDC; 'production' requires Keycloak JWTs."
+  description = "AI app environment mode: 'development' disables OIDC and returns mock suggestions; 'production' requires Keycloak JWTs and calls the LLM."
   type        = string
   default     = "development"
+}
+
+variable "ai_tokens_max_allowed_per_day" {
+  description = "Daily output-token budget per user in the AI service. Raise deliberately."
+  type        = number
+  default     = 1000
 }
 
 variable "ai_llm_enabled" {

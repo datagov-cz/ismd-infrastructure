@@ -149,6 +149,14 @@ resource "azurerm_container_app" "backend" {
         name  = "VALIDATION_SERVICE_URL"
         value = "http://${var.validator_backend_app_name}/validujeme"
       }
+      # Only set where the env deploys ismd-ai; elsewhere the app default stays.
+      dynamic "env" {
+        for_each = var.ai_backend_full_app_name != "" ? [1] : []
+        content {
+          name  = "ISMD_AI_SERVICE_URL"
+          value = "http://${var.ai_backend_full_app_name}"
+        }
+      }
       env {
         name  = "KEYCLOAK_ISSUER_URI"
         value = local.keycloak_issuer_uri

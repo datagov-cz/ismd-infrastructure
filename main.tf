@@ -140,6 +140,7 @@ module "dev" {
   ai_backend_image                  = var.ai_backend_image
   ai_backend_image_tag              = var.ai_backend_image_tag
   ai_app_environment                = var.ai_app_environment
+  ai_tokens_max_allowed_per_day     = var.ai_tokens_max_allowed_per_day
   ai_llm_enabled                    = var.ai_llm_enabled
   ai_llm_provider                   = var.ai_llm_provider
   ai_llm_endpoint_url               = var.ai_llm_endpoint_url
