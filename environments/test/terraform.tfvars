@@ -78,6 +78,7 @@ tool_app_insights_kv_secret_id                    = "https://ismd-kv-test.vault.
 tool_backend_db_user                              = "ismd_tool_app"
 tool_postgres_password_kv_secret_id               = "https://ismd-kv-test.vault.azure.net/secrets/postgres-password-tool"
 tool_keycloak_client_secret_kv_secret_id          = "https://ismd-kv-test.vault.azure.net/secrets/keycloak-client-secret"
+tool_esbirka_api_key_kv_secret_id                 = "https://ismd-kv-global.vault.azure.net/secrets/ismd-esbirka-api-key"
 tool_frontend_app_insights_kv_secret_id           = "https://ismd-kv-test.vault.azure.net/secrets/app-insights-connection-string"
 tool_frontend_nextauth_secret_kv_secret_id        = "https://ismd-kv-test.vault.azure.net/secrets/nextauth-secret"
 tool_frontend_keycloak_client_secret_kv_secret_id = "https://ismd-kv-test.vault.azure.net/secrets/keycloak-client-secret"

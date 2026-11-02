@@ -92,6 +92,12 @@ variable "keycloak_client_secret_kv_secret_id" {
   default     = ""
 }
 
+variable "esbirka_api_key_kv_secret_id" {
+  description = "Versionless KV secret id for the e-Sbirka REST API key. Empty leaves ESBIRKA_API_KEY unset; there is no inline form."
+  type        = string
+  default     = ""
+}
+
 # Frontend Class A: KV secret ids, each empty = inline value, set = key_vault_secret_id
 # reference pulled by the frontend's UserAssigned identity.
 variable "frontend_app_insights_kv_secret_id" {

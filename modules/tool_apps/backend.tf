@@ -161,6 +161,14 @@ resource "azurerm_container_app" "backend" {
         name        = "KEYCLOAK_CLIENT_SECRET"
         secret_name = "keycloak-client-secret"
       }
+      # Only while the reference is set, so an env without the key keeps today's env.
+      dynamic "env" {
+        for_each = var.esbirka_api_key_kv_secret_id != "" ? [1] : []
+        content {
+          name        = "ESBIRKA_API_KEY"
+          secret_name = "esbirka-api-key"
+        }
+      }
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "app-insights-connection-string"
@@ -248,6 +256,15 @@ resource "azurerm_container_app" "backend" {
     content {
       name                = "keycloak-client-secret"
       key_vault_secret_id = var.keycloak_client_secret_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backend_kv.id
+    }
+  }
+
+  dynamic "secret" {
+    for_each = var.esbirka_api_key_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "esbirka-api-key"
+      key_vault_secret_id = var.esbirka_api_key_kv_secret_id
       identity            = azurerm_user_assigned_identity.backend_kv.id
     }
   }
