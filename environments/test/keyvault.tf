@@ -71,6 +71,25 @@ resource "azurerm_key_vault_access_policy" "tool_backend" {
   secret_permissions = ["Get", "List"]
 }
 
+# The e-Sbirka API key is one key shared by every env, so it lives in the global vault.
+# Same two-phase ordering as above: this grant is applied before the tfvars reference.
+# A policy covers the whole vault, so Get also reaches the gateway cert's secret path;
+# accepted until the vaults move to RBAC, which can scope this to the one secret.
+data "azurerm_key_vault" "global" {
+  name                = "ismd-kv-global"
+  resource_group_name = "ismd-shared-global"
+}
+
+resource "azurerm_key_vault_access_policy" "tool_backend_global" {
+  count = var.deploy_tool_apps ? 1 : 0
+
+  key_vault_id = data.azurerm_key_vault.global.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = module.tool_apps[0].backend_kv_identity_principal_id
+
+  secret_permissions = ["Get"]
+}
+
 # Tool frontend's KV identity — same rationale as tool_backend above.
 resource "azurerm_key_vault_access_policy" "tool_frontend" {
   count = var.deploy_tool_apps ? 1 : 0

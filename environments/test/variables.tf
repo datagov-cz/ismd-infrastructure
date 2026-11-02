@@ -434,6 +434,12 @@ variable "tool_keycloak_client_secret_kv_secret_id" {
   default     = ""
 }
 
+variable "tool_esbirka_api_key_kv_secret_id" {
+  description = "Versionless KV secret id for the shared e-Sbirka REST API key in ismd-kv-global. Empty leaves ESBIRKA_API_KEY unset."
+  type        = string
+  default     = ""
+}
+
 variable "tool_frontend_app_insights_kv_secret_id" {
   description = "Class A: KV secret id for the tool frontend's app-insights connection string. Empty = inline. Set via .env.<env>."
   type        = string
