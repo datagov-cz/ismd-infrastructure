@@ -56,6 +56,10 @@ deploy_ai_apps = true
 # Pay-per-token, so creating it costs nothing; spend starts now ai_llm_enabled is
 # true. gpt-4o-mini 2024-07-18 is Deprecating (inference retires 2027-04-14).
 deploy_ai_foundry = true
+# 50k tokens per minute. Legal-act input counts towards this, and 10k returned 429s
+# on real vocabulary jobs (2026-11-02). Also the spend ceiling: the app's daily cap
+# only meters output tokens.
+ai_foundry_deployment_capacity = 50
 
 # LLM wiring for ismd-ai. The key lives in ismd-kv-dev, seeded out of band (see
 # ai_foundry.tf); ai_llm_model is the deployment name.
