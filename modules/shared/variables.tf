@@ -43,6 +43,12 @@ variable "private_endpoint_subnet_address_prefix" {
   default     = ""
 }
 
+variable "dedicated_workload_profile" {
+  description = "Keep the dedicated \"default\" workload profile. false = Consumption only (no node or plan-management charges)."
+  type        = bool
+  default     = true
+}
+
 variable "workload_profile_type" {
   description = "Workload profile type for the shared Container App Environment"
   type        = string

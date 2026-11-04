@@ -41,7 +41,7 @@ resource "azurerm_container_app" "backend" {
   # Set workload profile name based on environment
   # For Consumption profile, set to null
   # For Dedicated profile, use the provided workload profile name
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   identity {
     type         = "SystemAssigned, UserAssigned"
@@ -72,7 +72,7 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.backend_min_replicas
     container {
       name   = "ismd-validator-backend-${var.environment}"
       image  = "${var.backend_image}:${var.backend_image_tag}"

@@ -180,3 +180,8 @@ variable "container_app_environment_domain_prod" {
   type        = string
   default     = ""
 }
+
+variable "dev_enabled" {
+  description = "Dev on/off switch. false empties the dev backend pools (see dev_backend_pool_names). Set by terraw from ismd-kv-dev/dev-enabled."
+  type        = bool
+}

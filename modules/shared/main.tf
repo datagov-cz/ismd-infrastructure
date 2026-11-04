@@ -148,11 +148,26 @@ resource "azurerm_container_app_environment" "shared" {
     prevent_destroy = true
   }
 
-  workload_profile {
-    name                  = "default"
-    workload_profile_type = var.workload_profile_type
-    minimum_count         = var.workload_profile_min_count
-    maximum_count         = var.workload_profile_max_count
+  dynamic "workload_profile" {
+    for_each = var.dedicated_workload_profile ? [1] : []
+    content {
+      name                  = "default"
+      workload_profile_type = var.workload_profile_type
+      minimum_count         = var.workload_profile_min_count
+      maximum_count         = var.workload_profile_max_count
+    }
+  }
+
+  # Without the dedicated profile the Consumption one must be declared: removing
+  # every workload_profile block forces azurerm to recreate the environment,
+  # which prevent_destroy blocks. Move all apps off "default" in an earlier
+  # apply — Azure rejects removing a profile that apps still run on.
+  dynamic "workload_profile" {
+    for_each = var.dedicated_workload_profile ? [] : [1]
+    content {
+      name                  = "Consumption"
+      workload_profile_type = "Consumption"
+    }
   }
 
   tags = {

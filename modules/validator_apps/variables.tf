@@ -186,7 +186,13 @@ variable "frontend_min_replicas" {
   default     = 1
 
   validation {
-    condition     = var.frontend_min_replicas >= 1
-    error_message = "frontend_min_replicas must be at least 1."
+    condition     = var.frontend_min_replicas >= 0
+    error_message = "frontend_min_replicas must not be negative (0 = scaled to zero, the dev on/off switch)."
   }
+}
+
+variable "backend_min_replicas" {
+  description = "Minimum replicas for the validator backend. 0 = scaled to zero — the dev on/off switch."
+  type        = number
+  default     = 1
 }

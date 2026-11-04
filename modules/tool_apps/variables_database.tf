@@ -92,3 +92,21 @@ variable "fuseki_image" {
   default     = "ghcr.io/datagov-cz/ismd-tool-fuseki:latest"
 }
 
+variable "fuseki_cpu" {
+  description = "Fuseki vCPU. On the Consumption profile cpu:memory must be 1:2 (e.g. 1.5 / 3Gi)."
+  type        = number
+  default     = 1.0
+}
+
+variable "fuseki_memory" {
+  description = "Fuseki memory, e.g. \"6Gi\". On the Consumption profile cpu:memory must be 1:2."
+  type        = string
+  default     = "6Gi"
+}
+
+variable "fuseki_jvm_args" {
+  description = "JVM_ARGS for fuseki-server, e.g. \"-Xmx2g\". Empty = Jena's script default, -Xmx4G."
+  type        = string
+  default     = ""
+}
+

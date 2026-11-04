@@ -65,7 +65,7 @@ resource "azurerm_container_app" "keycloak" {
   resource_group_name          = var.resource_group_name
   revision_mode                = "Single"
 
-  workload_profile_name = var.workload_profile_name == "Consumption" ? null : var.workload_profile_name
+  workload_profile_name = var.workload_profile_name
 
   identity {
     type         = "UserAssigned"
@@ -73,7 +73,7 @@ resource "azurerm_container_app" "keycloak" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = var.min_replicas
     # LOAD-BEARING — do not scale above 1. No cache/cluster stack is configured
     # (no KC_CACHE / jgroups / Infinispan settings), so each replica keeps its own
     # local caches. A second replica would break login: user sessions and the OIDC
