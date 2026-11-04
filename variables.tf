@@ -643,3 +643,11 @@ variable "pg_backup_encryption_key" {
   sensitive   = true
   default     = ""
 }
+
+# Dev on/off switch. Read by terraw from ismd-kv-dev/dev-enabled on every dev-workspace
+# run; test/prod never set it. See environments/dev (validated there) and shared-global.
+variable "dev_enabled" {
+  description = "true = dev running; false = dev switched off (apps at 0 replicas, uptime probe off, alerts suppressed). Set by terraw."
+  type        = bool
+  default     = null
+}

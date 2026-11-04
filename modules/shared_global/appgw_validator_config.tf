@@ -176,3 +176,13 @@ locals {
     for rule in local.validator_request_routing_rules : rule if rule.enabled
   ]
 }
+
+locals {
+  # Pools emptied while dev is switched off (var.dev_enabled = false).
+  dev_backend_pool_names = [
+    "validator-dev-fe-pool",
+    "tool-dev-fe-pool",
+    "tool-dev-keycloak-pool",
+    "tool-dev-be-pool",
+  ]
+}

@@ -101,3 +101,11 @@ variable "backend_fqdn_prod" {
   type        = string
   default     = ""
 }
+
+# Dev on/off switch. No default on purpose: a bare `terraform plan` here fails
+# instead of silently switching dev on or off. terraw reads it from
+# ismd-kv-dev/dev-enabled; or export TF_VAR_dev_enabled=true|false.
+variable "dev_enabled" {
+  description = "Dev on/off switch: false empties the four dev backend pools on the shared App Gateway."
+  type        = bool
+}

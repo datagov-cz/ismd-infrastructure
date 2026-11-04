@@ -700,3 +700,14 @@ variable "pg_backup_encryption_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "dev_enabled" {
+  description = "Dev on/off switch: true = running, false = apps at 0 replicas, uptime probe off, alert notifications suppressed. shared-global empties the dev gateway pools from the same value."
+  type        = bool
+  default     = null
+
+  validation {
+    condition     = var.dev_enabled != null
+    error_message = "dev_enabled is unset. Run through terraw, which reads it from ismd-kv-dev/dev-enabled, or export TF_VAR_dev_enabled=true|false."
+  }
+}

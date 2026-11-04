@@ -230,3 +230,9 @@ variable "workload_profile_name" {
   type        = string
   default     = "Consumption"
 }
+
+variable "min_replicas" {
+  description = "Minimum replicas for the AI backend. 0 = scaled to zero — the dev on/off switch."
+  type        = number
+  default     = 1
+}

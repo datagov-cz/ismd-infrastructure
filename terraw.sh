@@ -173,6 +173,72 @@ vault_guard() {
     esac
 }
 
+# ── Dev on/off switch ──────────────────────────────────────────────────────────
+# One value, ismd-kv-dev/dev-enabled ("true"|"false"), drives both roots that own a
+# piece of dev: the infra root's dev workspace (replicas, uptime probe, alert
+# suppression) and shared-global (the four dev App Gateway pools). It is read on
+# every run of either, so a plain apply always matches the switch and never undoes
+# it. Always from ismd-kv-dev, whatever env is selected — shared-global has no env.
+DEV_SWITCH_VAULT="ismd-kv-dev"
+DEV_SWITCH_SECRET="dev-enabled"
+DEV_APPS="ismd-validator-dev/ismd-validator-frontend-dev ismd-validator-dev/ismd-validator-backend-dev ismd-tool-dev/ismd-tool-frontend-dev ismd-tool-dev/ismd-tool-backend-dev ismd-tool-dev/ismd-tool-keycloak-dev ismd-tool-dev/ismd-tool-fuseki-dev ismd-ai-dev/ismd-ai-dev"
+DEV_POOLS="validator-dev-fe-pool tool-dev-fe-pool tool-dev-keycloak-pool tool-dev-be-pool"
+FUSEKI_RG="ismd-tool-dev"
+FUSEKI_APP="ismd-tool-fuseki-dev"
+
+# True where Terraform reads var.dev_enabled: shared-global, or the infra root on dev.
+dev_switch_applies() {
+    local env="$1"
+    [ "$(pwd -P)" = "$(cd "$SCRIPT_DIR/shared-global" 2>/dev/null && pwd -P)" ] && return 0
+    [ "$env" = "dev" ] && [ "$(resolve_tfvars "$env")" = "environments/dev/terraform.tfvars" ]
+}
+
+# Export TF_VAR_dev_enabled from the vault. An explicit export still wins (one-off
+# override). Missing or not true|false → recorded as unresolved, so vault_guard
+# refuses apply: there is deliberately no default to fall back to.
+resolve_dev_switch() {
+    local env="$1"
+    dev_switch_applies "$env" || return 0
+    if [ -n "${TF_VAR_dev_enabled-}" ]; then
+        echo "[terraw] dev switch: ${TF_VAR_dev_enabled} (from the environment, not the vault)" >&2
+        return 0
+    fi
+    local v
+    v="$(az keyvault secret show --vault-name "$DEV_SWITCH_VAULT" --name "$DEV_SWITCH_SECRET" \
+            --query value -o tsv 2>/dev/null </dev/null | tr -d '\r\n')"
+    case "$v" in
+        true|false)
+            export TF_VAR_dev_enabled="$v"
+            echo "[terraw] dev switch: $([ "$v" = true ] && echo ON || echo OFF) ($DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET)" >&2
+            ;;
+        *)
+            VAULT_MISSING+=("TF_VAR_dev_enabled ($DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET, must be true|false)")
+            ;;
+    esac
+}
+
+# Fuseki keeps a single-writer TDB2 lock on its Azure Files share. Switching off
+# changes min_replicas, which creates a new revision; that revision first scales to
+# the old replica count and can never take the lock — a deadlock. 'terraw dev off'
+# deactivates the running revision first. Refuse a plain dev apply that would
+# switch off while Fuseki still runs.
+fuseki_running_revisions() {
+    az containerapp revision list -g "$FUSEKI_RG" -n "$FUSEKI_APP" \
+        --query '[?properties.active && properties.replicas > `0`].name' -o tsv 2>/dev/null </dev/null | tr -d '\r'
+}
+
+fuseki_guard() {
+    local env="$1"
+    [ "$cmd" = "apply" ] || return 0
+    [ "$env" = "dev" ] && dev_switch_applies "$env" || return 0
+    [ "${TF_VAR_dev_enabled-}" = "false" ] || return 0
+    [ "${TERRAW_FUSEKI_STOPPED-}" = "1" ] && return 0
+    [ -z "$(fuseki_running_revisions)" ] && return 0
+    echo "[terraw] ERROR: dev switch is OFF but $FUSEKI_APP is still running." >&2
+    echo "[terraw] Applying now would deadlock Fuseki on its TDB2 lock. Use: $0 dev off" >&2
+    return 1
+}
+
 # Resolve the per-env tfvars file relative to the current dir. Supports both
 # layouts: the main state (environments/<env>/terraform.tfvars, run from root)
 # and per-dir states like keycloak-config (<env>.tfvars, run from inside the dir).
@@ -315,11 +381,15 @@ case "$cmd" in
         args=()
         if [ -z "$env" ]; then
             echo "[terraw] WARN: no env set — running plain 'terraform $cmd'. Run 'terraw switch <env>' first if you wanted env-scoped vars." >&2
+            resolve_dev_switch ""
+            vault_guard "$cmd" || exit 1
         else
             workspace_guard "$env" || exit 1
             load_env_file "$env" || exit 1
             resolve_vault_secrets "$env"
+            resolve_dev_switch "$env"
             vault_guard "$cmd" || exit 1
+            fuseki_guard "$env" || exit 1
             tfv="$(resolve_tfvars "$env")"
             if [ -n "$tfv" ]; then
                 args+=(-var-file="$tfv")
@@ -330,6 +400,83 @@ case "$cmd" in
         fi
         exec terraform "$cmd" "${args[@]}" "$@"
         ;;
+    dev)
+        action="${1:-status}"
+        case "$action" in on|off|status) ;; *) echo "Usage: $0 dev on|off|status" >&2; exit 2 ;; esac
+
+        dev_status() {
+            local kv
+            kv="$(az keyvault secret show --vault-name "$DEV_SWITCH_VAULT" --name "$DEV_SWITCH_SECRET" \
+                    --query value -o tsv 2>/dev/null </dev/null | tr -d '\r\n')"
+            echo "dev switch ($DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET): ${kv:-<missing>}"
+            echo "gateway pools (address count):"
+            local p
+            for p in $DEV_POOLS; do
+                echo "  $p: $(az network application-gateway address-pool show -g ismd-shared-global \
+                    --gateway-name ismd-app-gateway -n "$p" --query 'length(backendAddresses || `[]`)' -o tsv 2>/dev/null </dev/null | tr -d '\r')"
+            done
+            echo "apps (min replicas / running replicas):"
+            local a
+            for a in $DEV_APPS; do
+                echo "  ${a#*/}: $(az containerapp show -g "${a%%/*}" -n "${a#*/}" --query 'properties.template.scale.minReplicas' -o tsv 2>/dev/null </dev/null | tr -d '\r') / $(az containerapp replica list -g "${a%%/*}" -n "${a#*/}" --query 'length(@)' -o tsv 2>/dev/null </dev/null | tr -d '\r')"
+            done
+            echo "uptime probe logic-dia-uptime-dev: $(az resource show -g ismd-shared-dev -n logic-dia-uptime-dev \
+                --resource-type Microsoft.Logic/workflows --query properties.state -o tsv 2>/dev/null </dev/null | tr -d '\r')"
+            echo "alert suppression apr-dia-env-off-dev enabled: $(az resource show -g ismd-shared-dev -n apr-dia-env-off-dev \
+                --resource-type Microsoft.AlertsManagement/actionRules --query properties.enabled -o tsv 2>/dev/null </dev/null | tr -d '\r')"
+        }
+
+        if [ "$action" = "status" ]; then
+            dev_status
+            exit 0
+        fi
+
+        # Each toggle applies shared-global, i.e. rewrites the App Gateway that also
+        # serves test and prod. From a branch missing other gateway changes, that apply
+        # reverts them on prod. Refuse a dirty tree; make anything but an up-to-date
+        # dev checkout an explicit choice.
+        if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null)" ]; then
+            echo "[terraw] ERROR: uncommitted changes in $SCRIPT_DIR — commit or discard before 'dev $action'." >&2
+            exit 1
+        fi
+        git -C "$SCRIPT_DIR" fetch -q origin dev 2>/dev/null
+        if [ "$(git -C "$SCRIPT_DIR" rev-parse HEAD)" != "$(git -C "$SCRIPT_DIR" rev-parse origin/dev 2>/dev/null)" ]; then
+            echo "[terraw] WARN: checkout is $(git -C "$SCRIPT_DIR" branch --show-current), not an up-to-date origin/dev." >&2
+            echo "[terraw] The shared-global apply will push THIS branch's gateway config — including to prod's routes." >&2
+            read -r -p "[terraw] Read both plans carefully. Continue? [y/N] " ok
+            [ "$ok" = "y" ] || exit 1
+        fi
+
+        value=$([ "$action" = on ] && echo true || echo false)
+        # The vault holds the DESIRED state. If an apply below is declined, the next
+        # apply of either root (plain or 'dev $action') completes the switch.
+        az keyvault secret set --vault-name "$DEV_SWITCH_VAULT" --name "$DEV_SWITCH_SECRET" \
+            --value "$value" -o none </dev/null || { echo "[terraw] ERROR: could not write $DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET" >&2; exit 1; }
+        echo "[terraw] desired state: dev $action ($DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET=$value)"
+
+        unfinished() { echo "[terraw] stopped: dev is only partly switched $action. Run '$0 dev $action' again to finish." >&2; exit 1; }
+        apply_sg()  { echo "[terraw] ── shared-global (dev gateway pools) ──"; (cd "$SCRIPT_DIR/shared-global" && "$SCRIPT_DIR/terraw.sh" apply) || unfinished; }
+        apply_dev() { echo "[terraw] ── dev workspace (apps, uptime probe, alerts) ──"; (cd "$SCRIPT_DIR" && "$SCRIPT_DIR/terraw.sh" apply dev) || unfinished; }
+
+        if [ "$action" = "off" ]; then
+            # Gateway first: traffic and probes stop before the apps go.
+            apply_sg
+            # Fuseki: stop the running revision so the new min-0 revision has no
+            # replica count to match and never contends for the TDB2 lock.
+            for rev in $(fuseki_running_revisions); do
+                echo "[terraw] deactivating Fuseki revision $rev (TDB2 lock)"
+                az containerapp revision deactivate -g "$FUSEKI_RG" -n "$FUSEKI_APP" --revision "$rev" -o none </dev/null || unfinished
+            done
+            export TERRAW_FUSEKI_STOPPED=1
+            apply_dev
+        else
+            # Apps first, so the gateway never routes to replicas that aren't up.
+            apply_dev
+            apply_sg
+        fi
+        echo
+        dev_status
+        ;;
     ""|help|-h|--help)
         env="$(current_env)"
         cat <<EOF
@@ -338,6 +485,9 @@ Usage:
   ./terraw.sh env              Show current env + tfvars resolution
   ./terraw.sh plan|apply|...   terraform with auto-injected -var-file
   ./terraw.sh plan <env> ...   switch to <env> first, then plan (same for apply etc.)
+  ./terraw.sh dev on|off       Switch dev on/off: sets $DEV_SWITCH_VAULT/$DEV_SWITCH_SECRET, then
+                               applies shared-global and the dev workspace (interactive plans)
+  ./terraw.sh dev status       Switch value and live state (pools, replicas, probe, alerts)
   ./terraw.sh <other>          Pass-through to terraform
 
 Secrets: TF_VARs listed in .terraw-vault-map are read from ismd-kv-<env> into this
@@ -359,6 +509,7 @@ EOF
             load_env_file "$env" >/dev/null 2>&1
             resolve_vault_secrets "$env" >/dev/null 2>&1
         fi
+        stateless_cmd "$cmd" || resolve_dev_switch "$env" >/dev/null 2>&1
         exec terraform "$cmd" "$@"
         ;;
 esac
