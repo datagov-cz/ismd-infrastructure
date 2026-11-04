@@ -65,8 +65,11 @@ resource "keycloak_role" "admin" {
 # Auto-assign USER to every new user (on top of Keycloak's built-in defaults).
 # ADMIN is intentionally NOT here — it stays a deliberate, manual grant.
 resource "keycloak_default_roles" "default" {
-  realm_id      = keycloak_realm.ismd.id
-  default_roles = concat(var.extra_default_roles, [keycloak_role.user.name])
+  realm_id = keycloak_realm.ismd.id
+  default_roles = concat(
+    [for role in var.extra_default_roles : role if var.account_console_enabled || !startswith(role, "account/")],
+    [keycloak_role.user.name],
+  )
 }
 
 # The single custom OIDC client. Public client, standard + direct-access flows
