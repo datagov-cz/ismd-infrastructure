@@ -524,3 +524,19 @@ variable "pg_backup_encryption_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "pg_backup_postgres_password_kv_secret_id" {
+  description = <<-EOT
+    Key Vault secret id of the admin password for the backup job (empty = inline value).
+    Two-phase: leave empty for the first apply so the backup_kv identity + its vault
+    grant get created, then set and re-apply to flip to the KV reference.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "pg_backup_encryption_key_kv_secret_id" {
+  description = "Key Vault secret id of the backup encryption passphrase (empty = inline value). Same two-phase rule as pg_backup_postgres_password_kv_secret_id."
+  type        = string
+  default     = ""
+}

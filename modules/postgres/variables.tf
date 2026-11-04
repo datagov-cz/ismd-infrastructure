@@ -29,9 +29,15 @@ variable "postgres_admin_user" {
 }
 
 variable "postgres_admin_password" {
-  description = "PostgreSQL admin password, resolved from Key Vault by terraw. Managed by Terraform: a new KV version plus an apply rotates the live password."
+  description = "PostgreSQL admin password, resolved from Key Vault by terraw. Write-only: never stored in state. Changing it has no effect until postgres_admin_password_version is bumped."
   type        = string
   sensitive   = true
+}
+
+variable "postgres_admin_password_version" {
+  description = "Bump to make Azure re-apply postgres_admin_password (write-only arguments are only sent when their version changes)."
+  type        = number
+  default     = 1
 }
 
 variable "postgres_sku_name" {
@@ -142,5 +148,17 @@ variable "backup_encryption_key" {
   description = "Passphrase for openssl encryption of the dumps, from ismd-kv-<env>/pg-backup-encryption-key via terraw. Key Vault is the only copy."
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "backup_postgres_password_kv_secret_id" {
+  description = "Key Vault secret id of the admin password for the backup job (empty = inline postgres_admin_password, which lands in state). Set only after the backup_kv identity's vault grant exists."
+  type        = string
+  default     = ""
+}
+
+variable "backup_encryption_key_kv_secret_id" {
+  description = "Key Vault secret id of the dump encryption passphrase (empty = inline backup_encryption_key, which lands in state). Set only after the backup_kv identity's vault grant exists."
+  type        = string
   default     = ""
 }
