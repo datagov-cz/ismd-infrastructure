@@ -69,10 +69,17 @@ resource "keycloak_oidc_identity_provider" "caais" {
   # sends client_id and lets the cert do the authenticating — exactly what CAAIS
   # checks. Matches the proven local setup (tool-backend/docker/keycloak/ismd-realm.json).
   #
+  # sendClientIdOnLogout: CAAIS's end_session returns 500 without a client_id,
+  # even with a valid id_token_hint and a post_logout_redirect_uri that exactly
+  # matches the logout URL registered on the AIS (confirmed by hand on DEV,
+  # 2026-09-02 - appending &client_id=ISMD_dev to the failing URL made it work).
+  # Keycloak defaults this to false and otherwise sends client_id only when there
+  # is no id_token; true adds it alongside the hint, which is what CAAIS needs.
   extra_config = {
-    clientAuthMethod = "client_secret_post"
-    pkceEnabled      = "true"
-    pkceMethod       = "S256"
+    clientAuthMethod     = "client_secret_post"
+    pkceEnabled          = "true"
+    pkceMethod           = "S256"
+    sendClientIdOnLogout = "true"
   }
 }
 
