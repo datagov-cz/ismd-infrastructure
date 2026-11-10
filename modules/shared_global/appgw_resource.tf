@@ -184,7 +184,7 @@ resource "azurerm_application_gateway" "appgw" {
   # Redirect Configurations
   # ========================================
   dynamic "redirect_configuration" {
-    for_each = concat(local.appgw_redirect_configurations, local.validator_redirect_configurations)
+    for_each = local.appgw_redirect_configurations
     content {
       name                 = redirect_configuration.value.name
       redirect_type        = redirect_configuration.value.redirect_type
