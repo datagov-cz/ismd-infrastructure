@@ -644,6 +644,18 @@ variable "pg_backup_encryption_key" {
   default     = ""
 }
 
+variable "pg_backup_postgres_password_kv_secret_id" {
+  description = "Key Vault secret id of the admin password for the backup job (empty = inline value). Set only after the job's backup_kv identity grant is applied. Dev and test only."
+  type        = string
+  default     = ""
+}
+
+variable "pg_backup_encryption_key_kv_secret_id" {
+  description = "Key Vault secret id of the backup encryption passphrase (empty = inline value). Same two-phase rule. Dev and test only."
+  type        = string
+  default     = ""
+}
+
 # Dev on/off switch. Read by terraw from ismd-kv-dev/dev-enabled on every dev-workspace
 # run; test/prod never set it. See environments/dev (validated there) and shared-global.
 variable "dev_enabled" {

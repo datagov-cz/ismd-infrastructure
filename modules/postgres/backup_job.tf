@@ -58,6 +58,23 @@ locals {
   SCRIPT
 }
 
+# Identity the job resolves its Key Vault references with. Pre-created so the vault
+# grant (environments/<env>/keyvault.tf) exists before any key_vault_secret_id is
+# validated at apply.
+resource "azurerm_user_assigned_identity" "backup_kv" {
+  count               = var.enable_logical_backups ? 1 : 0
+  name                = "ismd-pg-backup-${var.environment}-kv"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = "Tool"
+    Component   = "DatabaseBackup-KV"
+    ManagedBy   = "Terraform"
+  }
+}
+
 resource "azurerm_container_app_job" "backup" {
   count                        = var.enable_logical_backups ? 1 : 0
   name                         = "ismd-pg-backup-${var.environment}"
@@ -79,14 +96,44 @@ resource "azurerm_container_app_job" "backup" {
     replica_completion_count = 1
   }
 
-  secret {
-    name  = "pgpassword"
-    value = var.postgres_admin_password
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.backup_kv[0].id]
   }
 
-  secret {
-    name  = "backupkey"
-    value = var.backup_encryption_key
+  # Two-phase KV cutover, as for the apps: empty *_kv_secret_id = inline value (kept
+  # in state), set = key_vault_secret_id reference resolved by backup_kv. Phase 1
+  # creates the identity and its vault grant; phase 2 sets the ids.
+  dynamic "secret" {
+    for_each = var.backup_postgres_password_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "pgpassword"
+      value = var.postgres_admin_password
+    }
+  }
+  dynamic "secret" {
+    for_each = var.backup_postgres_password_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "pgpassword"
+      key_vault_secret_id = var.backup_postgres_password_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backup_kv[0].id
+    }
+  }
+
+  dynamic "secret" {
+    for_each = var.backup_encryption_key_kv_secret_id == "" ? [1] : []
+    content {
+      name  = "backupkey"
+      value = var.backup_encryption_key
+    }
+  }
+  dynamic "secret" {
+    for_each = var.backup_encryption_key_kv_secret_id != "" ? [1] : []
+    content {
+      name                = "backupkey"
+      key_vault_secret_id = var.backup_encryption_key_kv_secret_id
+      identity            = azurerm_user_assigned_identity.backup_kv[0].id
+    }
   }
 
   secret {

@@ -112,3 +112,9 @@ validator_frontend_app_insights_kv_secret_id = "https://ismd-kv-dev.vault.azure.
 tool_caais_client_id                      = "ISMD_dev"
 tool_caais_p12_kv_secret_id               = "https://ismd-kv-dev.vault.azure.net/secrets/ismd-dev-caais-test-cert"
 tool_caais_keystore_password_kv_secret_id = "https://ismd-kv-dev.vault.azure.net/secrets/caais-keystore-pw"
+
+# Logical-backup job: KV references resolved by its backup_kv identity (grant applied
+# 2026-10-19), so neither value is held inline in state. Admin login, not an app role:
+# the job dumps every database.
+pg_backup_postgres_password_kv_secret_id = "https://ismd-kv-dev.vault.azure.net/secrets/postgres-password"
+pg_backup_encryption_key_kv_secret_id    = "https://ismd-kv-dev.vault.azure.net/secrets/pg-backup-encryption-key"

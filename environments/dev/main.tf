@@ -146,6 +146,9 @@ module "postgres" {
   container_app_environment_id = module.shared.shared_container_app_environment_id
   backup_databases             = ["ismd_tool_db", "keycloak_db", "ismd_ai"]
   backup_encryption_key        = var.pg_backup_encryption_key
+
+  backup_postgres_password_kv_secret_id = var.pg_backup_postgres_password_kv_secret_id
+  backup_encryption_key_kv_secret_id    = var.pg_backup_encryption_key_kv_secret_id
 }
 
 # Server extracted from modules/tool_apps into modules/postgres (2026-08-12).
