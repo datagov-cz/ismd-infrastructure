@@ -119,6 +119,7 @@ module "dev" {
   tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
   tool_keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+  tool_esbirka_api_key_kv_secret_id        = var.tool_esbirka_api_key_kv_secret_id
 
   tool_frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
   tool_frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id
@@ -274,6 +275,7 @@ module "test" {
   tool_app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   tool_postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
   tool_keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+  tool_esbirka_api_key_kv_secret_id        = var.tool_esbirka_api_key_kv_secret_id
 
   tool_frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
   tool_frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id

@@ -281,6 +281,7 @@ module "tool_apps" {
   app_insights_kv_secret_id           = var.tool_app_insights_kv_secret_id
   postgres_password_kv_secret_id      = var.tool_postgres_password_kv_secret_id
   keycloak_client_secret_kv_secret_id = var.tool_keycloak_client_secret_kv_secret_id
+  esbirka_api_key_kv_secret_id        = var.tool_esbirka_api_key_kv_secret_id
 
   frontend_app_insights_kv_secret_id           = var.tool_frontend_app_insights_kv_secret_id
   frontend_nextauth_secret_kv_secret_id        = var.tool_frontend_nextauth_secret_kv_secret_id
