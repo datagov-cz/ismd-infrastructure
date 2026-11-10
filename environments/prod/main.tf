@@ -12,6 +12,11 @@ module "shared" {
   vnet_address_space_ipv6         = "fd00:db8:decd::/48" # PROD: unique IPv6
   validator_subnet_address_prefix = "10.3.2.0/23"        # PROD: within 10.3.0.0/16
   tool_subnet_address_prefix      = "10.3.4.0/23"        # PROD: within 10.3.0.0/16
+
+  # Consumption only until prod is stood up properly (2026-10, cost): drops the
+  # D4 node and the Dedicated Plan Management fee. Standing up the tool stack
+  # here needs this back to true — tool_apps below still targets "default".
+  dedicated_workload_profile = false
 }
 
 # Create validator apps using shared Container App Environment
@@ -43,8 +48,9 @@ module "validator_apps" {
   frontend_app_name = var.frontend_app_name
   backend_app_name  = var.backend_app_name
 
-  # Workload profile configuration
-  workload_profile_name = "default"
+  # Consumption until prod is stood up properly (2026-10, cost): the two
+  # 0.5 vCPU apps serving the coming-soon page do not need a D4 node.
+  workload_profile_name = "Consumption"
 
   # Frontend gating (live | coming_soon | maintenance)
   site_status         = var.validator_site_status
