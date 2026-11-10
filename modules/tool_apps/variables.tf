@@ -235,6 +235,12 @@ variable "validator_backend_app_name" {
   type        = string
 }
 
+variable "ai_backend_full_app_name" {
+  description = "Full name of the AI backend container app (e.g. ismd-ai-dev), called internally by app name like the validator. Empty = ISMD_AI_SERVICE_URL is not set."
+  type        = string
+  default     = ""
+}
+
 # Workload Profile Configuration
 variable "workload_profile_name" {
   description = "Name of the workload profile to use for the container apps"
