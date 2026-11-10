@@ -295,6 +295,50 @@ resource "azurerm_web_application_firewall_policy" "appgw" {
         }
       }
     }
+
+    # Bot classification by Microsoft threat intelligence + verified crawler
+    # identity. Added 2026-10-07 after a ~81k-request scraper rotated through
+    # ~23k proxy IPs (max 20 req/IP/week), invisible to RateLimitPerClientIp.
+    #
+    # LOG-ONLY for now. 1.0 defaults: BadBots 100100/100200 = Block, GoodBots
+    # 200100 = Allow (skips every other rule, DRS included), all others = Log.
+    # Those three are overridden to Log so nothing changes behaviour. After a
+    # week, read ApplicationGatewayFirewallLog for Bot* matches, check monitors
+    # and real users are not in BadBots, then restore Block on 100100/100200.
+    # 200100 should stay Log: Allow would exempt crawlers from DRS.
+    #
+    # 1.0 is the newest version the applicationGatewayAvailableWafRuleSets API
+    # lists for this subscription (checked 2026-10-07).
+    managed_rule_set {
+      type    = "Microsoft_BotManagerRuleSet"
+      version = "1.0"
+
+      rule_group_override {
+        rule_group_name = "BadBots"
+
+        rule {
+          id      = "100100"
+          enabled = true
+          action  = "Log"
+        }
+
+        rule {
+          id      = "100200"
+          enabled = true
+          action  = "Log"
+        }
+      }
+
+      rule_group_override {
+        rule_group_name = "GoodBots"
+
+        rule {
+          id      = "200100"
+          enabled = true
+          action  = "Log"
+        }
+      }
+    }
   }
 
   tags = {
