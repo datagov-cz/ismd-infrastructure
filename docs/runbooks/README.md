@@ -44,3 +44,9 @@ Known correction already applied:
 | `al-dia-availability-{endpoint}-{env}` | [availability.md](availability.md) |
 | `al-dia-la-ingestion-near-cap-{env}` | [la-ingestion-near-cap.md](la-ingestion-near-cap.md) |
 | `al-dia-ghcr-pull-failure-{env}` | [ghcr-pull-failure.md](ghcr-pull-failure.md) |
+
+## Procedures
+
+Not tied to an alert.
+
+- [postgres-restore-one-database.md](postgres-restore-one-database.md): restore one database from the weekly dumps.
