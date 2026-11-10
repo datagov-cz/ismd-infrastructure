@@ -140,3 +140,22 @@ variable "paging_email_recipients" {
   type        = list(string)
   default     = []
 }
+
+# Dev on/off switch (environments/dev, driven by ismd-kv-dev/dev-enabled via terraw)
+variable "uptime_enabled" {
+  description = "Run the 5-minute uptime probe Logic App. false while the environment is switched off — it would otherwise wake the apps and record failures."
+  type        = bool
+  default     = true
+}
+
+variable "enable_notification_switch" {
+  description = "Create the alert processing rule that can suppress this environment's alert notifications (see suppress_notifications)."
+  type        = bool
+  default     = false
+}
+
+variable "suppress_notifications" {
+  description = "Suppress notifications for every alert in resource_group_name except al-dia-service-health. true while the environment is switched off. Needs enable_notification_switch."
+  type        = bool
+  default     = false
+}
