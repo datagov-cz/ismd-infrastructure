@@ -50,6 +50,25 @@ variable "alert_card_language" {
   }
 }
 
+# Postgres maintenance window → banner on alert cards fired inside it. Azure's
+# planned maintenance restarts the server; the alerts it triggers (AppGW backend
+# unhealthy, restarts, db-alive) otherwise look unexplained.
+variable "postgres_maintenance_window" {
+  description = "The env's Postgres custom maintenance window, UTC, same shape as modules/postgres. Alerts fired within postgres_maintenance_banner_minutes of its start get a maintenance banner. null = no banner."
+  type = object({
+    day_of_week  = number
+    start_hour   = number
+    start_minute = number
+  })
+  default = null
+}
+
+variable "postgres_maintenance_banner_minutes" {
+  description = "How long after the maintenance window start an alert still gets the banner. Covers the window plus the time for alerts to fire and resolve."
+  type        = number
+  default     = 120
+}
+
 # Teams notification target (Logic App posts to this channel)
 variable "teams_group_id" {
   description = "Azure AD Group ID of the Teams team that owns the alert channel. Required once Logic App connector is authorized."

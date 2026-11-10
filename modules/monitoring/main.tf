@@ -54,6 +54,10 @@ locals {
         Fired    = "🔥 Aktivní"
         Resolved = "✅ Vyřešeno"
       }
+      days               = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"]
+      maintenance_title  = "Plánovaná údržba Azure"
+      maintenance_body   = "spuštěno v okně údržby PostgreSQL (%s %02d:%02d UTC). Azure při údržbě restartuje server — pravděpodobná příčina, ne chyba aplikace."
+      maintenance_health = "Service Health →"
     }
     en = {
       header            = "🚨 DIA Alert"
@@ -77,6 +81,10 @@ locals {
         Fired    = "🔥 Firing"
         Resolved = "✅ Resolved"
       }
+      days               = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      maintenance_title  = "Azure planned maintenance"
+      maintenance_body   = "fired in the PostgreSQL maintenance window (%s %02d:%02d UTC). Azure restarts the server during maintenance — likely cause, not an application fault."
+      maintenance_health = "Service Health →"
     }
   }
 
@@ -88,11 +96,26 @@ locals {
   severity_lookup  = "@{coalesce(json('${replace(jsonencode(local.s.severity_map), "'", "''")}')?[triggerBody()?['data']?['essentials']?['severity']], triggerBody()?['data']?['essentials']?['severity'])}"
   condition_lookup = "@{coalesce(json('${replace(jsonencode(local.s.condition_map), "'", "''")}')?[triggerBody()?['data']?['essentials']?['monitorCondition']], triggerBody()?['data']?['essentials']?['monitorCondition'])}"
 
+  # Maintenance banner: shown when the alert fired within
+  # postgres_maintenance_banner_minutes of the Postgres window start. Compared as
+  # minute-of-week (Logic Apps dayOfWeek: 0 = Sunday, same as Flexible Server), mod
+  # 10080 so a window near Saturday midnight wraps into Sunday. Empty when no window.
+  pg_mw        = var.postgres_maintenance_window
+  fired_expr   = "triggerBody()?['data']?['essentials']?['firedDateTime']"
+  fired_minute = "add(mul(dayOfWeek(${local.fired_expr}), 1440), add(mul(int(formatDateTime(${local.fired_expr}, 'HH')), 60), int(formatDateTime(${local.fired_expr}, 'mm'))))"
+  maintenance_html = local.pg_mw == null ? "" : replace(join("", [
+    "<p>🛠 <b>${local.s.maintenance_title}:</b> ",
+    format(local.s.maintenance_body, local.s.days[local.pg_mw.day_of_week], local.pg_mw.start_hour, local.pg_mw.start_minute),
+    " <a href=\"https://aka.ms/servicehealthpm\">${local.s.maintenance_health}</a></p>",
+  ]), "'", "''")
+  maintenance_banner = local.pg_mw == null ? "" : "@{if(less(mod(add(sub(${local.fired_minute}, ${local.pg_mw.day_of_week * 1440 + local.pg_mw.start_hour * 60 + local.pg_mw.start_minute}), 10080), 10080), ${var.postgres_maintenance_banner_minutes}), '${local.maintenance_html}', '')}"
+
   # Full alert card content (used for top-level Fired post). Localized labels,
   # localized severity + status, status timestamp adjusted for Resolved using
   # resolvedDateTime, monitorService omitted when empty, portal deep-links.
   card_content_full = join("", [
     "<p><b>${local.s.header} — ${upper(var.environment)} — </b>${local.severity_lookup}</p>",
+    local.maintenance_banner,
     "<p><b>${local.s.rule}:</b> @{triggerBody()?['data']?['essentials']?['alertRule']}</p>",
     "<p><b>${local.s.status}:</b> ${local.condition_lookup} ${local.s.at} @{convertTimeZone(if(equals(triggerBody()?['data']?['essentials']?['monitorCondition'], 'Resolved'), coalesce(triggerBody()?['data']?['essentials']?['resolvedDateTime'], triggerBody()?['data']?['essentials']?['firedDateTime']), triggerBody()?['data']?['essentials']?['firedDateTime']), 'UTC', 'Central European Standard Time', 'yyyy-MM-dd HH:mm:ss')}</p>",
     "<p><b>${local.s.description}:</b> @{triggerBody()?['data']?['essentials']?['description']}</p>",

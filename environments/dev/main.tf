@@ -98,6 +98,12 @@ module "validator_apps" {
 # separate step — changing it here forces replacement (total data loss). Move the
 # resource with `az resource move`, re-import the addresses, then change it.
 # See docs/postgres-shared-move-plan.md.
+locals {
+  # Maintenance: Sunday 00:00 UTC (02:00 Prague) — dev is patched first. Shared
+  # with module.monitoring, which flags alerts fired inside this window.
+  postgres_maintenance_window = { day_of_week = 0, start_hour = 0, start_minute = 0 }
+}
+
 module "postgres" {
   count  = var.deploy_tool_apps ? 1 : 0
   source = "../../modules/postgres"
@@ -130,8 +136,7 @@ module "postgres" {
   app_outbound_ips  = []
   admin_allowed_ips = var.admin_allowed_ips
 
-  # Maintenance: Sunday 00:00 UTC (02:00 Prague) — dev is patched first.
-  maintenance_window = { day_of_week = 0, start_hour = 0, start_minute = 0 }
+  maintenance_window = local.postgres_maintenance_window
 
   # Server logs + Query Store to the env workspace.
   log_analytics_workspace_id = module.shared.shared_log_analytics_workspace_id
@@ -458,6 +463,9 @@ module "monitoring" {
 
   # Card localization (cs|en). Defaults to cs in the variable definition.
   alert_card_language = var.alert_card_language
+
+  # Banner on cards fired in the Postgres maintenance window (null when no server here).
+  postgres_maintenance_window = var.deploy_tool_apps ? local.postgres_maintenance_window : null
 
   # Public-endpoint availability probes (5-min cadence, 3 EMEA regions, fail 2/3 → alert).
   # Keycloak's .well-known/openid-configuration is a cheap signed-response endpoint that
