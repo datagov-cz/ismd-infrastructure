@@ -17,6 +17,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore"
+    # Major version bumps are manual; Dependabot raises only minor/patch updates.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     # One grouped PR per run instead of a separate PR per provider per directory.
     groups:
       terraform-providers:
@@ -32,6 +36,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore"
+    # Major version bumps are manual; Dependabot raises only minor/patch updates.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       github-actions:
         patterns:
