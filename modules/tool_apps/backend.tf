@@ -189,12 +189,16 @@ resource "azurerm_container_app" "backend" {
       # it false until their jar-bearing images ship.
       # Lost in the nb/recovery restore (the variable survived, these blocks did
       # not) — restored 2026-08-12 so code matches the deployed DEV backend.
-      dynamic "env" {
-        for_each = var.enable_app_insights_agent ? [1] : []
-        content {
-          name  = "JAVA_TOOL_OPTIONS"
-          value = "-javaagent:/app/applicationinsights-agent.jar"
-        }
+      # JVM heap: without a flag the JVM takes 25% of the 1Gi container (~248 MB).
+      # 50% leaves ~500 MB for metaspace, threads and the App Insights agent
+      # (non-heap measured ~230 MB on DEV, 2026-11-19). Always set; the agent
+      # flag is prepended only where enable_app_insights_agent is on.
+      env {
+        name = "JAVA_TOOL_OPTIONS"
+        value = join(" ", compact([
+          var.enable_app_insights_agent ? "-javaagent:/app/applicationinsights-agent.jar" : "",
+          "-XX:MaxRAMPercentage=50",
+        ]))
       }
       dynamic "env" {
         for_each = var.enable_app_insights_agent ? [1] : []
@@ -203,17 +207,30 @@ resource "azurerm_container_app" "backend" {
           value = "${var.backend_app_name}-${var.environment}"
         }
       }
+      # Expose /actuator/health/{liveness,readiness} explicitly rather than
+      # relying on Spring's Kubernetes auto-detection.
+      env {
+        name  = "MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED"
+        value = "true"
+      }
+      # Liveness and readiness use the probe groups, which report only the app's
+      # own state. The full /actuator/health includes the DB check — it took 37s
+      # on 2026-11-19 — and with a 1s timeout that turned a slow dependency into
+      # failed probes on a singleton backend. Startup keeps the full endpoint so
+      # a new replica waits for its dependencies before taking traffic.
       liveness_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/popisujeme/actuator/health"
+        path             = "/popisujeme/actuator/health/liveness"
         interval_seconds = var.environment == "dev" ? 30 : 10
+        timeout          = 3
       }
       readiness_probe {
         transport        = "HTTP"
         port             = 8080
-        path             = "/popisujeme/actuator/health"
+        path             = "/popisujeme/actuator/health/readiness"
         interval_seconds = 10
+        timeout          = 3
       }
       startup_probe {
         transport = "HTTP"
