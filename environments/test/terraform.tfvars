@@ -62,10 +62,9 @@ deploy_tool_apps = true
 validator_site_status = "live"
 tool_site_status      = "live"
 
-# Validator runs v1.0.3 (cherry-pick: gate only, no BFF refactor) — keep legacy
-# wiring (NEXT_PUBLIC_BE_URL + externally exposed backend with AppGW IP allowlist)
-# until a BFF-capable image is released.
-validator_use_bff = false
+# Validator frontend v1.0.4+ calls the backend through its BFF route
+# (/validujeme/api/backend/*), which needs BE_URL. Backend ingress is internal-only.
+validator_use_bff = true
 
 # Monitoring — paging_email_recipients is fed from .env.test (TF_VAR_paging_email_recipients).
 deploy_monitoring = true
